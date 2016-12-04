@@ -107,6 +107,42 @@ object MatrixUtilsTests {
     /** Run reps tests testSolve(dim,"Test_j") */
     def testSolve(dim:Int,reps:Int):Unit = for(j <- 1 to reps) testSolve(dim,"Test_"+j)
 
+
+
+    /** Test solution of underdetermind system Ax=b where A is mxn with m < n full rank m.
+      * Solution is x=x0+Fu, all u, where F has n-m orthonormal columns.
+      * This it suffices to check AF=0 and Ax0=b, see MatrixUtils::solveUnderdetermined.
+      */
+    def testSolveUnderdetermined(A:DenseMatrix[Double], b:DenseVector[Double]):Unit = {
+
+        assert(A.rows == b.length,"Dimension mismatch in Ax=b: A.rows="+A.rows+", b.length="+b.length)
+        val sol = MatrixUtils.solveUnderdetermined(A,b)
+        val x0 = sol._1
+        val F = sol._2
+        val AF = A*F
+        val errF = Math.sqrt(sum(AF:*AF))
+        val errY = norm(A*x0-b)
+
+        print("||AF||="+errF+",  ||Ax0-b||="+errY+"\n")
+    }
+
+    /** Runs the preceeding test on reps systems Ax=b with m=n/2 and A,b having random entries in (0,1)
+      * and 1.0 added to the diagonal of A to keep the condition number reasonable.
+      */
+    def testSolveUnderdetermined(n:Int,reps:Int):Unit = {
+
+        print("\n\n#---Testing solution of random underdetermined systems Ax=b:\n")
+        for(rep <- 0 until reps){
+
+            val m=n/2
+            val b = DenseVector.rand[Double](m)
+            val A = DenseMatrix.rand[Double](m,n)
+            for(i <- 0 until m) A(i,i)+=1.0
+
+            testSolveUnderdetermined(A,b)
+        }
+    }
+
     /** Run all tests in dimension dim with reps repetitions of each test.
       */
     def runAll(dim:Int,reps:Int):Unit = {
@@ -132,5 +168,8 @@ object MatrixUtilsTests {
             print("\n\n#----- Tests of solveWithPreconditioning Hx=b:\n")
             testSolve(dim,reps)
         }
+        testSolveUnderdetermined(dim,reps)
     }
 }
+
+

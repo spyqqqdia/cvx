@@ -13,8 +13,8 @@ object Runner extends App {
     /** Run the various tests and benchmarks.*/
     override def main(args: Array[String]) {
 
-        val doTestMatrixUtils = false
-        val doTestUnconstrainedMinimization = true
+        val doTestMatrixUtils = true
+        val doTestUnconstrainedMinimization = false
 
 
         if(doTestMatrixUtils){

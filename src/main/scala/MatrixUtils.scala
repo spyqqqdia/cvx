@@ -128,7 +128,7 @@ object MatrixUtils {
 
             val f_i = Math.sqrt(max(abs(Q(i,::).t)))
             if(f_i==0) throw new IllegalArgumentException("row_"+i+"(H) is zero.")
-            d(i)=1.0/f_i;
+            d(i)=1.0/f_i
             i+=1
         }
         Q = (d*d.t):*H                         // outer(d,d) eltwise-* Q
@@ -145,7 +145,7 @@ object MatrixUtils {
         (d,Q)
     }
 
-    /** Solve Hx=b, where H is positive semi-definite without zero row.
+    /** Solve Hx=b, where H is positive semi-definite without zero row using Cholesky factorization.
       *
       * First we precondition the matrix H by replacing H --> Q=DHD, where D is a suitable diagonal matrix
       * (algorithm of Ruiz), then using Cholesky factorization on the preconditioned matrix Q.
@@ -198,5 +198,36 @@ object MatrixUtils {
         val w = MatrixUtils.forwardSolve(L,d:*b)
         val u = MatrixUtils.backSolve(L.t,w)
         d:*u
+    }
+
+    /** Solves underdetermined systen Ax=b where A is an mxn matrix with m < n and full rank m,
+      * using the QR factorization of the adjoint A', see docs/nullspace.pdf
+      *
+      * The condition rank(A)=m is not checked and implies that dim(ker(A))=n-m.
+      * The solutions x are parametrized as x=x0+Fu, where F is an nx(n-m) matrix with
+      * orthonormal columns forming a basis of ker(A) (in particular then Im(F)=ker(A))
+      * and x0 is the minimum norm solution of Ax=b.
+      *
+      * Note that the matrix F then satisfies AF=0 (i.e. $Im(F)\subseteq ker(A)$), and conversely
+      * this condition combined with the fact that rank(F)=n-m=dim(ker(A)) implies that Im(F)=ker(A).
+      * If then x0 is any solution of Ax=b it follows that x=x0+Fu yields all solutions of this system.
+      *
+      * Intended application:
+      * getting rid of equality constraints Ax=b by change of variables x --> u via x = x0+Fu.
+      * This is why we assume that A has full rank as this is expected in all applications.
+      *
+      * @return ordered pair (x0,F)
+      */
+    def solveUnderdetermined(A:DenseMatrix[Double],b:DenseVector[Double]):
+    (DenseVector[Double],DenseMatrix[Double]) = {
+
+        val qrA=qr(A.t); val Q=qrA.q; val R=qrA.r  // A'=QR
+
+        val m = A.rows; val n = A.cols
+        val F = Q(::,m until n)
+        // special solution: rewrite Ax=b as R'Q'x=b, set y=Q'x, solve R'y=b for y, then set x=Qy.
+        val y = forwardSolve(R.t,b)
+        val x0 = Q(::,0 until m)*y
+        (x0,F)
     }
 }
