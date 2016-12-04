@@ -1,0 +1,17 @@
+#-----------------------------------------------------------------------
+2016-12-02:|
+-------------
+
+Status: code compiles and runs but __nothing working__,
+newton steps are not descent directions, hessians of convex test functions
+often not positive semidefinite.
+
+Improve diagnostics in
+           TestUnconstrainedMinimization::testList
+print value of known global min, value at solution.
+
+Test the backsolve routine. The forwardsolve routine is already tested.
+
+Implement
+             MathUtils.solveWithPreconditioning
+for a posiive semidefinite system.

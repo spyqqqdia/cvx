@@ -1,0 +1,14 @@
+#--------------------------------------------------------------
+2016-12-03:|
+-------------
+
+Fixed numerous bugs including errors in docs/cvx_notes, hessian of test function in example.
+Added
+    MatrixUtils.solveWithPreconditioning
+solver for positive semidefinite system Hx=b (regularized to (H+delta*I)x=b if nearly singular.
+
+Rewrote UnconstrainedSolver to use this solver for the Newton step.
+Added tests for all the linear equation solvers.
+
+Status: compiles and runs, all tests working.
+
