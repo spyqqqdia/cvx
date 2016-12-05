@@ -15,3 +15,23 @@ Test the backsolve routine. The forwardsolve routine is already tested.
 Implement
              MathUtils.solveWithPreconditioning
 for a posiive semidefinite system.
+
+
+#-----------------------------------------------------------------------
+2016-12-05:|
+-------------
+
+Add new Exception LinSolveException when solving Ax=b fails. Should contain
+message as well as the matrix A, the vector b instead of adding these as strings
+to the message.
+
+Add class Constraint (inequality constraint), has id, gradient, hessian, method to check
+if it is satisfied, strictly satisfied with margin of error etc.
+
+Introduce class MinimizationProblem:
+has objective function with gradient and hessian and constraints as well as a method
+allocating a solver.
+
+Rename the current TestFunctions to MinimizationProblems.
+
+Then do the BarrierSolver.
