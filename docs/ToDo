@@ -14,7 +14,7 @@ Test the backsolve routine. The forwardsolve routine is already tested.
 
 Implement
              MathUtils.solveWithPreconditioning
-for a posiive semidefinite system.
+for a positive semidefinite system.
 
 
 #-----------------------------------------------------------------------
