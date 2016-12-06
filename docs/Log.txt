@@ -12,3 +12,17 @@ Added tests for all the linear equation solvers.
 
 Status: compiles and runs, all tests working.
 
+
+#--------------------------------------------------------------
+2016-12-06:|
+-------------
+
+Numerous new classes (Solution, ObjectiveFunction, Solver,...) to clean up current state.
+Started with BarrierSolver.
+
+Status: unfinished.
+Code compiles, but the new versions of Type1 power test functions do not work with the UnconstrainedSolver,
+output on test. Some items in the solution object empty?
+
+The normSquared test function does work.
+

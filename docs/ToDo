@@ -35,3 +35,10 @@ allocating a solver.
 Rename the current TestFunctions to MinimizationProblems.
 
 Then do the BarrierSolver.
+
+#-----------------------------------------------------------------------
+2016-12-06:|
+-------------
+
+Find out why the Type1 power test functions produce no output in the test.
+Complete the BarrierSolver: factory functions for versions with and without equality constraints.
