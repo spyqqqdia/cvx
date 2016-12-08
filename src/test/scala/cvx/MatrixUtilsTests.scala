@@ -117,11 +117,11 @@ object MatrixUtilsTests {
 
         assert(A.rows == b.length,"Dimension mismatch in Ax=b: A.rows="+A.rows+", b.length="+b.length)
         val sol = MatrixUtils.solveUnderdetermined(A,b)
-        val x0 = sol._1
-        val F = sol._2
+        val z0 = sol.z0
+        val F = sol.F
         val AF = A*F
         val errF = Math.sqrt(sum(AF:*AF))
-        val errY = norm(A*x0-b)
+        val errY = norm(A*z0-b)
 
         print("||AF||="+errF+",  ||Ax0-b||="+errY+"\n")
     }

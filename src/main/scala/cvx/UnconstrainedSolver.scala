@@ -17,7 +17,7 @@ import breeze.linalg.{DenseMatrix, DenseVector, NotConvergedException, _}
   *
   * @param C open convex set over which the objective function is minimized
   */
-class UnconstrainedSolver(val objF:ObjectiveFunction, val C:ConvexSet)
+class UnconstrainedSolver(val objF:ObjectiveFunction, val C:ConvexSet with SamplePoint)
 extends Solver {
 
     /** @return C.samplePoint, override as needed.*/

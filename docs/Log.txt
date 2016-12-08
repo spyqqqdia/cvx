@@ -26,3 +26,15 @@ output on test. Some items in the solution object empty?
 
 The normSquared test function does work.
 
+
+#--------------------------------------------------------------
+2016-12-09_a:|
+---------------
+
+Massive rewrite. Added Traits SamplePoint (of convex set), FeasiblePoint (of constraint set),
+SolutionSpace reworked, finished BarrierSolver.
+
+Status: code compiles, completely untested, known bug of 2016-12-06 unresolved.
+Probably full of bugs.
+
+

@@ -24,9 +24,9 @@ abstract class TestFunction(override val dim:Int) extends ObjectiveFunction(dim)
     /** Unconstrained solver for minimizing the the test function over the convex set C.
       * Note: at least one global solution should be in C, so that unconstrained minimization
       * is reasonable.
-      * The idea is to mostly use $C=R^n$.
+      * The idea is to mostly use the full Euclidean space.
       */
-    def solver(C:ConvexSet):UnconstrainedSolver = new UnconstrainedSolver(this,C)
+    def solver(C:ConvexSet with SamplePoint):UnconstrainedSolver = new UnconstrainedSolver(this,C)
 }
 
 

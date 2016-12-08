@@ -15,7 +15,7 @@ object MatrixUtils {
     def checkSymmetric(Q:DenseMatrix[Double],tol:Double):Boolean = {
 
         val diff = Q-Q.t
-        Math.sqrt(sum((diff:*diff))) < tol
+        Math.sqrt(sum(diff:*diff)) < tol
     }
 
     /** Solves the equation Lx=b where L is a lower, upper or diagonal matrix
@@ -210,22 +210,21 @@ object MatrixUtils {
       * using the QR factorization of the adjoint A', see docs/nullspace.pdf
       *
       * The condition rank(A)=m is not checked and implies that dim(ker(A))=n-m.
-      * The solutions x are parametrized as x=x0+Fu, where F is an nx(n-m) matrix with
+      * The solutions x are parametrized as x=z0+Fu, where F is an nx(n-m) matrix with
       * orthonormal columns forming a basis of ker(A) (in particular then Im(F)=ker(A))
-      * and x0 is the minimum norm solution of Ax=b.
+      * and z0 is the minimum norm solution of Ax=b.
       *
       * Note that the matrix F then satisfies AF=0 (i.e. $Im(F)\subseteq ker(A)$), and conversely
       * this condition combined with the fact that rank(F)=n-m=dim(ker(A)) implies that Im(F)=ker(A).
       * If then x0 is any solution of Ax=b it follows that x=x0+Fu yields all solutions of this system.
       *
       * Intended application:
-      * getting rid of equality constraints Ax=b by change of variables x --> u via x = x0+Fu.
+      * getting rid of equality constraints Ax=b by change of variables x --> u via x = z0+Fu.
       * This is why we assume that A has full rank as this is expected in all applications.
       *
-      * @return ordered pair (x0,F)
+      * @return SolutionSpace(F,x0)
       */
-    def solveUnderdetermined(A:DenseMatrix[Double],b:DenseVector[Double]):
-    (DenseVector[Double],DenseMatrix[Double]) = {
+    def solveUnderdetermined(A:DenseMatrix[Double],b:DenseVector[Double]):SolutionSpace = {
 
         val qrA=qr(A.t); val Q=qrA.q; val R=qrA.r  // A'=QR
 
@@ -233,7 +232,7 @@ object MatrixUtils {
         val F = Q(::,m until n)
         // special solution: rewrite Ax=b as R'Q'x=b, set y=Q'x, solve R'y=b for y, then set x=Qy.
         val y = forwardSolve(R.t,b)
-        val x0 = Q(::,0 until m)*y
-        (x0,F)
+        val z0 = Q(::,0 until m)*y
+        SolutionSpace(z0,F)
     }
 }
