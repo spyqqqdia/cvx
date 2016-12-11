@@ -34,15 +34,12 @@ object ConvexSet {
             def samplePoint = x
         }
     }
-}
+    def fullSpace(dim:Int) = new ConvexSet(dim) with SamplePoint {
 
-
-/** All points x in Euclidean space of dimension dim.*/
-class FullSpace(override val dim:Int) extends ConvexSet(dim) with SamplePoint {
-
-    def isInSet(x:DenseVector[Double]):Boolean = true
-    /**Random point x with x_j = j*(10.0/dim)*u_j, where u_j is uniform in (-1,1).*/
-    def samplePoint = DenseVector.tabulate[Double](dim){j => 10*j*(2*rand()-1)/dim}
+        def isInSet(x:DenseVector[Double]):Boolean = true
+        /**Random point x with x_j = j*(10.0/dim)*u_j, where u_j is uniform in (-1,1).*/
+        def samplePoint = DenseVector.tabulate[Double](dim){j => 10*j*(2*rand()-1)/dim}
+    }
 }
 
 

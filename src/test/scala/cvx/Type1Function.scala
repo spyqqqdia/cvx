@@ -4,7 +4,7 @@ import breeze.linalg.{DenseMatrix, DenseVector, _}
 /**
   * Created by oar on 12/2/16.
   *
-  * Test function g(x) for unconstrained optimization as in example 1,
+  * Objective function g(x) for unconstrained optimization as in example 1,
   * docs/cvx_notes, section Hessian:
   *
   * $g(x)=\sum_j\alpha_j\phi_j(a_j\cdot x)$, where $a_j=row_j(A)$.
@@ -15,21 +15,21 @@ import breeze.linalg.{DenseMatrix, DenseVector, _}
   * function.
   *
   * With the matrix A we control scaling of the independent variables and with
-  * the coefficients alpha_j we scale the dependent variables.
+  * the coefficients alpha_j we scale the dependent variable.
   * With this we can examine the need for and effectiveness of preconditioners.
   *
   * @param A mxn matrix A satisfying m<=n.
   * @param alpha vector with positive entries
   */
-abstract class Type1TestFunction(val A:DenseMatrix[Double],val alpha:DenseVector[Double])
-extends TestFunction(A.cols) {
+abstract class Type1Function(val A:DenseMatrix[Double],val alpha:DenseVector[Double])
+extends ObjectiveFunction(A.cols) {
 
     val m = A.rows
     assert(m<=A.cols,"A.rows<=A.cols required, but A.rows="+A.rows+", A.cols="+A.cols)
     assert(alpha.length==m,"q=alpha.length must equal A.rows but q="+alpha.length+", A.rows="+A.rows)
-    // coefficients must be nonnegative
+    // coefficients must be positive
+    assert((0 until m).forall(j => alpha(j)>0))
 
-    def id:String
     /** Function phi_j as in docs/cvx_notes, section Hessian, example 1.*/
     def phi(j:Int,u:Double):Double
     /** Derivative of function phi_j.*/
@@ -78,17 +78,17 @@ extends TestFunction(A.cols) {
 }
 
 
-object Type1TestFunction {
+object Type1Function {
 
 
     /** $f(x)=\sum_j\alpha_j[(a_j\cdot x)^2]^q$, where $a_j=row_j(A)$.
       * Here we shoud have q>=1 for this to be twice continuously differentiable.
       *
       */
-    def powerTestFunction(A:DenseMatrix[Double], alpha:DenseVector[Double], q:Double):Type1TestFunction = {
+    def powerTestFunction(A:DenseMatrix[Double], alpha:DenseVector[Double], q:Double):Type1Function = {
 
         assert(q>=1,"q="+q+" is < 1.")
-        new Type1TestFunction(A: DenseMatrix[Double], alpha: DenseVector[Double]) {
+        new Type1Function(A: DenseMatrix[Double], alpha: DenseVector[Double]) {
 
             def id = "Type 1 power test function with q=" + MathUtils.round(q,3)
             def phi(j: Int, u: Double) = Math.pow(u * u, q)
@@ -106,7 +106,7 @@ object Type1TestFunction {
       *
       * @param dim dimension will be dim, A will be dim x dim
       */
-    def randomPowerTestFunction(dim:Integer,q:Double):Type1TestFunction = {
+    def randomPowerTestFunction(dim:Integer,q:Double):Type1Function = {
 
         assert(q>=1,"q="+q+" is < 1.")
         val B = DenseMatrix.rand[Double](dim,dim)

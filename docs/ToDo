@@ -42,3 +42,13 @@ Then do the BarrierSolver.
 
 Find out why the Type1 power test functions produce no output in the test.
 Complete the BarrierSolver: factory functions for versions with and without equality constraints.
+
+
+#-----------------------------------------------------------------------
+2016-12-11:|
+-------------
+
+Implement the affine changed power function minmization problems, factory function
+OptimizationProblems.randomPowerProblem,
+See docs/cvx_notes.pdf, p5, Example 2.1, where all $phi_j(x) = (x*x)^q$ with q>1 to ensure
+twice continuous differentiability.

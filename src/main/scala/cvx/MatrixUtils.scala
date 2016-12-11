@@ -222,9 +222,9 @@ object MatrixUtils {
       * getting rid of equality constraints Ax=b by change of variables x --> u via x = z0+Fu.
       * This is why we assume that A has full rank as this is expected in all applications.
       *
-      * @return SolutionSpace(F,x0)
+      * @return ordered pair (z0,F)
       */
-    def solveUnderdetermined(A:DenseMatrix[Double],b:DenseVector[Double]):SolutionSpace = {
+    def solveUnderdetermined(A:DenseMatrix[Double],b:DenseVector[Double]): (DenseVector[Double],DenseMatrix[Double])= {
 
         val qrA=qr(A.t); val Q=qrA.q; val R=qrA.r  // A'=QR
 
@@ -233,6 +233,10 @@ object MatrixUtils {
         // special solution: rewrite Ax=b as R'Q'x=b, set y=Q'x, solve R'y=b for y, then set x=Qy.
         val y = forwardSolve(R.t,b)
         val z0 = Q(::,0 until m)*y
-        SolutionSpace(z0,F)
+
+        // check that F has orthonormal columns (F.t*F=I)
+        val I = DenseMatrix.eye[Double](n)
+
+        (z0,F)
     }
 }

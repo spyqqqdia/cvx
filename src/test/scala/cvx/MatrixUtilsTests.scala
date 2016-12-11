@@ -117,8 +117,8 @@ object MatrixUtilsTests {
 
         assert(A.rows == b.length,"Dimension mismatch in Ax=b: A.rows="+A.rows+", b.length="+b.length)
         val sol = MatrixUtils.solveUnderdetermined(A,b)
-        val z0 = sol.z0
-        val F = sol.F
+        val z0 = sol._1
+        val F = sol._2
         val AF = A*F
         val errF = Math.sqrt(sum(AF:*AF))
         val errY = norm(A*z0-b)

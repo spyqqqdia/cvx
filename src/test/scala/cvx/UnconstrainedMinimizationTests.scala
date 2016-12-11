@@ -7,31 +7,27 @@ import breeze.linalg.{DenseMatrix, DenseVector, _}
   */
 object UnconstrainedMinimizationTests {
 
-    def testList(testFunctions:List[TestFunction],maxIter:Int):Unit = {
+    /** Solve a list of unconstrained Optimization problems with known solutions, then report
+      * if the computed solutions are correct.
+      *
+      * @param tol tolerance for distance between an actual (usually the unique) solution and the
+      * solution found by the solver, see [OptimizationSolution].
+      */
+    def testList(optProblems:List[OptimizationProblem with OptimizationSolution],tol:Double):Unit =
+        for(problem <- optProblems) try {
 
-        val alpha = 0.07         // line search descent factor
-        val beta = 0.75          // line search backtrack factor
-        val delta = 1e-14        // regularizer Hd = -y --> (H+delta*I)d = -y if needed.
-        val tol = 1e-7
+            print("\n\n#-----Problem: "+problem.id+":\n\n")
 
-        for(testFunction <- testFunctions) try {
+            val sol = problem.solve
+            val x = sol.x                       // minimizer, solution found
+            val y = problem.objF.valueAt(x)     // value at solution found
+            val y_opt = problem.minimumValue
 
-            print("\n\n#-----"+testFunction.id+":\n\n")
-            val gMin = testFunction.globalMin
-            val dim = testFunction.dim
-            val C = new FullSpace(dim)
-            val x0 = DenseVector.rand[Double](dim)
-            val solver = testFunction.solver(C)
-
-            val sol = solver.solve(maxIter,alpha,beta,tol,delta)
-            val x = sol.x                       // minimizer
-            val y = testFunction.valueAt(x)
-            val y_opt = testFunction.globalMin
             val newtonDecrement = sol.gap      // Newton decrement at solution
             val normGrad = sol.normGrad        // norm of gradient at solution
             val iter = sol.iter
             val maxedOut = sol.maxedOut
-            val isSolution = testFunction.isMinimizer(x,tol)
+            val isSolution = problem.isMinimizer(x,tol)
 
             var msg = "Iterations = "+iter+"; maxiter reached: "+maxedOut+"\n"
             msg += "Newton decrement:  "+MathUtils.round(newtonDecrement,10)+"\n"
@@ -45,19 +41,23 @@ object UnconstrainedMinimizationTests {
             case e:breeze.linalg.NotConvergedException => print(e.getMessage())
 
         }
-    }
 
-    /** Test minimizing the the function f(x)=||x||^2 followed by a list of
+
+    /** Test minimizing the the function f(x)=pow(||x||,2) followed by a list of
       * k type 1 random test functions of power type.
       *
       * @param dim dimension of domain.
       */
-    def testRandomType1Fcns(k:Int,dim:Int,maxIter:Int):Unit = {
+    def testRandomType1Fcns(k:Int,dim:Int,tol:Double):Unit = {
 
-        val fncs_pow:List[TestFunction] =
-            (1 to k).map(i => Type1TestFunction.randomPowerTestFunction(dim,1+randomDouble())).toList
+        //--- FIX ME: implement the OptimizationProblems.randomPowerProblem function.
 
-        val fncs = List(TestFunction.normSquared(dim)):::fncs_pow
-        testList(fncs,maxIter)
+        /*
+        val fncs_pow:List[OptimizationProblem with OptimizationSolution] =
+            (1 to k).map(i => OptimizationProblems.randomPowerProblem(dim,1+randomDouble())).toList
+
+        val fncs = List(OptimizationProblems.normSquared(dim)):::fncs_pow
+        testList(fncs,tol)
+        */
     }
 }

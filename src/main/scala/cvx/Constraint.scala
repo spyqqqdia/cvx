@@ -169,9 +169,10 @@ trait FeasiblePoint {
 
 /** Holder for a sequence of constraints with some additional methods.
   */
-abstract class ConstraintSet(val dim:Int, val constraints:Seq[Constraint]){
+abstract class ConstraintSet(val dim:Int, val constraints:Seq[Constraint]) {
 
-	assert(constraints.forall(cnt => cnt.dim==dim))
+	assert(constraints.forall(cnt => cnt.dim == dim))
+
 	/** A point x where all constraints in a set of constraints are defined,
 	  * i.e. the functions g_j(x) defining the constraints a g_j(x)<=ub_j are all defined.
 	  * The constraints do not have to be not satisfied at the point x.
@@ -181,18 +182,35 @@ abstract class ConstraintSet(val dim:Int, val constraints:Seq[Constraint]){
 
 	def numConstraints = constraints.size
 
-	/** @return null.*/
+	/** @return null. */
 	def samplePoint = null
-	/** Set of points where the constraints are satisfied strictly.*/
-	def strictlyFeasibleSet = new ConvexSet(dim){
 
-		def isInSet(x:DenseVector[Double]) = {
+	def isSatisfiedStrictlyBy(x:DenseVector[Double]):Boolean = constraints.forall(_.isSatisfiedStrictly(x))
 
-			assert(x.length==dim)
+	/** Set of points where the constraints are satisfied strictly. */
+	def strictlyFeasibleSet = new ConvexSet(dim) {
+
+		def isInSet(x: DenseVector[Double]) = {
+
+			assert(x.length == dim)
 			constraints.forall(cnt => cnt.isSatisfiedStrictly(x))
 		}
 	}
+    /** Turn this constraint set into a constraint set with a fesible point.*/
+	def addFeasiblePoint(x0:DenseVector[Double]): ConstraintSet with FeasiblePoint = {
+
+        // check if x0 is strictly feasible
+		assert(x0.length==dim,"Feasible point does not have the right dimension")
+		assert(constraints.forall(_.isSatisfiedStrictly(x0)))
+		new ConstraintSet(dim,constraints) with FeasiblePoint {
+
+			def pointWhereDefined = x0
+		    def feasiblePoint = x0
+		}
+	}
 }
+
+
 object ConstraintSet {
 
 	//--- Objective function and constraints for basic feasibility analysis ---//

@@ -38,3 +38,22 @@ Status: code compiles, completely untested, known bug of 2016-12-06 unresolved.
 Probably full of bugs.
 
 
+#--------------------------------------------------------------
+2016-12-10:|
+-------------
+
+Renamed TestFunction --> MinimizationProblem, some changes (e.g contains objective Function as value etc.)
+
+#--------------------------------------------------------------
+2016-12-11:|
+-------------
+
+Consolidated solver parameters (maxIter, alpha,...) into case class.
+Finished BarrierSolver, OptimizationProblem.
+
+Code compiles, equation solving tests go through.
+Minimization solvers totally untested.
+
+
+
+

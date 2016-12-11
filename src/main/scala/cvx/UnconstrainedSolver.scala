@@ -16,9 +16,11 @@ import breeze.linalg.{DenseMatrix, DenseVector, NotConvergedException, _}
   * Then C is the set of _strictly_ feasible points.
   *
   * @param C open convex set over which the objective function is minimized
+  * @param pars see [SolverParams].
   */
-class UnconstrainedSolver(val objF:ObjectiveFunction, val C:ConvexSet with SamplePoint)
-extends Solver {
+class UnconstrainedSolver(
+     val objF:ObjectiveFunction, val C:ConvexSet with SamplePoint, val pars:SolverParams
+) extends Solver {
 
     /** @return C.samplePoint, override as needed.*/
     def startingPoint: DenseVector[Double] = C.samplePoint
@@ -26,24 +28,14 @@ extends Solver {
     /** Find the location $x$ of the minimum of f=objF over C by the newton method
       * starting from the starting point x0.
       *
-      * @param maxIter : maximal number of Newton steps computed.
-      * @param alpha   : line search descent factor
-      * @param beta    : line search backtrack factor
-      * @param tol     : termination as soon as both the norm of the gradient is less than tol and
-      *                the Newton decrement satisfies $l=\lambda(x)$ satisfies $l^2/2 < tol$.
-      *                Recall that $l^2/2$ indicates the distance of f(x) from the optimal value.
-      * @param delta   : if hessF(x) is close to singular, then the regularization hessF(x)+delta*I
-      *                is used to compute the Newton step
-      *                (this can be interpreted as restricting the step to a trust region,
-      *                See docs/cvx_notes.tex, section Regularization).
-      *
-      *                Distance from singularity of the Hessian will be determined from the size of the smallest
-      *                diagonal element of the Cholesky factor hessF(x)=LL'.
-      *                If this is smaller than sqrt(delta), the regularization will be applied.
+      is smaller than sqrt(delta), the regularization will be applied.
       *
       * @return Solution object: minimizer with additional info
       */
-    def solve(maxIter:Int,alpha:Double,beta:Double,tol:Double,delta:Double):Solution = {
+    def solve():Solution = {
+
+        val maxIter = pars.maxIter; val alpha=pars.alpha; val beta=pars.beta
+        val tol=pars.tol; val delta=pars.delta
 
         val breakDown = NotConvergedException.Breakdown
         var iter = 0
@@ -83,7 +75,7 @@ extends Solver {
 
                 // cannot happen unless gradient is messed up
                 if (it == 100) throw new NotConvergedException(
-                    breakDown, "Line search: sufficient decrease not reached after 100 iterations, gradient messed up??"
+                    breakDown, "Line search: sufficient decrease not reached after 100 iterations"
                 )
 
                 // step to next iterate
@@ -95,4 +87,35 @@ extends Solver {
         }
         Solution(x,newtonDecrement,normGrad,iter,iter==maxIter)
     }
+}
+object UnconstrainedSolver {
+
+    def apply(objF:ObjectiveFunction, C:ConvexSet with SamplePoint, pars:SolverParams): UnconstrainedSolver =
+        new UnconstrainedSolver(objF,C,pars)
+
+    /** Unconstrained solver in the variable u with C being the whole space in dimension dim(u), where
+      * the solutions to the equality constraints Ax=b are parameterized as x=z0+Fu, see [EqualityConstraints].
+      * The solver reports the solution x not u.
+      *
+      * @param pars solver parameters, see [SolverParams].
+      * @return
+      */
+    def apply(objF:ObjectiveFunction, eqs:EqualityConstraints,pars:SolverParams): UnconstrainedSolver = {
+
+        val z0 = eqs.z0
+        val F = eqs.F
+        val dim_u = F.cols
+        val C = ConvexSet.fullSpace(dim_u)
+        // ovverride solve to report x instead of u
+        new UnconstrainedSolver(objF,C,pars) {
+
+            override def solve = {
+
+                val sol = super.solve
+                val u = sol.x; val x = z0+F*u
+                Solution(x, sol.gap, sol.normGrad, sol.iter, sol.maxedOut)
+            }
+        }
+    }
+
 }
