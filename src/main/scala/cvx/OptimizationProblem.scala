@@ -7,17 +7,17 @@ import breeze.linalg.{DenseVector, _}
   * Since the location of the minimum may not be unique it is formulated as a boolean check
   * (indicator function of the solution set).
   */
-trait OptimizationSolution {
+trait KnownMinimizer {
 
     /** Minimum value of the objective function: sum_j\phi_j(0).*/
     def isMinimizer(x:DenseVector[Double],tol:Double):Boolean
     /** Minimum value of the objective function: sum_j\phi_j(0).*/
     def minimumValue:Double
 }
-object OptimizationSolution {
+object KnownMinimizer {
 
     /** Uniquely determined solution at x=x0 with value objF(x0)=y0.*/
-    def apply(x0:DenseVector[Double],y0:Double) = new OptimizationSolution {
+    def apply(x0:DenseVector[Double],y0:Double) = new KnownMinimizer {
 
         def isMinimizer(x:DenseVector[Double],tol:Double) = norm(x-x0) < tol
         def minimumValue = y0
@@ -163,9 +163,9 @@ object OptimizationProblem {
     /** Add the known solution to the minimization problem.
       * For testing purposes.
       */
-    def addSolution(problem:OptimizationProblem,optSol:OptimizationSolution):
-    OptimizationProblem with OptimizationSolution  =
-        new OptimizationProblem(problem.id,problem.dim,problem.solver) with OptimizationSolution {
+    def addSolution(problem:OptimizationProblem,optSol:KnownMinimizer):
+    OptimizationProblem with KnownMinimizer  =
+        new OptimizationProblem(problem.id,problem.dim,problem.solver) with KnownMinimizer {
 
             def isMinimizer(x:DenseVector[Double],tol:Double) = optSol.isMinimizer(x,tol)
             def minimumValue = optSol.minimumValue

@@ -13,7 +13,7 @@ object UnconstrainedMinimizationTests {
       * @param tol tolerance for distance between an actual (usually the unique) solution and the
       * solution found by the solver, see [OptimizationSolution].
       */
-    def testList(optProblems:List[OptimizationProblem with OptimizationSolution],tol:Double):Unit =
+    def testList(optProblems:List[OptimizationProblem with KnownMinimizer], tol:Double):Unit =
         for(problem <- optProblems) try {
 
             print("\n\n#-----Problem: "+problem.id+":\n\n")
@@ -38,26 +38,27 @@ object UnconstrainedMinimizationTests {
             print(msg)
         } catch {
 
-            case e:breeze.linalg.NotConvergedException => print(e.getMessage())
+            case e:Exception => {
+
+                print("Exception of class "+e.getClass+"occurred")
+                print("\nMessage: "+e.getMessage)
+                print("\nStacktrace:\n")
+                e.printStackTrace()
+            }
 
         }
 
 
-    /** Test minimizing the the function f(x)=pow(||x||,2) followed by a list of
-      * k type 1 random test functions of power type.
+    /** Test the standard list, [OptimizationProblems.standardProblems] in dimension dim.
       *
-      * @param dim dimension of domain.
+      * @param dim dimension of independent variable.
+      * @param pars parameters controlling the solver behaviour (maxIter, backtracking line search
+      * parameters etc, see [SolverParams].
+      * @param tol tolerance for deviation from the known solution.
       */
-    def testRandomType1Fcns(k:Int,dim:Int,tol:Double):Unit = {
+    def testStandardProblems(dim:Int,pars:SolverParams,tol:Double):Unit = {
 
-        //--- FIX ME: implement the OptimizationProblems.randomPowerProblem function.
-
-        /*
-        val fncs_pow:List[OptimizationProblem with OptimizationSolution] =
-            (1 to k).map(i => OptimizationProblems.randomPowerProblem(dim,1+randomDouble())).toList
-
-        val fncs = List(OptimizationProblems.normSquared(dim)):::fncs_pow
-        testList(fncs,tol)
-        */
+        val problems = OptimizationProblems.standardProblems(dim,pars)
+        testList(problems,tol)
     }
 }

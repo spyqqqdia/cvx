@@ -23,4 +23,7 @@ object ObjectiveFunctions {
         def gradientAt(x:DenseVector[Double]) = x
         def hessianAt(x:DenseVector[Double]) = DenseMatrix.eye[Double](dim)
     }
+
+
+
 }

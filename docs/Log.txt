@@ -56,4 +56,22 @@ Minimization solvers totally untested.
 
 
 
+#--------------------------------------------------------------
+2016-12-16:|
+-------------
+
+Renamed:
+OptimizationSolution ---> KnownMinimizer
+Solution ---> SolverResult
+
+Finished: power function problems and standard list of OptimizationProblems
+(in OptimizationProblems).
+Some bugfixes, especially in MatrixUtils.solveWithPreconditioning, where we have to
+catch all Exceptions on the first try (could be breeze.linalg.NonConvergedException and not only
+our own LinSolveException) to get into the catch block where we do the regularization.
+
+Status: compiles, test of standard problems goes through.
+
+
+
 

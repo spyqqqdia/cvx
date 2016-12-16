@@ -187,7 +187,7 @@ object MatrixUtils {
         } catch {
 
             // try Cholesky factorization of H+delta*I
-            case e: LinSolveException => try {
+            case e: Exception => try {
 
                 val I = DenseMatrix.eye[Double](Q.rows)
                 L = cholesky(Q + I * delta)

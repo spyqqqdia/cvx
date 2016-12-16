@@ -52,3 +52,10 @@ Implement the affine changed power function minmization problems, factory functi
 OptimizationProblems.randomPowerProblem,
 See docs/cvx_notes.pdf, p5, Example 2.1, where all $phi_j(x) = (x*x)^q$ with q>1 to ensure
 twice continuous differentiability.
+
+
+#--------------------------------------------------------------
+2016-12-16:|
+-------------
+
+Implement the constrained test problems.

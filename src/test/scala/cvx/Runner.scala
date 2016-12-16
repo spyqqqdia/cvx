@@ -3,18 +3,14 @@ package cvx
 
 
 /** Main class, runs all tests from main method.
-  *
-  * In the caliper benchmarking framework the class running main must be called
-  * "Runner".
-  * We also run all other tests from this class.
   **/
 object Runner extends App {
 
     /** Run the various tests and benchmarks.*/
     override def main(args: Array[String]) {
 
-        val doTestMatrixUtils = true
-        val doTestUnconstrainedMinimization = false
+        val doTestMatrixUtils = false
+        val doTestProblems = true
 
 
         if(doTestMatrixUtils){
@@ -24,12 +20,18 @@ object Runner extends App {
             MatrixUtilsTests.runAll(dim,reps)
         }
 
-        if(doTestUnconstrainedMinimization){
+        if(doTestProblems){
 
-            val k = 3           // number of random test functions of power type
-            val dim = 100       // dimension of objective function
-            val maxIter = 100   // max number of Newton steps computed
-            UnconstrainedMinimizationTests.testRandomType1Fcns(k,dim,maxIter)
+            val dim = 100               // dimension of objective function
+            val maxIter = 200           // max number of Newton steps computed
+            val alpha = 0.1             // line search descent factor
+            val beta = 0.5              // line search backtrack factor
+            val tolSolver = 1e-12       // tolerance for norm of gradient, duality gap
+            val tolSolution = 1e-2      // tolerance for solution identification
+            val delta = 1e-8            // regularization A -> A+delta*I if ill conditioned
+            val pars = SolverParams(maxIter,alpha,beta,tolSolver,delta)
+
+            UnconstrainedMinimizationTests.testStandardProblems(dim,pars,tolSolution)
         }
 
 
