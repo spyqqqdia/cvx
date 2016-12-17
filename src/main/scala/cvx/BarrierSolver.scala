@@ -81,7 +81,7 @@ object BarrierSolver {
 
 					val d = cnt.ub - cnt.valueAt(x)
 					if (d <= 0)
-						throw new IllegalArgumentException("barrierFunction(x) undefined, not strictly feasible x = "+x)
+						throw new IllegalArgumentException("x not strictly feasible, d = "+d+", x:\n"+x)
 					sum-Math.log(d)
 				})
 			def gradientBarrierFunction(t:Double,x:DenseVector[Double]):DenseVector[Double] =
@@ -90,7 +90,7 @@ object BarrierSolver {
 					val d = cnt.ub - cnt.valueAt(x)
 					val G = cnt.gradientAt(x)
 					if (d <= 0)
-						throw new IllegalArgumentException("gradientBarrierFunction(x) undefined, not strictly feasible x = "+x)
+						throw new IllegalArgumentException("x not strictly feasible, d = "+d+", x:\n"+x)
 					sum-G/d
 				})
 			def hessianBarrierFunction(t:Double,x:DenseVector[Double]):DenseMatrix[Double] =
@@ -100,9 +100,10 @@ object BarrierSolver {
 				val G = cnt.gradientAt(x)
 				val H = cnt.hessianAt(x)
 				if (d <= 0)
-					throw new IllegalArgumentException("gradientBarrierFunction(x) undefined, not strictly feasible x = "+x)
+					throw new IllegalArgumentException("x not strictly feasible, d = "+d+", x:\n"+x)
 
-				sum+G*G.t/(d*d)-H/d
+				val GGt = G*G.t
+				sum+GGt/(d*d)+H/d
 			})
 		}
 	}
@@ -210,9 +211,8 @@ object BarrierSolver {
 	  */
 	private def phase_I_Solver(cnts:ConstraintSet,pars:SolverParams):BarrierSolver = {
 
-		val dim = cnts.dim
-		val feasObjF = ConstraintSet.phase_I_ObjectiveFunction(dim,cnts)
-		val feasCnts = ConstraintSet.phase_I_Constraints(dim,cnts)
+		val feasObjF = ConstraintSet.phase_I_ObjectiveFunction(cnts)
+		val feasCnts = ConstraintSet.phase_I_Constraints(cnts)
 
 		apply(feasObjF,feasCnts,pars)
 	}
@@ -225,12 +225,10 @@ object BarrierSolver {
 	  * @param cnts constraints to be anaylzed for feasibility
 	  * @param pars solver parameters, see [SolverParams].
 	  */
-	private def phase_I_Analysis(
-		cnts:ConstraintSet, pars:SolverParams
-	): FeasibilityReport = {
+	private def phase_I_Analysis(cnts:ConstraintSet, pars:SolverParams): FeasibilityReport = {
 
 		val feasBS = phase_I_Solver(cnts,pars)
-		val sol = feasBS.solve
+		val sol = feasBS.solve()
 
 		val dim = cnts.dim
 		val w_feas = sol.x                  // w = c(x,s)
@@ -265,7 +263,7 @@ object BarrierSolver {
 		val solverNoEqs = phase_I_Solver(cnts,pars)
 		// change variables x = z0+Fu
 		val solver = variableChangedSolver(solverNoEqs,solEqs)
-		val sol = solver.solve
+		val sol = solver.solve()
 
 		val w_feas = sol.x             // w = c(u,s), dim(u)=m, s scalar
 		val u_feas = w_feas(0 until k)
@@ -286,9 +284,8 @@ object BarrierSolver {
 	  */
 	private def phase_I_Solver_SOI(cnts:ConstraintSet,pars:SolverParams):BarrierSolver = {
 
-		val n = cnts.dim
-		val feasObjF = ConstraintSet.phase_I_SOI_ObjectiveFunction(n,cnts)
-		val feasCnts = ConstraintSet.phase_I_SOI_Constraints(n,cnts)
+		val feasObjF = ConstraintSet.phase_I_SOI_ObjectiveFunction(cnts)
+		val feasCnts = ConstraintSet.phase_I_SOI_Constraints(cnts)
 		apply(feasObjF,feasCnts,pars)
 	}
 
@@ -305,7 +302,7 @@ object BarrierSolver {
 		val p = cnts.numConstraints
 		val n = cnts.dim
 		val solver = phase_I_Solver_SOI(cnts,pars)
-		val sol = solver.solve
+		val sol = solver.solve()
 
 		val w_feas = sol.x                     // w = c(x,s),  dim(x)=n, s_j=g_j(x), j<p
 		val x_feas = w_feas(0 until n)         // unclear how many constraints that satisfies, so we check
@@ -342,7 +339,7 @@ object BarrierSolver {
 		val solverNoEqs = phase_I_Solver_SOI(cnts,pars)
 		// change variables x = z0+Fu
 		val solver = variableChangedSolver(solverNoEqs,solEqs)
-		val sol = solver.solve
+		val sol = solver.solve()
 
 		val w_feas = sol.x                 // w = c(u,s),   dim(u)=m, s_j=g_j(x), j<p
 		val u_feas = w_feas(0 until k)

@@ -73,5 +73,22 @@ our own LinSolveException) to get into the catch block where we do the regulariz
 Status: compiles, test of standard problems goes through.
 
 
+#--------------------------------------------------------------
+2016-12-17:|
+-------------
+
+Removed some bugs in constructing the phase_I versions of Constraints,
+most notably
+     Constraint::phase_I, phase_I_SOI
+the hessianAt(x) did not return hess but the subslice as result of the subslice assigment.
+Parameter signature simplified (parameter dim eliminated, is taken directly from the constraint set).
+
+New optimization problem
+                     OptimizationProblems.minX1
+with constraints implemented. Fails the test: backtracking line search runs into the boundary
+of the feasible region, then the barrier function throws an excpetion as it is evaluated at a point
+which is not strictly feasible.
+
+
 
 

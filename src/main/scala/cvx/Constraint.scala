@@ -23,70 +23,77 @@ abstract class Constraint(val id:String, val dim:Int, val ub:Double){
 	/** @return ub-g(x).*/
 	def margin(x:DenseVector[Double]):Double = ub-valueAt(x)
 
-	/** Version of this constraint for basic phase I analysis, [boyd], 11.4.1, p579.
-	  * Recall: one new variable s with upper bound zero and g_j(x)<=ub replaced with
-	  * g_j(x)-s<=ub.
-	  */
-	def phase_I:Constraint = new Constraint(id+"_phase_I",dim+1,ub){
 
-		def valueAt(u:DenseVector[Double]):Double = {
-
-			checkDim(u)
-			valueAt(u(0 until dim))-u(dim)
-		}
-		def gradientAt(u:DenseVector[Double]):DenseVector[Double] = {
-
-			checkDim(u)
-			val grad = DenseVector.zeros[Double](dim)      // dim = cnt.dim+1
-			grad(0 until (dim-1)) := gradientAt(u(0 until (dim-1)))
-			grad(dim-1)= 1.0
-			grad
-		}
-		def hessianAt(u:DenseVector[Double]):DenseMatrix[Double] = {
-
-			checkDim(u)
-			val hess = DenseMatrix.zeros[Double](dim,dim)
-			hess(0 until (dim-1), 0 until (dim-1)) := hessianAt(u(0 until (dim-1)))
-		}
-	}
-	/** Version of this constraint for sum of infeasibilities phase I analysis,
-	  * [boyd], 11.4.1, p580.
-	  * Recall: this is defined in the context of the full constraint set.
-	  * We have p new variables s_s,...,s_p and if s_j is the variable corresponding to this
-	  * constraint, then the new constraint has the form g_j(x)-s_j<=ub_j.
-	  *
-	  * @param p number of additional variables s_j (intended application: total number
-	  *          of constraints).
-	  * @param j index of additional variable s_j corresponding to this constraint
-	  *          (zero based).
-	  */
-	def phase_I_SOI(p:Int,j:Int):Constraint = new Constraint(id+"_phase_I",dim+p,ub){
-
-		// u=(x,s_1,...,s_p) is the new variable.
-
-		/** The variables of the original problem.*/
-		def x(u:DenseVector[Double]):DenseVector[Double] = u(0 until dim)
-
-		def valueAt(u:DenseVector[Double]):Double = valueAt(x(u))-u(dim+j)
-
-		def gradientAt(u:DenseVector[Double]):DenseVector[Double] = {
-
-			val grad = DenseVector.zeros[Double](dim+p)
-			grad(0 until dim) := gradientAt(x(u))
-			grad(dim+j)= 1.0
-			grad
-		}
-		def hessianAt(u:DenseVector[Double]):DenseMatrix[Double] = {
-
-			val hess = DenseMatrix.zeros[Double](dim+p,dim+p)
-			hess(0 until dim, 0 until dim) := hessianAt(x(u))
-		}
-	}
 }
 
 
 object Constraint {
-	
+
+
+    /** Version of constraint cnt for basic phase I analysis, [boyd], 11.4.1, p579.
+      * Recall: one new variable s with upper bound zero and g_j(x)<=ub replaced with
+      * g_j(x)-s<=ub.
+      */
+    def phase_I(cnt:Constraint):Constraint = new Constraint(cnt.id+"_phase_I",cnt.dim+1,cnt.ub){
+
+        // dim = cnt.dim+1
+        def valueAt(u:DenseVector[Double]):Double = {
+
+            checkDim(u)
+            cnt.valueAt(u(0 until dim-1))-u(dim-1)
+        }
+        def gradientAt(u:DenseVector[Double]):DenseVector[Double] = {
+
+            checkDim(u)
+            val grad = DenseVector.zeros[Double](dim)      // dim = cnt.dim+1
+            grad(0 until (dim-1)) := cnt.gradientAt(u(0 until (dim-1)))
+            grad(dim-1)= 1.0
+            grad
+        }
+        def hessianAt(u:DenseVector[Double]):DenseMatrix[Double] = {
+
+            checkDim(u)
+            val hess = DenseMatrix.zeros[Double](dim,dim)
+            hess(0 until (dim-1), 0 until (dim-1)) := cnt.hessianAt(u(0 until (dim-1)))
+            hess
+        }
+    }
+    /** Version of this constraint for sum of infeasibilities phase I analysis,
+      * [boyd], 11.4.1, p580.
+      * Recall: this is defined in the context of the full constraint set.
+      * We have p new variables s_s,...,s_p and if s_j is the variable corresponding to this
+      * constraint, then the new constraint has the form g_j(x)-s_j<=ub_j.
+      *
+      * @param p number of additional variables s_j (intended application: total number
+      *          of constraints).
+      * @param j index of additional variable s_j corresponding to this constraint
+      *          (zero based).
+      */
+    def phase_I_SOI(cnt:Constraint,p:Int,j:Int):Constraint = new Constraint(cnt.id+"_phase_I",cnt.dim+p,cnt.ub){
+
+        // u=(x,s_1,...,s_p) is the new variable, note dim = cnt.dim+p
+
+        /** The variables of the original problem.*/
+        def x(u:DenseVector[Double]):DenseVector[Double] = u(0 until dim-p)   // dim(x) = n = cnt.dim = dim-p
+
+        def valueAt(u:DenseVector[Double]):Double = valueAt(x(u))-u(dim-p+j)
+
+        def gradientAt(u:DenseVector[Double]):DenseVector[Double] = {
+
+            val grad = DenseVector.zeros[Double](dim)
+            grad(0 until dim-p) := gradientAt(x(u))
+            grad(dim-p+j)= 1.0
+            grad
+        }
+        def hessianAt(u:DenseVector[Double]):DenseMatrix[Double] = {
+
+            val hess = DenseMatrix.zeros[Double](dim,dim)
+            hess(0 until dim-p, 0 until dim-p) := hessianAt(x(u))
+            hess
+        }
+    }
+
+
 
     /** Turns each constraint cnt: g_j(x)<=ub_j in the list constraints into the constraint
 	 *  g_j(x,s)-s_j<=ub_j for feasibility analysis via the _sum of infeasibilities_ method of
@@ -96,26 +103,26 @@ object Constraint {
 	 * constraints in the list constraints. Thus each new constraint has dimension dim+n,
 	 * where dim is the common dimension of all the constraints in the list.
 	 *
-	 * @param cnts list of constraints all in the same dimension dim.
+	 * @param cnts list of constraints all in the same dimension n.
      *
      */
-    def phase_I_SOI_Constraints(dim:Int, cnts:Seq[Constraint]):List[Constraint] = {
+    def phase_I_SOI_Constraints(n:Int, cnts:Seq[Constraint]):List[Constraint] = {
 
-        assert(cnts.forall(_.dim==dim))
+        assert(cnts.forall(_.dim==n))
 		// modify the constraints in constraints in cnts
 		val p = cnts.size     // number of constraints
 		var j = -1
-		val cnts_SOI = cnts.map(cnt => { j+=1; cnt.phase_I_SOI(p,j) }).toList
+		val cnts_SOI = cnts.map(cnt => { j+=1; phase_I_SOI(cnt,p,j) }).toList
 
 		// list of constraints s_j>=0, i.e. -s_j<=0
-		val sPositive:List[Constraint] = (0 until p).map(j => new Constraint("s_"+j+">=0",dim+p,0.0) {
+		val sPositive:List[Constraint] = (0 until p).map(j => new Constraint("s_"+j+">=0",n+p,0.0) {
 		
-		    def valueAt(u:DenseVector[Double]):Double = -u(dim+j)
+		    def valueAt(u:DenseVector[Double]):Double = -u(dim-p+j)    // note: dim = n+p
 			  
             def gradientAt(u:DenseVector[Double]):DenseVector[Double] =
-				DenseVector.tabulate[Double](dim+p)(k => if(k==j) -1 else 0 )
+				DenseVector.tabulate[Double](dim)(k => if(k==j) -1 else 0 )
             // hessian is the zero matrix
-		    def hessianAt(u:DenseVector[Double]):DenseMatrix[Double] = DenseMatrix.zeros[Double](dim+p,dim+p)
+		    def hessianAt(u:DenseVector[Double]):DenseMatrix[Double] = DenseMatrix.zeros[Double](dim,dim)
 		}).toList
 
 		cnts_SOI:::sPositive
@@ -139,7 +146,16 @@ extends Constraint(id,dim,ub){
     def valueAt(x:DenseVector[Double]) = { checkDim(x); r + (a dot x)	}
     def gradientAt(x:DenseVector[Double]) = { checkDim(x); a }
 	def hessianAt(x:DenseVector[Double]) = { checkDim(x); DenseMatrix.zeros[Double](dim,dim) }
-} 
+}
+object LinearConstraint {
+
+	/** Constraint r + (a dot x) <= ub. */
+	def apply(id:String,dim:Int,ub:Double,r:Double,a:DenseVector[Double]) = new LinearConstraint(id,dim,ub,r,a)
+}
+
+
+
+
 /** Quadratic constraint r + a'x + (1/2)*x'Qx <= ub, where Q is a symmetric matrix.
  */
 class QuadraticConstraint(
@@ -157,6 +173,12 @@ extends Constraint(id,dim,ub){
 	def valueAt(x:DenseVector[Double]) = { checkDim(x); r + (a dot x) + (x dot (Q*x))/2 }
     def gradientAt(x:DenseVector[Double]) = { checkDim(x); a+Q*x }
 	def hessianAt(x:DenseVector[Double]) = { checkDim(x); Q }
+}
+object QuadraticConstraint {
+
+	/** Constraint r + (a dot x) + x'Qx <= ub. */
+	def apply(id:String,dim:Int,ub:Double,r:Double,a:DenseVector[Double], Q:DenseMatrix[Double]) =
+		new QuadraticConstraint(id,dim,ub,r,a,Q)
 }
 
 
@@ -213,16 +235,24 @@ abstract class ConstraintSet(val dim:Int, val constraints:Seq[Constraint]) {
 
 object ConstraintSet {
 
+	/** Factory function,
+	  *
+	  * @param dim common dimension of all constraints in the list constraints
+	  * @param constraints list of constraints
+	  * @param x0 point at which all constraints are defined.
+      * @return
+      */
+	def apply(dim:Int, constraints:Seq[Constraint],x0:DenseVector[Double]) =
+		new ConstraintSet(dim,constraints){ def pointWhereDefined = x0 }
+
 	//--- Objective function and constraints for basic feasibility analysis ---//
 
 	/** Objective function for basic feasibility analysis, see [boyd], 11.4.1, p579.
 	  * Recall: one new variable s and the function is f(x,s)=s.
-	  *
-	  * @param n common dimension of all the constraints (dimension of variable x).
       */
-	def phase_I_ObjectiveFunction(n:Int, cnts:ConstraintSet):ObjectiveFunction = {
+	def phase_I_ObjectiveFunction(cnts:ConstraintSet):ObjectiveFunction = {
 
-		assert(cnts.constraints.forall(_.dim==n))
+		val n = cnts.dim
 		new ObjectiveFunction(n+1){
 
 			def valueAt(x:DenseVector[Double]):Double = x(n)
@@ -240,17 +270,15 @@ object ConstraintSet {
 	  *
 	  * For these we can always find a point at which all these constraints are satisfied.
 	  * (member function [feasiblePoint]).
-	  *
-	  * @param n common dimension of all the constraints (dimension of variable x).
 	  */
-	def phase_I_Constraints(n:Int,cnts:ConstraintSet):ConstraintSet with FeasiblePoint = {
+	def phase_I_Constraints(cnts:ConstraintSet):ConstraintSet with FeasiblePoint = {
 
-		assert(cnts.constraints.forall(_.dim==n))
-		new ConstraintSet(1+cnts.dim,cnts.constraints.map(cnt => cnt.phase_I)) with FeasiblePoint {
+		val n = cnts.dim
+		new ConstraintSet(n+1,cnts.constraints.map(cnt => Constraint.phase_I(cnt))) with FeasiblePoint {
 
 			val x0:DenseVector[Double] = cnts.pointWhereDefined
 			val y0:Double = cnts.constraints.map(_.valueAt(x0)).max  // max_j g_j(x0)
-			def feasiblePoint = DenseVector.tabulate[Double](dim+1)(j => if (j<dim) x0(j) else 1+y0 )
+			def feasiblePoint = DenseVector.tabulate[Double](dim)(j => if (j<dim-1) x0(j) else 1+y0 )
 			def pointWhereDefined = feasiblePoint
 		}
 	}
@@ -262,13 +290,10 @@ object ConstraintSet {
 	  * [boyd], 11.4.1, p579.
 	  * Recall: one new variable s_j for each constraint g_j(x) <= ub_j and the objective
 	  * function is f(x,s) = s_1+...+s_p, where p is the number of constraints.
-	  *
-	  * @param n common dimenson of all the constraints in cnts (dimension of variable x)
 	  */
-	def phase_I_SOI_ObjectiveFunction(n:Int,cnts:ConstraintSet):ObjectiveFunction = {
+	def phase_I_SOI_ObjectiveFunction(cnts:ConstraintSet):ObjectiveFunction = {
 
-		assert(cnts.constraints.forall(_.dim==n))
-
+		val n = cnts.dim
 		val p = cnts.numConstraints
 		val dim = n + p
 
@@ -292,13 +317,10 @@ object ConstraintSet {
 	  *
 	  * For these we can always find a point at which all these constraints are satisfied.
 	  * The member function _samplePoint_ returns such a point.
-	  *
-	  * @param n common dimension of the constraints in cnts (dimension n of original variable x).
 	  */
-	def phase_I_SOI_Constraints(n:Int, cnts:ConstraintSet):ConstraintSet with FeasiblePoint =  {
+	def phase_I_SOI_Constraints(cnts:ConstraintSet):ConstraintSet with FeasiblePoint =  {
 
-		assert(cnts.constraints.forall(_.dim==n))
-
+        val n = cnts.dim
 		val p = cnts.numConstraints
 		val cnts_SOI = Constraint.phase_I_SOI_Constraints(n,cnts.constraints)
 
@@ -309,7 +331,7 @@ object ConstraintSet {
 			// new variable u = (x,s) = (x_1,...,x_n,s_1,...,s_p), where n=dim
 			// feasibility if s_j > g_j(x) where g_j(x) <= ub_j is the jth original constraint
 			def feasiblePoint =
-				DenseVector.tabulate[Double](dim+p)(j => if (j<n) x(j) else 1+cnts.constraints(j).valueAt(x))
+				DenseVector.tabulate[Double](dim)(j => if (j<n) x(j) else 1+cnts.constraints(j).valueAt(x))
 
 			def pointWhereDefined = feasiblePoint
 		}

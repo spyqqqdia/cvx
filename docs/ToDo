@@ -59,3 +59,11 @@ twice continuous differentiability.
 -------------
 
 Implement the constrained test problems.
+
+New optimization problem
+                     OptimizationProblems.minX1
+with constraints fails the test: backtracking line search runs into the boundary
+of the feasible region, then the barrier function throws an excpetion as it is evaluated at a point
+which is not strictly feasible. Fix this.
+
+Next: implement KKT system solver with block elimination in MatrixUtils.
