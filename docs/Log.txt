@@ -90,5 +90,15 @@ of the feasible region, then the barrier function throws an excpetion as it is e
 which is not strictly feasible.
 
 
+#--------------------------------------------------------------
+2016-12-18:|
+-------------
+
+Put minX1 at the head of the list of test problems.
+Minimal changes in UnconstrainedSolver::solve.
+Problem minX1 fails test as backtracking line search does not reach sufficient decrease.
+Objective function orgradient of the problem or the barrier solver must be messed up.
+
+
 
 

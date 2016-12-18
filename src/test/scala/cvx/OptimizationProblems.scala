@@ -13,6 +13,7 @@ object OptimizationProblems {
 
     /** @return list of OptimizationProblems in dimension dim with known solution as follows:
       * first the following unconstrained problems
+      *     minX1,
       *     f(x) = x dot x, followed by
       *     3 [randomPowerProblem]s with one dimensional solution space (m = dim-1)
       *
@@ -32,7 +33,7 @@ object OptimizationProblems {
             val id = "Random power problem in dimension "+dim+" with m="+dim+"-1 and exponent 2*"+q
             theList = theList :+ randomPowerProblem(id,dim,m,q,pars)
         }
-        theList :+ minX1(pars)
+        minX1(pars) :: theList
     }
 
     /** f(x) = (1/2)*(x dot x).*/

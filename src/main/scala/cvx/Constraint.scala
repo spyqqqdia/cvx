@@ -17,7 +17,7 @@ abstract class Constraint(val id:String, val dim:Int, val ub:Double){
 	def checkDim(x:DenseVector[Double]):Unit =
         assert(x.length==dim,"Dimension mismatch: x.length = "+x.length+", dim="+dim)	
 	def isSatisfied(x:DenseVector[Double]):Boolean = valueAt(x)<=ub
-	def isSatisfiedStrictly(x:DenseVector[Double]):Boolean = valueAt(x)<ub
+	def isSatisfiedStrictly(x:DenseVector[Double]):Boolean = valueAt(x)*(1+3e-16) < ub
 	/** @return |g(x)-ub|<tol. */
 	def isActive(x:DenseVector[Double], tol:Double=1e-12):Boolean = Math.abs(valueAt(x)-ub)<tol
 	/** @return ub-g(x).*/

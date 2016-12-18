@@ -62,8 +62,8 @@ Implement the constrained test problems.
 
 New optimization problem
                      OptimizationProblems.minX1
-with constraints fails the test: backtracking line search runs into the boundary
-of the feasible region, then the barrier function throws an excpetion as it is evaluated at a point
-which is not strictly feasible. Fix this.
+with constraints fails the test: backtracking line search does not reach sufficient decrease
+after 100 iterations (in UnconstrainedSolver::solve). This is only explicable if the objective function
+or the gradient are messed up.
 
 Next: implement KKT system solver with block elimination in MatrixUtils.

@@ -63,23 +63,22 @@ class UnconstrainedSolver(
             if(newtonDecrement > tol){
 
                 // backtracking line search
-                var it = 0 // safeguard against bugs in gradient
+                var it = 0 // safeguard against bugs
                 var t = 1.0
-                var dx = d
-                while (!C.isInSet(x + dx)) {
-                    t *= beta; dx *= beta; it += 1
-                }
-                while ((objF.valueAt(x + dx) > f + alpha * t * q) && (it < 100)) {
-                    t *= beta; dx *= beta; it += 1
-                }
 
+                // from x+d move back towards x into the set C
+                while (!C.isInSet(x + d*t) && (it < 100)) { t *= beta; it += 1 }
+                if (it == 100) throw new NotConvergedException(
+                    breakDown, "Line search: backtracking into the set C failed."
+                )
+                // move back further to ensure sufficient value decrease
+                while ((objF.valueAt(x + d*t) > f + alpha * t * q) && (it < 100)) { t *= beta; it += 1 }
                 // cannot happen unless gradient is messed up
                 if (it == 100) throw new NotConvergedException(
                     breakDown, "Line search: sufficient decrease not reached after 100 iterations"
                 )
-
                 // step to next iterate
-                x = x + dx
+                x = x + d*t
                 y = objF.gradientAt(x)
                 normGrad = norm(y)
             }
