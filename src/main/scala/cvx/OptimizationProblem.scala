@@ -101,12 +101,12 @@ object OptimizationProblem {
       * and starting the iteration at ineqs.feasiblePoint.
       */
     def withBarrierMethod(
-        id:String, dim:Int, objF:ObjectiveFunction, eqs:EqualityConstraints, ineqs: ConstraintSet with FeasiblePoint,
+        id:String, dim:Int, objF:ObjectiveFunction, ineqs: ConstraintSet with FeasiblePoint, eqs:EqualityConstraints,
         pars:SolverParams
     ): OptimizationProblem = {
 
         assert(dim==objF.dim && dim==ineqs.dim)
-        val solver = BarrierSolver(objF,eqs,ineqs,pars)
+        val solver = BarrierSolver(objF,ineqs,eqs,pars)
         new OptimizationProblem(id,dim,solver)
     }
 
@@ -120,17 +120,18 @@ object OptimizationProblem {
       * @param objF objective function
       * @param ineqs inequality constraints
       * @param pars solver parameters, see [SolverParams].
-      * @param doSOIAnalysis: perform a sum of infeasibilities analysis ([boyd], section 11.4.1, p580).
       * If set to false, the simple analysis will be carried out ([boyd], section 11.4.1, p579).
+      * @param printFeas print the value of the variable s in the simple feasibility analysis
+      *                  if no feasible point is found.
       * @return problem minimizing objective function under constraints applying the parameters in pars
       * and starting the iteration at ineqs.feasiblePoint.
       */
     def withBarrierMethod(
-        id:String, dim:Int, objF:ObjectiveFunction, ineqs: ConstraintSet, doSOIAnalysis:Boolean, pars:SolverParams
+        id:String, dim:Int, objF:ObjectiveFunction, ineqs: ConstraintSet, pars:SolverParams, printFeas:Boolean
     ): OptimizationProblem = {
 
         assert(dim==objF.dim && dim==ineqs.dim)
-        val solver = BarrierSolver(objF,ineqs,doSOIAnalysis,pars)
+        val solver = BarrierSolver(objF,ineqs,pars,printFeas)
         new OptimizationProblem(id,dim,solver)
     }
 
@@ -144,18 +145,19 @@ object OptimizationProblem {
       * @param objF objective function
       * @param ineqs inequality constraints
       * @param pars solver parameters, see [SolverParams].
-      * @param doSOIAnalysis: perform a sum of infeasibilities analysis ([boyd], section 11.4.1, p580).
+      * @param printFeas print the value of the variable s in the simple feasibility analysis
+      *                  if no feasible point is found.
       * If set to false, the simple analysis will be carried out ([boyd], section 11.4.1, p579).
       * @return problem minimizing objective function under constraints applying the parameters in pars
       * and starting the iteration at ineqs.feasiblePoint.
       */
     def withBarrierMethod(
-        id:String, dim:Int, objF:ObjectiveFunction, ineqs: ConstraintSet, eqs:EqualityConstraints,
-        doSOIAnalysis:Boolean, pars:SolverParams
+        id:String, dim:Int, objF:ObjectiveFunction, ineqs: ConstraintSet, eqs:EqualityConstraints, pars:SolverParams,
+        printFeas:Boolean
     ): OptimizationProblem = {
 
         assert(dim==objF.dim && dim==ineqs.dim)
-        val solver = BarrierSolver(objF,ineqs,eqs,doSOIAnalysis,pars)
+        val solver = BarrierSolver(objF,ineqs,eqs,pars,printFeas)
         new OptimizationProblem(id,dim,solver)
     }
 

@@ -111,5 +111,21 @@ With this the the test problem OptimizationProblems.minX1 is solved correctly.
 Status: all test problems implemented so far (uncontstrained + minX1) work correctly.
 
 
+#--------------------------------------------------------------
+2017-01-14A:|
+--------------
+
+Moved SOI feasibility analysis into the constraint sets.
+The BarrierSolvers now always use simple feasibility analysis.
+
+Reason: SOI feasibility analysis is not guaranteed to deliver a feasible point
+when applied trivially. More sophisticated application is needed as described
+in ConstraintSet.doSOIAnalysis.
+
+Fixed some BUGs in the feasibility solvers. These seem to be working.
+
+Status: test program go through, no known bugs.
+
+
 
 

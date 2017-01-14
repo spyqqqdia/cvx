@@ -74,3 +74,11 @@ Next: implement KKT system solver with block elimination in MatrixUtils.
 
 Implement quadratically constrained quadratic problems (faster setup), then add many test
 problems with known solutions.
+
+
+#--------------------------------------------------------------
+2017-01-14A:|
+--------------
+
+The class ConstraintSet also need a method doSOIAnalysis ehich takes a set of
+equality constraints, low priority. We need some tests for SOI feasibility analysis.

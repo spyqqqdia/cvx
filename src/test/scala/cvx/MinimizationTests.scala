@@ -49,6 +49,7 @@ object MinimizationTests {
         }
 
 
+
     /** Test the standard list, [OptimizationProblems.standardProblems] in dimension dim.
       *
       * @param dim dimension of independent variable.
@@ -65,7 +66,11 @@ object MinimizationTests {
     /** Test the single problem OptimizationProblems.minX1.*/
     def testMinX1(pars:SolverParams,tol:Double):Unit = {
 
-        val problems = List(OptimizationProblems.minX1(pars))
+
+        val problems = List(
+            OptimizationProblems.minX1_FP(pars),
+            OptimizationProblems.minX1_no_FP(pars)
+        )
         testList(problems,tol)
     }
 }

@@ -177,11 +177,12 @@ object BarrierSolver {
 	  * the equality constraints.
 	  */
 	def apply(
-        objF:ObjectiveFunction, eqs:EqualityConstraints, cnts:ConstraintSet with FeasiblePoint, pars:SolverParams
+        objF:ObjectiveFunction, ineqs:ConstraintSet with FeasiblePoint, eqs:EqualityConstraints, pars:SolverParams
     ): BarrierSolver = {
 
-		val x0 = cnts.feasiblePoint
+		val x0 = ineqs.feasiblePoint
 		assert(eqs.isSatisfiedBy(x0))
+
 
 		val sol = eqs.solutionSpace
 		val F:DenseMatrix[Double] = sol.F
@@ -193,11 +194,11 @@ object BarrierSolver {
 		assert(z0.size == dim_x, "Dimension mismatch: z0.size="+z0.size+" not equal dim(x)="+dim_x)
 		// check if all constraints have the same dimension as x
 		assert(
-			cnts.constraints.forall(cnt => cnt.dim==dim_x),
+			ineqs.constraints.forall(cnt => cnt.dim==dim_x),
 			"Dimension mismatch: not all constraints have dimension dim(x)"
 		)
 		// the solver without equality constraints
-		val bsNoEqs = apply(objF,cnts,pars)
+		val bsNoEqs = apply(objF,ineqs,pars)
 		// change variables x = z0+Fu
 		variableChangedSolver(bsNoEqs,sol)
 	}
@@ -234,10 +235,12 @@ object BarrierSolver {
 		val w_feas = sol.x                  // w = c(x,s)
 		val x_feas = w_feas(0 until dim)    // unclear how many constraints that satisfies, so we check
 		val s_feas = w_feas(dim)            // if s_feas < 0, all constraints are strictly satisfied.
+		val s = Vector[Double](1)
+		s(0)=s_feas
 		val isStrictlySatisfied = s_feas < 0
 		val violatedCnts = cnts.constraints.filter(!_.isSatisfiedStrictly(x_feas))
 
-		FeasibilityReport(x_feas,isStrictlySatisfied,violatedCnts)
+		FeasibilityReport(x_feas,s,isStrictlySatisfied,violatedCnts)
 	}
 
 
@@ -269,10 +272,12 @@ object BarrierSolver {
 		val u_feas = w_feas(0 until k)
 		val x_feas = z0+F*u_feas       // unclear how many constraints that satisfies, so we check
 		val s_feas = w_feas(k)         // if s_feas < 0, all constraints are strictly satisfied.
+		val s = Vector[Double](1)
+		s(0)=s_feas
 		val isStrictlySatisfied = s_feas < 0
 		val violatedCnts = cnts.constraints.filter(!_.isSatisfiedStrictly(x_feas))
 
-		FeasibilityReport(u_feas,isStrictlySatisfied,violatedCnts)
+		FeasibilityReport(u_feas,s,isStrictlySatisfied,violatedCnts)
 	}
 
 
@@ -297,7 +302,7 @@ object BarrierSolver {
 	  * @param cnts constraints to be anaylzed for feasibility
 	  * @param pars solver parameters, see [SolverParams].
 	  */
-	private def phase_I_Analysis_SOI(cnts:ConstraintSet, pars:SolverParams): FeasibilityReport = {
+	def phase_I_Analysis_SOI(cnts:ConstraintSet, pars:SolverParams): FeasibilityReport = {
 
 		val p = cnts.numConstraints
 		val n = cnts.dim
@@ -310,7 +315,7 @@ object BarrierSolver {
 		val isStrictlySatisfied = (0 until n).forall(j => s_feas(j) < 0)
 		val violatedCnts = cnts.constraints.filter(!_.isSatisfiedStrictly(x_feas))
 
-		FeasibilityReport(x_feas,isStrictlySatisfied,violatedCnts)
+		FeasibilityReport(x_feas,s_feas,isStrictlySatisfied,violatedCnts)
 	}
 
 
@@ -348,7 +353,7 @@ object BarrierSolver {
 		val isStrictlySatisfied = (0 until p).forall(j => s_feas(j) < 0)
 		val violatedCnts = cnts.constraints.filter(!_.isSatisfiedStrictly(x_feas))
 
-		FeasibilityReport(x_feas,isStrictlySatisfied,violatedCnts)
+		FeasibilityReport(x_feas,s_feas,isStrictlySatisfied,violatedCnts)
 	}
 
 
@@ -358,20 +363,23 @@ object BarrierSolver {
 	  * _strictly feasible point_ for the constraints cnts is known. Will then perform
 	  * a feasibility analysis.
 	  *
-	  * @param doSOIAnalysis perform a sum of infeasibilities analysis ([boyd], section 11.4.1, p580).
 	  * If set to false, the simple analysis will be carried out ([boyd], section 11.4.1, p579).
 	  * @param pars solver parameters (see [SolverParams] applied to both the feasibility and
 	  * minimization problem.
+	  * @param printFeas print the variable s of the feasibilty analysis on feasibility failure
+	  * (we need this parameter mainly to avoid signature collision with apply above)
 	  */
-	def apply(objF:ObjectiveFunction, cnts:ConstraintSet, doSOIAnalysis:Boolean, pars:SolverParams):BarrierSolver = {
+	def apply(objF:ObjectiveFunction, cnts:ConstraintSet, pars:SolverParams, printFeas:Boolean):BarrierSolver = {
 
-		val feasibilityReport: FeasibilityReport =
-			if(!doSOIAnalysis)
-				BarrierSolver.phase_I_Analysis(cnts,pars)
-			else
-				BarrierSolver.phase_I_Analysis_SOI(cnts,pars)
+		val feasibilityReport: FeasibilityReport = BarrierSolver.phase_I_Analysis(cnts,pars)
 
-		if(!feasibilityReport.isStrictlyFeasible) throw new InfeasibleProblemException(feasibilityReport)
+
+		if(!feasibilityReport.isStrictlyFeasible && printFeas){
+
+			print("\nFeasibility variable s: ")
+			print(feasibilityReport.s); print("\n")
+			throw new InfeasibleProblemException(feasibilityReport)
+		}
 
 		val x0 = feasibilityReport.x0
         // check if this is really a feasible point
@@ -385,32 +393,35 @@ object BarrierSolver {
 	/** Barrier solver for minimization under the inequality constraints in cnts and equality constraints in eqs
 	  * when no _strictly feasible point_ for the constraints cnts is known. Will then perform a feasibility analysis.
 	  *
-	  * @param doSOIAnalysis perform a sum of infeasibilities analysis ([boyd], section 11.4.1, p580).
 	  * If set to false, the simple analysis will be carried out ([boyd], section 11.4.1, p579).
+ *
 	  * @param pars solver parameters (see [SolverParams] applied to both the feasibility and
 	  * minimization problem.
+	  * @param printFeas print the variable s of the feasibilty analysis on feasibility failure
+	  * (we need this parameter mainly to avoid signature collision with apply above)
 	  */
 	def apply(
-        objF:ObjectiveFunction, cnts:ConstraintSet, eqs:EqualityConstraints, doSOIAnalysis:Boolean,
-		pars:SolverParams
+		objF:ObjectiveFunction, ineqs:ConstraintSet, eqs:EqualityConstraints, pars:SolverParams, printFeas:Boolean
     ):BarrierSolver = {
 
-		val feasibilityReport: FeasibilityReport =
-			if(!doSOIAnalysis)
-				BarrierSolver.phase_I_Analysis(cnts,eqs,pars)
-			else
-				BarrierSolver.phase_I_Analysis_SOI(cnts,eqs,pars)
+		val feasibilityReport: FeasibilityReport = BarrierSolver.phase_I_Analysis(ineqs,eqs,pars)
 
-		if(!feasibilityReport.isStrictlyFeasible) throw new InfeasibleProblemException(feasibilityReport)
+
+		if(!feasibilityReport.isStrictlyFeasible && printFeas){
+
+			print("\nFeasibility variable s:\n")
+			print(feasibilityReport.s)
+			throw new InfeasibleProblemException(feasibilityReport)
+		}
 
 		val x0 = feasibilityReport.x0
 
         // check if this is really a feasible point
-        assert(cnts.isSatisfiedStrictlyBy(x0),"Inequality constraints not strictly satisfied")
+        assert(ineqs.isSatisfiedStrictlyBy(x0),"Inequality constraints not strictly satisfied")
         assert(eqs.isSatisfiedBy(x0),"Equality constraints not strictly satisfied")
 
-		val feasCnts = cnts.addFeasiblePoint(x0)
-		apply(objF,eqs,feasCnts,pars)
+		val feasCnts = ineqs.addFeasiblePoint(x0)
+		apply(objF,feasCnts,eqs,pars)
 	}
 
 }

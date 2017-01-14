@@ -47,7 +47,7 @@ object Constraint {
             checkDim(u)
             val grad = DenseVector.zeros[Double](dim)      // dim = cnt.dim+1
             grad(0 until (dim-1)) := cnt.gradientAt(u(0 until (dim-1)))
-            grad(dim-1)= 1.0
+            grad(dim-1)= -1.0
             grad
         }
         def hessianAt(u:DenseVector[Double]):DenseMatrix[Double] = {
@@ -76,19 +76,19 @@ object Constraint {
         /** The variables of the original problem.*/
         def x(u:DenseVector[Double]):DenseVector[Double] = u(0 until dim-p)   // dim(x) = n = cnt.dim = dim-p
 
-        def valueAt(u:DenseVector[Double]):Double = valueAt(x(u))-u(dim-p+j)
+        def valueAt(u:DenseVector[Double]):Double = cnt.valueAt(x(u))-u(dim-p+j)
 
         def gradientAt(u:DenseVector[Double]):DenseVector[Double] = {
 
             val grad = DenseVector.zeros[Double](dim)
-            grad(0 until dim-p) := gradientAt(x(u))
-            grad(dim-p+j)= 1.0
+            grad(0 until dim-p) := cnt.gradientAt(x(u))
+            grad(dim-p+j)= -1.0
             grad
         }
         def hessianAt(u:DenseVector[Double]):DenseMatrix[Double] = {
 
             val hess = DenseMatrix.zeros[Double](dim,dim)
-            hess(0 until dim-p, 0 until dim-p) := hessianAt(x(u))
+            hess(0 until dim-p, 0 until dim-p) := cnt.hessianAt(x(u))
             hess
         }
     }
@@ -120,7 +120,7 @@ object Constraint {
 		    def valueAt(u:DenseVector[Double]):Double = -u(dim-p+j)    // note: dim = n+p
 			  
             def gradientAt(u:DenseVector[Double]):DenseVector[Double] =
-				DenseVector.tabulate[Double](dim)(k => if(k==j) -1 else 0 )
+				DenseVector.tabulate[Double](dim)(k => if(k==dim-p+j) -1.0 else 0.0 )
             // hessian is the zero matrix
 		    def hessianAt(u:DenseVector[Double]):DenseMatrix[Double] = DenseMatrix.zeros[Double](dim,dim)
 		}).toList
@@ -230,6 +230,27 @@ abstract class ConstraintSet(val dim:Int, val constraints:Seq[Constraint]) {
 		    def feasiblePoint = x0
 		}
 	}
+
+	/** Perform a sum of infeasibilities (SOI) feasibility analysis on this constraint set
+	  * with the feasibility solver [BarrierSolver.phase_I_Solver_SOI].
+	  *
+	  * If g_j(x) <= ub_j are the constraints in this constraint set this will
+	  * minimize the function f(x,s)=s_1+...+s_p subject to s_j>=0 and g_j(x)-s_j <= ub_j.
+	  *
+	  * This gives an indication which constraints might be feasible (s_j=0) although the
+	  * solution (x,s) of the feasibility solver is not guaranteed to yield a point x
+	  * satisfying all or even many constraints (due to the constraint s_j>=0).
+	  * However often x does solve many or even all constraints. This is simply a matter of luck.
+	  *
+	  * To get around this problem replace the upper bounds ub_j in the constraints with
+	  * ub_j-epsilon and run the SOI feasibility analysis on this new constraint set.
+	  * Then the point x in the solution (x,s) of the feasibility solver will satisfy the
+	  * original constraint g_j(x) <= ub_j strictly whenever s_j<epsilon.
+	  *
+	  * @param pars solver parameters for the feasiblity solver ([BarrierSolver.phase_I_Solver_SOI]).
+	  * @return a feasibility report containing both the vectors x and s above as well as other information.
+      */
+	def doSOIAnalysis(pars:SolverParams):FeasibilityReport = BarrierSolver.phase_I_Analysis_SOI(this,pars)
 }
 
 
@@ -331,7 +352,7 @@ object ConstraintSet {
 			// new variable u = (x,s) = (x_1,...,x_n,s_1,...,s_p), where n=dim
 			// feasibility if s_j > g_j(x) where g_j(x) <= ub_j is the jth original constraint
 			def feasiblePoint =
-				DenseVector.tabulate[Double](dim)(j => if (j<n) x(j) else 1+cnts.constraints(j).valueAt(x))
+				DenseVector.tabulate[Double](dim)(j => if (j<n) x(j) else 1+cnts.constraints(j-n).valueAt(x))
 
 			def pointWhereDefined = feasiblePoint
 		}
@@ -348,6 +369,19 @@ case class FeasibilityReport(
 
 	/** Point which satisfies many constraints.*/
 	x0:DenseVector[Double],
+	/** Vector of the additional variables s_j (subject ot g_j(x)-s_j <= ub_j)
+	  * at the optimum of the feasibility solver.
+	  *
+	  * In case of a SOI feasibility analysis the s_j are constrained to be non negative
+	  * and we can classify the constraint g_j(x) <= ub_j to be feasible if s_j is sufficiently
+	  * close to zero.
+	  *
+	  * In case of a simple feasibility analysis there is only one additional variable
+	  * which is unconstrained and the vector s has dimension one.
+	  * In this case we only get the following information: all the constraints
+	  * are strictly feasible if and only if s(0)<0.
+	  */
+	s:Vector[Double],
 	/** Flag if x0 satisfies all constraints strictly. */
 	isStrictlyFeasible:Boolean,
 	/** List of constraints which x0 does not satisfy strictly.*/
