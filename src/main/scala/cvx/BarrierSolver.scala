@@ -150,7 +150,7 @@ object BarrierSolver {
       * when no inequality constraints are present.
       * The solver will solve the system as x = z0 + Fu, and perform the minimization after a change of variables
       * x --> u.
-      * It is assumed that the strictly feasible point returned by [cnts.feasiblePoint] also satisfies
+      * It is assumed that the strictly feasible point returned by [ineqs.feasiblePoint] also satisfies
       * the equality constraints.
       */
     def apply(objF:ObjectiveFunction, eqs:EqualityConstraints, pars:SolverParams): UnconstrainedSolver = {
@@ -173,7 +173,7 @@ object BarrierSolver {
 	  * is known.
 	  * The solver will solve the system as x = z0 + Fu, and perform the minimization after a change of variables
 	  * x --> u.
-	  * It is assumed that the strictly feasible point returned by [cnts.feasiblePoint] also satisfies
+	  * It is assumed that the strictly feasible point returned by [ineqs.feasiblePoint] also satisfies
 	  * the equality constraints.
 	  */
 	def apply(
@@ -249,13 +249,13 @@ object BarrierSolver {
 	  *  With equality constraints parameterized as x=z0+Fu.
 	  *  Reports feasible candidate as u0 not as x0 = z0+Fu0.
 	  *
-	  * @param cnts inequality constraints
+	  * @param ineqs inequality constraints
 	  * @param eqs equality constraints
 	  * @param pars solver parameters, see [SolverParams].
 	  */
-	private def phase_I_Analysis(cnts:ConstraintSet, eqs:EqualityConstraints, pars:SolverParams): FeasibilityReport = {
+	private def phase_I_Analysis(ineqs:ConstraintSet, eqs:EqualityConstraints, pars:SolverParams): FeasibilityReport = {
 
-		val n = cnts.dim
+		val n = ineqs.dim
 		val solEqs = eqs.solutionSpace
 		val F:DenseMatrix[Double] = eqs.F
 		val z0 = eqs.z0
@@ -263,7 +263,7 @@ object BarrierSolver {
 
 		val k=F.cols     // dimension of variable u in x=z0+Fu
 
-		val solverNoEqs = phase_I_Solver(cnts,pars)
+		val solverNoEqs = phase_I_Solver(ineqs,pars)
 		// change variables x = z0+Fu
 		val solver = variableChangedSolver(solverNoEqs,solEqs)
 		val sol = solver.solve
@@ -275,7 +275,7 @@ object BarrierSolver {
 		val s = Vector[Double](1)
 		s(0)=s_feas
 		val isStrictlySatisfied = s_feas < 0
-		val violatedCnts = cnts.constraints.filter(!_.isSatisfiedStrictly(x_feas))
+		val violatedCnts = ineqs.constraints.filter(!_.isSatisfiedStrictly(x_feas))
 
 		FeasibilityReport(u_feas,s,isStrictlySatisfied,violatedCnts)
 	}
@@ -294,7 +294,7 @@ object BarrierSolver {
 		apply(feasObjF,feasCnts,pars)
 	}
 
-	/** Phase I feasibility analysis according to more soi (sum of infeasibilities) algorithm,
+	/** Phase I feasibility analysis according to soi (sum of infeasibilities) algorithm,
 	  *  [boyd], 11.4.1, p580 using a BarrierSolver on the feasibility problem. This approach
 	  *  generates points satisfying more constraints than the basic method, if the problem is infeasible.
 	  *  No equality constraints.
@@ -319,21 +319,21 @@ object BarrierSolver {
 	}
 
 
-	/** Phase I feasibility analysis according to more soi (sum of infeasibilities) algorithm,
+	/** Phase I feasibility analysis according to soi (sum of infeasibilities) algorithm,
 	  *  [boyd], 11.4.1, p580 using a BarrierSolver on the feasibility problem. This approach
 	  *  generates points satisfying more constraints than the basic method, if the problem is infeasible.
 	  *  With equality constraints.
 	  *
-	  * @param cnts inequality constraints to be anaylzed for feasibility
+	  * @param ineqs inequality constraints to be anaylzed for feasibility
 	  * @param eqs inequality constraints to be anaylzed for feasibility
 	  * @param pars solver parameters, see [SolverParams].
 	  */
 	private def phase_I_Analysis_SOI(
-		cnts:ConstraintSet, eqs:EqualityConstraints, pars:SolverParams
+		ineqs:ConstraintSet, eqs:EqualityConstraints, pars:SolverParams
 	): FeasibilityReport = {
 
-		val p = cnts.numConstraints
-		val n = cnts.dim
+		val p = ineqs.numConstraints
+		val n = ineqs.dim
 		val solEqs = eqs.solutionSpace
 		val F:DenseMatrix[Double] = eqs.F
 		val z0:DenseVector[Double] = eqs.z0
@@ -341,7 +341,7 @@ object BarrierSolver {
 
 		val k=F.cols     // dimension of variable u in change of variables x = z0+Fu
 
-		val solverNoEqs = phase_I_Solver_SOI(cnts,pars)
+		val solverNoEqs = phase_I_Solver_SOI(ineqs,pars)
 		// change variables x = z0+Fu
 		val solver = variableChangedSolver(solverNoEqs,solEqs)
 		val sol = solver.solve
@@ -351,7 +351,7 @@ object BarrierSolver {
 		val x_feas = z0+F*u_feas           // unclear how many constraints that satisfies, so we check
 		val s_feas = w_feas(k until k+p)   // if s_feas(j) < 0, for all j<p, then all constraints are strictly satisfied.
 		val isStrictlySatisfied = (0 until p).forall(j => s_feas(j) < 0)
-		val violatedCnts = cnts.constraints.filter(!_.isSatisfiedStrictly(x_feas))
+		val violatedCnts = ineqs.constraints.filter(!_.isSatisfiedStrictly(x_feas))
 
 		FeasibilityReport(x_feas,s_feas,isStrictlySatisfied,violatedCnts)
 	}
@@ -359,8 +359,8 @@ object BarrierSolver {
 
 	//---------- Solvers, when no feasible points are known ----------------- //
 
-	/** Barrier solver for minimization under the inequality constraints in cnts when no
-	  * _strictly feasible point_ for the constraints cnts is known. Will then perform
+	/** Barrier solver for minimization under the inequality constraints in ineqs when no
+	  * _strictly feasible point_ for the constraints ineqs is known. Will then perform
 	  * a feasibility analysis.
 	  *
 	  * If set to false, the simple analysis will be carried out ([boyd], section 11.4.1, p579).
@@ -390,8 +390,8 @@ object BarrierSolver {
 	}
 
 
-	/** Barrier solver for minimization under the inequality constraints in cnts and equality constraints in eqs
-	  * when no _strictly feasible point_ for the constraints cnts is known. Will then perform a feasibility analysis.
+	/** Barrier solver for minimization under the inequality constraints in ineqs and equality constraints in eqs
+	  * when no _strictly feasible point_ for the constraints ineqs is known. Will then perform a feasibility analysis.
 	  *
 	  * If set to false, the simple analysis will be carried out ([boyd], section 11.4.1, p579).
  *

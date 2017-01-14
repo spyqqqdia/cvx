@@ -100,8 +100,10 @@ Consequently it might better to have two versions of simple feasibility analysis
 and one without equality constraints. The feasibility solver with equality constraints
 needs separate implementation as only the variable x in the compound variable (x,s) is affected
 by the transformation x=Fu.
+Thus the matrix which transforms the barrier function has two blocks the second of which is the
+identity matrix. Needless to say this multiplication can be implemented more efficiently by operating on
+the blocks separately (and doing nothing on the block indexed by the s-variables).
 
-Pursue the simpler approach, then implement a second solution method using the KKT conditions
-with equality constraints.
+
 
 
