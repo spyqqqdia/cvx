@@ -39,6 +39,14 @@
   <component name="ProjectRootManager" version="2" languageLevel="JDK_1_8" default="false" assert-keyword="true" jdk-15="true" project-jdk-name="1.8" project-jdk-type="JavaSDK">
     <output url="file://$PROJECT_DIR$/out" />
   </component>
+  <component name="ScaladocSettings">
+    <option name="outputDir" value="$PROJECT_DIR$/docs/scaladoc" />
+    <option name="additionalFlags" value="" />
+    <option name="maxHeapSize" value="" />
+    <option name="docTitle" value="cvx documentation" />
+    <option name="verbose" value="true" />
+    <option name="openInBrowser" value="false" />
+  </component>
   <component name="masterDetails">
     <states>
       <state key="ProjectJDKs.UI">

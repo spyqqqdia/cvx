@@ -80,5 +80,28 @@ problems with known solutions.
 2017-01-14A:|
 --------------
 
-The class ConstraintSet also need a method doSOIAnalysis ehich takes a set of
+The class ConstraintSet also needs a method doSOIAnalysis which takes a set of
 equality constraints, low priority. We need some tests for SOI feasibility analysis.
+
+Simplify the various forms of the BarrierSolver.apply constructors by adding an optional feasible
+point to the ConstraintSets and a method to add a feasible point.
+The barrier solvers should now no longer assume that a feasible point is given. Instead check if
+the inequality constraint set has one and if it is in the range of the equality constraints.
+Otherwise it needs to perform a feasibility analysis to find one.
+We need to beef up the simple feasibility analysis to be able to deal with equality constraints.
+
+The simplest way may be to operate on the level of the objective function and inequality constraints
+(by restricting these to the range of the equality constraints) and not on the level of the barrier solver.
+However this is very inefficient since it implies many more matrix multiplications.
+
+The matrices are bigger (more columns) the fewer equality conditions we have -- a bad constellation.
+
+Consequently it might better to have two versions of simple feasibility analysis: one with
+and one without equality constraints. The feasibility solver with equality constraints
+needs separate implementation as only the variable x in the compound variable (x,s) is affected
+by the transformation x=Fu.
+
+Pursue the simpler approach, then implement a second solution method using the KKT conditions
+with equality constraints.
+
+
