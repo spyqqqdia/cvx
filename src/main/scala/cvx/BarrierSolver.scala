@@ -35,7 +35,7 @@ extends Solver {
 	  *
 	  * @return Solution object: minimizer with additional info.
 	  */
-	def solve():Solution = {
+	def solve:Solution = {
 	
 	    val tol=pars.tol // tolerance for duality gap
 		val mu = 10.0    // factor to increase parameter t in barrier method.
@@ -91,7 +91,7 @@ object BarrierSolver {
 					val G = cnt.gradientAt(x)
 					if (d <= 0)
 						throw new IllegalArgumentException("x not strictly feasible, d = "+d+", x:\n"+x)
-					sum-G/d
+					sum+G/d
 				})
 			def hessianBarrierFunction(t:Double,x:DenseVector[Double]):DenseMatrix[Double] =
 				cnts.constraints.foldLeft(objF.hessianAt(x)*t)((sum:DenseMatrix[Double],cnt:Constraint) => {
@@ -134,13 +134,13 @@ object BarrierSolver {
 
 			def numConstraints = bs.numConstraints
 			def barrierFunction(t:Double,u:DenseVector[Double]) = bs.barrierFunction(t,z0+F*u)
-			def gradientBarrierFunction(t:Double,u:DenseVector[Double]) = F.t*(bs.gradientBarrierFunction(t,z0+F*u))
-			def hessianBarrierFunction(t:Double,u:DenseVector[Double]) = (F.t*(bs.hessianBarrierFunction(t,z0+F*u)))*F
+			def gradientBarrierFunction(t:Double,u:DenseVector[Double]) = F.t*bs.gradientBarrierFunction(t,z0+F*u)
+			def hessianBarrierFunction(t:Double,u:DenseVector[Double]) = (F.t*bs.hessianBarrierFunction(t,z0+F*u))*F
 
 			override def solve() = {
 
 				// 'super': with new X { ... } we automatically extend X
-				val sol = super.solve()
+				val sol = super.solve
 				new Solution(z0+F*sol.x,sol.gap,sol.normGrad,sol.iter,sol.maxedOut)
 			}
 		}
@@ -228,7 +228,7 @@ object BarrierSolver {
 	private def phase_I_Analysis(cnts:ConstraintSet, pars:SolverParams): FeasibilityReport = {
 
 		val feasBS = phase_I_Solver(cnts,pars)
-		val sol = feasBS.solve()
+		val sol = feasBS.solve
 
 		val dim = cnts.dim
 		val w_feas = sol.x                  // w = c(x,s)
@@ -263,7 +263,7 @@ object BarrierSolver {
 		val solverNoEqs = phase_I_Solver(cnts,pars)
 		// change variables x = z0+Fu
 		val solver = variableChangedSolver(solverNoEqs,solEqs)
-		val sol = solver.solve()
+		val sol = solver.solve
 
 		val w_feas = sol.x             // w = c(u,s), dim(u)=m, s scalar
 		val u_feas = w_feas(0 until k)
@@ -302,7 +302,7 @@ object BarrierSolver {
 		val p = cnts.numConstraints
 		val n = cnts.dim
 		val solver = phase_I_Solver_SOI(cnts,pars)
-		val sol = solver.solve()
+		val sol = solver.solve
 
 		val w_feas = sol.x                     // w = c(x,s),  dim(x)=n, s_j=g_j(x), j<p
 		val x_feas = w_feas(0 until n)         // unclear how many constraints that satisfies, so we check
@@ -339,7 +339,7 @@ object BarrierSolver {
 		val solverNoEqs = phase_I_Solver_SOI(cnts,pars)
 		// change variables x = z0+Fu
 		val solver = variableChangedSolver(solverNoEqs,solEqs)
-		val sol = solver.solve()
+		val sol = solver.solve
 
 		val w_feas = sol.x                 // w = c(u,s),   dim(u)=m, s_j=g_j(x), j<p
 		val u_feas = w_feas(0 until k)

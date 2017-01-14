@@ -97,7 +97,18 @@ which is not strictly feasible.
 Put minX1 at the head of the list of test problems.
 Minimal changes in UnconstrainedSolver::solve.
 Problem minX1 fails test as backtracking line search does not reach sufficient decrease.
-Objective function orgradient of the problem or the barrier solver must be messed up.
+Objective function or gradient of the problem or the barrier solver must be messed up.
+
+#--------------------------------------------------------------
+2017-01-14:|
+-------------
+
+Fixed bug in the Barriersolver for minimization without equality constraints.
+(sign in the computation of the Hessian).
+The problem is localized to this one function and should fix the issue everywhere.
+
+With this the the test problem OptimizationProblems.minX1 is solved correctly.
+Status: all test problems implemented so far (uncontstrained + minX1) work correctly.
 
 
 

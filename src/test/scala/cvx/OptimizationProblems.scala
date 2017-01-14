@@ -125,8 +125,8 @@ object OptimizationProblems {
         // set of inequality constraints
 
         // constraint x1 >= exp(x0)
-        val ub = 0.0 // upper limit
-        val ct1 = new Constraint("x2>=exp(x1)",dim,0.0){
+        val ub = 0.0 // upper bound
+        val ct1 = new Constraint("x2>=exp(x1)",dim,ub){
 
             def valueAt(x:DenseVector[Double]) = Math.exp(x(0))-x(1)
             def gradientAt(x:DenseVector[Double]) = DenseVector(Math.exp(x(0)),-1.0)
@@ -144,7 +144,7 @@ object OptimizationProblems {
         val x_feas = DenseVector(0.0,1.01)
         val ineqsF = ineqs.addFeasiblePoint(x_feas)
 
-        val id = "f(x0,x1)=x0 on x1>=exp(x0), x1 <= r+k*x0, no feasible point."
+        val id = "f(x0,x1)=x0 on x1>=exp(x0), x1 <= r+k*x0, with feasible point."
         val doSOIAnalysis = false
 
         // val problem = OptimizationProblem.withBarrierMethod(id,dim,objF,ineqs,doSOIAnalysis,pars)

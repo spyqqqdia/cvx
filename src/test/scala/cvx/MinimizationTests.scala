@@ -5,7 +5,7 @@ import breeze.linalg.{DenseMatrix, DenseVector, _}
 /**
   * Created by oar on 12/2/16.
   */
-object UnconstrainedMinimizationTests {
+object MinimizationTests {
 
     /** Solve a list of unconstrained Optimization problems with known solutions, then report
       * if the computed solutions are correct.
@@ -59,6 +59,13 @@ object UnconstrainedMinimizationTests {
     def testStandardProblems(dim:Int,pars:SolverParams,tol:Double):Unit = {
 
         val problems = OptimizationProblems.standardProblems(dim,pars)
+        testList(problems,tol)
+    }
+
+    /** Test the single problem OptimizationProblems.minX1.*/
+    def testMinX1(pars:SolverParams,tol:Double):Unit = {
+
+        val problems = List(OptimizationProblems.minX1(pars))
         testList(problems,tol)
     }
 }

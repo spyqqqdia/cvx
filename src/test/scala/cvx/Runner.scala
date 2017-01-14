@@ -10,7 +10,17 @@ object Runner extends App {
     override def main(args: Array[String]) {
 
         val doTestMatrixUtils = false
-        val doTestProblems = true
+        val doTestProblems = false
+        val doMinX1 = true
+
+        // solver parameters
+        val maxIter = 200           // max number of Newton steps computed
+        val alpha = 0.05            // line search descent factor
+        val beta = 0.75             // line search backtrack factor
+        val tolSolver = 1e-12       // tolerance for norm of gradient, duality gap
+        val tolSolution = 1e-2      // tolerance for solution identification
+        val delta = 1e-8            // regularization A -> A+delta*I if ill conditioned
+        val pars = SolverParams(maxIter,alpha,beta,tolSolver,delta)
 
 
         if(doTestMatrixUtils){
@@ -23,15 +33,12 @@ object Runner extends App {
         if(doTestProblems){
 
             val dim = 100               // dimension of objective function
-            val maxIter = 200           // max number of Newton steps computed
-            val alpha = 0.05            // line search descent factor
-            val beta = 0.75             // line search backtrack factor
-            val tolSolver = 1e-12       // tolerance for norm of gradient, duality gap
-            val tolSolution = 1e-2      // tolerance for solution identification
-            val delta = 1e-8            // regularization A -> A+delta*I if ill conditioned
-            val pars = SolverParams(maxIter,alpha,beta,tolSolver,delta)
+            MinimizationTests.testStandardProblems(dim,pars,tolSolution)
+        }
 
-            UnconstrainedMinimizationTests.testStandardProblems(dim,pars,tolSolution)
+        if(doMinX1){
+
+            MinimizationTests.testMinX1(pars,tolSolution)
         }
 
 

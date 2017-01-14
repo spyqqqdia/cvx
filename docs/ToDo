@@ -67,3 +67,10 @@ after 100 iterations (in UnconstrainedSolver::solve). This is only explicable if
 or the gradient are messed up.
 
 Next: implement KKT system solver with block elimination in MatrixUtils.
+
+#--------------------------------------------------------------
+2017-01-14:|
+-------------
+
+Implement quadratically constrained quadratic problems (faster setup), then add many test
+problems with known solutions.
