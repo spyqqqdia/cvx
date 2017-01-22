@@ -9,10 +9,10 @@ object Runner extends App {
     /** Run the various tests and benchmarks.*/
     override def main(args: Array[String]) {
 
-        val doTestMatrixUtils = false
+        val doTestMatrixUtils = true
         val doTestProblems = false
         val doMinX1 = false
-        val doKktTests = true
+        val doKktTests = false
 
         // solver parameters
         val maxIter = 200           // max number of Newton steps computed

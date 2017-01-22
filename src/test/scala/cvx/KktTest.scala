@@ -29,6 +29,8 @@ object KktTest {
         val H = L*L.t
         val q = -(H*x+A.t*w)
         val b = A*x
+        val condH = MatrixUtils.conditionNumber(H)
+        println("Condition number of H: "+condH)
 
         val kktType = 0
         val (x1,w1) = KKTSystem.solveWithCholFactor(L,A,q,b)
@@ -36,11 +38,19 @@ object KktTest {
         val q1 = -(H*x1+A.t*w1)
         val b1 = A*x1
 
-        val forwardError = norm(q1-q)/norm(q) + norm(b1-b)/norm(b)
-        val backwardError = norm(x1-x)/norm(x) + norm(w1-w)/norm(w)
-        println("Forward error: "+forwardError+",\t\tbackward error: "+backwardError)
-
-        forwardError<tol && backwardError<tol
+        val forwardErrorAbs = norm(q1-q) + norm(b1-b)
+        val backwardErrorAbs = norm(x1-x) + norm(w1-w)
+        val forwardErrorRel = norm(q1-q)/norm(q) + norm(b1-b)/norm(b)
+        val backwardErrorRel = norm(x1-x)/norm(x) + norm(w1-w)/norm(w)
+        println(
+            "Forward error (absolute): "+MathUtils.round(forwardErrorAbs,2)+
+                ",\t\tforward error (relative): "+MathUtils.round(forwardErrorRel,4)
+        )
+        println(
+            "Backward error (absolute): "+MathUtils.round(backwardErrorAbs,2)+
+                ",\t\tbackward error (relative): "+MathUtils.round(backwardErrorRel,4)
+        )
+        forwardErrorRel<tol && backwardErrorRel<tol
     }
 
     /** Test the solution of random system
@@ -90,7 +100,7 @@ object KktTest {
       * where H is nxn and A is pxn.
       *
       * @param tol tolerance (L2-norm) in forward and backward error
-      * @return true if both forward and backward error (L2-norm) are less than tol, else false.
+      * @return true if both forward and backward error (relative, L2-norm) are less than tol, else false.
       */
     def testPositiveDefinite(
         H:DenseMatrix[Double], A:DenseMatrix[Double],
@@ -100,6 +110,8 @@ object KktTest {
         println("\nSolving KKT system:")
         val q = -(H*x+A.t*w)
         val b = A*x
+        val condH = MatrixUtils.conditionNumber(H)
+        println("Condition number of H: "+condH)
 
         val kktType = 0
         val (x1,w1) = KKTSystem(H,A,q,b,kktType).solve
@@ -107,11 +119,19 @@ object KktTest {
         val q1 = -(H*x1+A.t*w1)
         val b1 = A*x1
 
-        val forwardError = norm(q1-q)/norm(q) + norm(b1-b)/norm(b)
-        val backwardError = norm(x1-x)/norm(x) + norm(w1-w)/norm(w)
-        println("Forward error: "+forwardError+",\t\tbackward error: "+backwardError)
-
-        forwardError<tol && backwardError<tol
+        val forwardErrorAbs = norm(q1-q) + norm(b1-b)
+        val backwardErrorAbs = norm(x1-x) + norm(w1-w)
+        val forwardErrorRel = norm(q1-q)/norm(q) + norm(b1-b)/norm(b)
+        val backwardErrorRel = norm(x1-x)/norm(x) + norm(w1-w)/norm(w)
+        println(
+            "Forward error (absolute): "+MathUtils.round(forwardErrorAbs,2)+
+            ",\t\tforward error (relative): "+MathUtils.round(forwardErrorRel,4)
+        )
+        println(
+            "Backward error (absolute): "+MathUtils.round(backwardErrorAbs,2)+
+            ",\t\tbackward error (relative): "+MathUtils.round(backwardErrorRel,4)
+        )
+        forwardErrorRel<tol && backwardErrorRel<tol
     }
 
     /** Test the solution of random system

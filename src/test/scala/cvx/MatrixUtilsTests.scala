@@ -19,6 +19,8 @@ object MatrixUtilsTests {
         val K = lowerTriangular(L)     // make sure its lower triangular
         val H = K*K.t
         val B = H*X
+        val condH = MatrixUtils.conditionNumber(H)
+        println("Condition number of H: "+condH)
 
         // solving HX=LL'X=B as L'X=Y, LY=B
         val Y = MatrixUtils.triangularSolve(L,"L",B)
@@ -26,12 +28,20 @@ object MatrixUtilsTests {
 
         val B1 = H*X1
         val diffB = B-B1
-        val forwardError = MatrixUtils.normHS(diffB)/MatrixUtils.normHS(B)
+        val forwardErrorAbs = MatrixUtils.normHS(diffB)
+        val forwardErrorRel = forwardErrorAbs/MatrixUtils.normHS(B)
         val diffX = X-X1
-        val backwardError = MatrixUtils.normHS(diffX)/MatrixUtils.normHS(X)
-        println("Forward error: "+forwardError+",\t\tbackward error: "+backwardError)
-
-        forwardError<tol && backwardError<tol
+        val backwardErrorAbs = MatrixUtils.normHS(diffX)
+        val backwardErrorRel = backwardErrorAbs/MatrixUtils.normHS(X)
+        println(
+            "Forward error (absolute): "+MathUtils.round(forwardErrorAbs,10)+
+                ",\t\tforward error (relative): "+MathUtils.round(forwardErrorRel,10)
+        )
+        println(
+            "Backward error (absolute): "+MathUtils.round(backwardErrorAbs,10)+
+                ",\t\tbackward error (relative): "+MathUtils.round(backwardErrorRel,10)
+        )
+        forwardErrorRel<tol && backwardErrorRel<tol
     }
 
     /** Testing the solution of a system HX=B using lapack through MatrixUtils.triangularSolve.

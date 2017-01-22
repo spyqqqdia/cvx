@@ -140,7 +140,19 @@ primal-dual method since we will then not get the residuals convergent to zero. 
 use the size of the residuals as a termination criterion.
 
 The errors are too small to indicate a programming bug.
-Apparently the test matrices are ill conditioned.
+Apparently the test matrices are ill conditioned, the construction H=LL' ensures that the
+condition number of H is much worse than that of L.
+
+--------------------------------------------------------------
+2017-01-23:|
+-------------
+
+Added file docs/KKT.pdf
+
+Added computation of the condition number of H to the KKT tests (via SVD).
+These are not that large (about 1600). In light of these condition numbers the solutions are
+remarkably inaccurate.
+Maybe we need to compute the condition numbers of the whole KKT matrix.
 
 
 

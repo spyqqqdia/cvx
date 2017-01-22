@@ -105,5 +105,21 @@ identity matrix. Needless to say this multiplication can be implemented more eff
 the blocks separately (and doing nothing on the block indexed by the s-variables).
 
 
+#--------------------------------------------------------------
+2017-01-23:|
+--------------
+
+Find out what the problem is with the accuracy of the solutions of the KKT system.
+There is no problem with MatrixUtils.triangularSolve, the errors in the test cases
+with the identical matrices H=LL' are zero.
+
+Even though identical matrices L and  H=LL' are used in the test for MatrixUtils.triangularSolve
+and the KKTSystem solution, the condition numbers are worse in the KKT case (1600 versus 500).
+The equilibration of H in the KKTSystem solver seems to increase the condition number.
+But it is still too small to cause such inaccuracy.
+Thus there must be some other problem with the KKT code.
+
+
+
 
 

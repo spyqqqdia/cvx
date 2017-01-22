@@ -21,6 +21,18 @@ object MatrixUtils {
         Math.sqrt(sum(diff:*diff)) < tol
     }
 
+    /** The condition number: quotient of largest singular value divided by smallest one
+      * computed using the SVD factorization of H.
+      * Needless to say the accuracy of this computation is also negatively influenced by
+      * ill conditioning.
+      */
+    def conditionNumber(H:DenseMatrix[Double]):Double = {
+
+        val svdH = svd(H)
+        val sigma = svdH.singularValues
+        max(sigma)/min(sigma)
+    }
+
     /** Solves the equation Ax=b where A is a lower, upper or diagonal matrix
       * by calling lapack.DTRTRS.
       *
