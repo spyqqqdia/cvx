@@ -11,6 +11,9 @@ import com.github.fommil.netlib.LAPACK.{getInstance => lapack}
   */
 object MatrixUtils {
 
+    /** HS-norm sqrt(sum(A_ij*A_ij)).*/
+    def normHS(A:DenseMatrix[Double]) = Math.sqrt(sum(A:*A))
+
     /** @return norm(Q-Q-t) < tol.*/
     def checkSymmetric(Q:DenseMatrix[Double],tol:Double):Boolean = {
 
@@ -18,7 +21,7 @@ object MatrixUtils {
         Math.sqrt(sum(diff:*diff)) < tol
     }
 
-    /** Solves the equation Lx=b where L is a lower, upper or diagonal matrix
+    /** Solves the equation Ax=b where A is a lower, upper or diagonal matrix
       * by calling lapack.DTRTRS.
       *
       * Triangular solve in lapack is the routine DTRTRS, error bounds are
@@ -39,24 +42,24 @@ object MatrixUtils {
       *     org.netlib.util.intW     // number coded info, breeze: new intW(0)
       * );
       *
-      * @param L  lower triangular matrix
+      * @param A  triangular matrix
       * @param Ltype  "L", "U", "D" (lower, upper triangular, diagonal)
       * @param B  right hand side of equation
       * @return
       */
-    def triangularSolve(L:DenseMatrix[Double],Ltype:String, B:DenseMatrix[Double]): DenseMatrix[Double] = {
+    def triangularSolve(A:DenseMatrix[Double],Ltype:String, B:DenseMatrix[Double]): DenseMatrix[Double] = {
 
-        val Lc = lowerTriangular(L)       // copy the lower triangular part
+        assert(Ltype=="L" || Ltype=="U","Ltype must be L or U but is "+Ltype)
+        // copy the triangular part:
+        val Q = if(Ltype=="L") lowerTriangular(A) else upperTriangular(A)
         val Y = B.copy                    // result will be written to Y
 
-        val n = Lc.rows
+        val n = Q.rows
         val info = new intW(0)
 
         // solve Lc*X=Y  with result X written to Y
         if(Ltype=="L" || Ltype=="U")
-            lapack.dtrtrs(Ltype,"N","N",n,B.cols,Lc.data,n,Y.data,n,info)
-        else
-            lapack.dtrtrs("L","N","U",n,B.cols,Lc.data,n,Y.data,n,info)
+            lapack.dtrtrs(Ltype,"N","N",n,B.cols,Q.data,n,Y.data,n,info)
         Y
     }
     /** Solves Lx=b. where L is viewed as a lower triangular matrix. Only the part
@@ -239,4 +242,5 @@ object MatrixUtils {
 
         (z0,F)
     }
+
 }

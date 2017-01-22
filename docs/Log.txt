@@ -127,5 +127,21 @@ Fixed some BUGs in the feasibility solvers. These seem to be working.
 Status: test program go through, no known bugs.
 
 
+--------------------------------------------------------------
+2017-01-22:|
+-------------
+
+Fixed BUG in MatrixUtils.triangularSolve, added test for same in MatrixUtilsTests.
+New class KKTSystem.
+Solution relies on MatrixUtils.triangularSolve, forward errors a little large in the (random)
+test problems, particularly absolute errors.
+This could be a problem when this is extended to the system for the infeasible start
+primal-dual method since we will then not get the residuals convergent to zero. So we cannot
+use the size of the residuals as a termination criterion.
+
+The errors are too small to indicate a programming bug.
+Apparently the test matrices are ill conditioned.
+
+
 
 

@@ -8,6 +8,63 @@ import breeze.linalg.{DenseMatrix, DenseVector, _}
   */
 object MatrixUtilsTests {
 
+
+    /** Testing the solution of a system HX=B using lapack through MatrixUtils.triangularSolve.
+      * Here we do H of the form H=LL' with given lower triangular L
+      *
+      * @return true if both forward and backward error are less than tol.
+      */
+    def testTriangularSolve(L:DenseMatrix[Double], X:DenseMatrix[Double], tol:Double):Boolean = {
+
+        val K = lowerTriangular(L)     // make sure its lower triangular
+        val H = K*K.t
+        val B = H*X
+
+        // solving HX=LL'X=B as L'X=Y, LY=B
+        val Y = MatrixUtils.triangularSolve(L,"L",B)
+        val X1 = MatrixUtils.triangularSolve(L.t,"U",Y)
+
+        val B1 = H*X1
+        val diffB = B-B1
+        val forwardError = MatrixUtils.normHS(diffB)/MatrixUtils.normHS(B)
+        val diffX = X-X1
+        val backwardError = MatrixUtils.normHS(diffX)/MatrixUtils.normHS(X)
+        println("Forward error: "+forwardError+",\t\tbackward error: "+backwardError)
+
+        forwardError<tol && backwardError<tol
+    }
+
+    /** Testing the solution of a system HX=B using lapack through MatrixUtils.triangularSolve.
+      * Here we do H of the form H=LL' with random nxn lower triangular L and random nxp matrix X.
+      *
+      * @return true if both forward and backward error are less than tol.
+      */
+    def testTriangularSolve(n:Int,p:Int,tol:Double):Boolean = {
+
+        // uniform in (-1,1)
+        val Q:DenseMatrix[Double] = DenseMatrix.tabulate(n,n)((i,j) => -5+10*Math.random())
+        val L = lowerTriangular(Q)
+        (0 until n).map(i => L(i,i) = L(i,i)+20.0)    // improve conditioning
+
+        val X:DenseMatrix[Double] = DenseMatrix.rand(n,p)
+        testTriangularSolve(L,X,tol)
+    }
+
+
+    /** Testing the solution of m systems HX=B using lapack through MatrixUtils.triangularSolve.
+      * Here we do H of the form H=LL' with random nxn lower triangular L and random nxp matrix X.
+      *
+      * @return true if all forward and backward errors are less than tol.
+      */
+    def testTriangularSolve(n:Int,p:Int,reps:Int,tol:Double):Boolean = {
+
+        println("\n#---Testing triangularSolve on systems HX=B:")
+        val results = (0 until reps).map(i => testTriangularSolve(n,p,tol))
+        results.forall(p => p)
+    }
+
+
+
     /** Testing MatrixUtils::backSolve on a system Ux=b with U being the upper triangular part of W+delta*I,
       * where W is a dim x dim matrix with random entries in (0,1).
       *
@@ -145,7 +202,7 @@ object MatrixUtilsTests {
 
     /** Run all tests in dimension dim with reps repetitions of each test.
       */
-    def runAll(dim:Int,reps:Int):Unit = {
+    def runAll(dim:Int,reps:Int,tol:Double):Unit = {
 
         print("\n\n Solving Ix=-b:\n")
         val I = DenseMatrix.eye[Double](dim)
@@ -169,6 +226,7 @@ object MatrixUtilsTests {
             testSolve(dim,reps)
         }
         testSolveUnderdetermined(dim,reps)
+        testTriangularSolve(dim,10,reps,tol)
     }
 }
 

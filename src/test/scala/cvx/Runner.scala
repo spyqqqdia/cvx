@@ -11,7 +11,8 @@ object Runner extends App {
 
         val doTestMatrixUtils = false
         val doTestProblems = false
-        val doMinX1 = true
+        val doMinX1 = false
+        val doKktTests = true
 
         // solver parameters
         val maxIter = 200           // max number of Newton steps computed
@@ -25,9 +26,16 @@ object Runner extends App {
 
         if(doTestMatrixUtils){
 
-            val dim = 3
+            val dim = 100
             val reps= 10
-            MatrixUtilsTests.runAll(dim,reps)
+            val tol = 1e-10
+            MatrixUtilsTests.runAll(dim,reps,tol)
+        }
+
+        if(doKktTests){
+
+            //KktTest.testSolutionWithCholFactor(5,100,10,1e-10)
+            KktTest.testPositiveDefinite(5,1000,100,1e-10)
         }
 
         if(doTestProblems){
