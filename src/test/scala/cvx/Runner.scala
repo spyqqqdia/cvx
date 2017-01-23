@@ -9,10 +9,10 @@ object Runner extends App {
     /** Run the various tests and benchmarks.*/
     override def main(args: Array[String]) {
 
-        val doTestMatrixUtils = true
+        val doTestMatrixUtils = false
         val doTestProblems = false
         val doMinX1 = false
-        val doKktTests = false
+        val doKktTests = true
 
         // solver parameters
         val maxIter = 200           // max number of Newton steps computed
@@ -34,8 +34,9 @@ object Runner extends App {
 
         if(doKktTests){
 
-            //KktTest.testSolutionWithCholFactor(5,100,10,1e-10)
-            KktTest.testPositiveDefinite(5,1000,100,1e-10)
+            val debug = true
+            //KktTest.testSolutionWithCholFactor(5,1000,100,1e-10,debug)
+            KktTest.testPositiveDefinite(5,1000,100,1e-10,debug)
         }
 
         if(doTestProblems){

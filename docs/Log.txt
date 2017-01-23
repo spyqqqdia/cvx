@@ -154,6 +154,24 @@ These are not that large (about 1600). In light of these condition numbers the s
 remarkably inaccurate.
 Maybe we need to compute the condition numbers of the whole KKT matrix.
 
+--------------------------------------------------------------
+2017-01-23A:|
+--------------
+
+Eliminated minor bugs in KktTest setup.
+Added parameter debug to KKTSystem solveType0 to print the condition number
+of the matrix H after equilibration.
+
+
+Experiments:
+KKTSystem.solveWithCholFactor: works
+KKTSystem.blockSolve: works with condition numbers of 2e6, no problems.
+KKTSystem.solvePD:
+does not work, the difference to blockSolve is only the Ruiz equilibration.
+In the test examples equilibration reduces the condition number by half.
+Thus there must be a bug in the transformation toi the equilibrated system.
+
+
 
 
 

@@ -22,18 +22,16 @@ object KktTest {
       */
     def testSolutionWithCholFactor(
         L:DenseMatrix[Double], A:DenseMatrix[Double],
-        x:DenseVector[Double], w:DenseVector[Double], tol:Double
+        x:DenseVector[Double], w:DenseVector[Double], tol:Double, debug:Boolean
     ):Boolean = {
 
-        println("\nSolving KKT system:")
         val H = L*L.t
         val q = -(H*x+A.t*w)
         val b = A*x
         val condH = MatrixUtils.conditionNumber(H)
-        println("Condition number of H: "+condH)
+        println("Condition number of H: "+MathUtils.round(condH,1))
 
-        val kktType = 0
-        val (x1,w1) = KKTSystem.solveWithCholFactor(L,A,q,b)
+        val (x1,w1) = KKTSystem.solveWithCholFactor(L,A,q,b,debug)
 
         val q1 = -(H*x1+A.t*w1)
         val b1 = A*x1
@@ -43,12 +41,12 @@ object KktTest {
         val forwardErrorRel = norm(q1-q)/norm(q) + norm(b1-b)/norm(b)
         val backwardErrorRel = norm(x1-x)/norm(x) + norm(w1-w)/norm(w)
         println(
-            "Forward error (absolute): "+MathUtils.round(forwardErrorAbs,2)+
-                ",\t\tforward error (relative): "+MathUtils.round(forwardErrorRel,4)
+            "Forward error (absolute): "+MathUtils.round(forwardErrorAbs,10)+
+                ",\t\tforward error (relative): "+MathUtils.round(forwardErrorRel,10)
         )
         println(
-            "Backward error (absolute): "+MathUtils.round(backwardErrorAbs,2)+
-                ",\t\tbackward error (relative): "+MathUtils.round(backwardErrorRel,4)
+            "Backward error (absolute): "+MathUtils.round(backwardErrorAbs,10)+
+                ",\t\tbackward error (relative): "+MathUtils.round(backwardErrorRel,10)
         )
         forwardErrorRel<tol && backwardErrorRel<tol
     }
@@ -61,13 +59,13 @@ object KktTest {
       * @param tol tolerance (L2-norm) in forward and backward error
       * @return true if both forward and backward error (L2-norm) are less than tol, else false.
       */
-    def testSolutionWithCholFactor(n:Int,p:Int,tol:Double):Boolean = {
+    def testSolutionWithCholFactor(n:Int,p:Int,tol:Double,debug:Boolean):Boolean = {
 
-        println("\nSolving random KKT system:")
+        println("\n\nSolving random KKT system in dimensions n="+n+", p="+p)
         // uniform in (-1,1)
         val Q:DenseMatrix[Double] = DenseMatrix.tabulate(n,n)((i,j) => -5+10*Math.random())
         val L = lowerTriangular(Q)
-        (0 until n).map(i => L(i,i) = L(i,i)+20.0)    // improve conditioning
+        (0 until n).map(i => L(i,i) = L(i,i)+Math.sqrt(n))    // improve conditioning
 
         val A:DenseMatrix[Double] = DenseMatrix.rand(p,n)
         (0 until p).map(i => A(i,i) = A(i,i)+1.0)
@@ -75,7 +73,7 @@ object KktTest {
         val x = DenseVector.tabulate(n)(i => -1+2*Math.random())     // uniform in (-1,1)
         val w = DenseVector.tabulate(p)(i => -2+4*Math.random())     // uniform in (-2,2)
 
-        testSolutionWithCholFactor(L,A,x,w,tol)
+        testSolutionWithCholFactor(L,A,x,w,tol,debug)
     }
 
 
@@ -84,9 +82,9 @@ object KktTest {
       *      Ax = b
       * where H is nxn and A is pxn where the Cholesky factor H=LL' is given.
       */
-    def testSolutionWithCholFactor(m:Int,n:Int,p:Int,tol:Double):Boolean = {
+    def testSolutionWithCholFactor(m:Int,n:Int,p:Int,tol:Double,debug:Boolean):Boolean = {
 
-        val results = (0 until m).map(i => testSolutionWithCholFactor(n,p,tol))
+        val results = (0 until m).map(i => testSolutionWithCholFactor(n,p,tol,debug))
         results.forall(p => p)
     }
 
@@ -104,17 +102,17 @@ object KktTest {
       */
     def testPositiveDefinite(
         H:DenseMatrix[Double], A:DenseMatrix[Double],
-        x:DenseVector[Double], w:DenseVector[Double], tol:Double
+        x:DenseVector[Double], w:DenseVector[Double],
+        tol:Double, debug:Boolean
     ):Boolean = {
 
-        println("\nSolving KKT system:")
         val q = -(H*x+A.t*w)
         val b = A*x
         val condH = MatrixUtils.conditionNumber(H)
-        println("Condition number of H: "+condH)
+        println("Condition number of H: "+MathUtils.round(condH,1))
 
         val kktType = 0
-        val (x1,w1) = KKTSystem(H,A,q,b,kktType).solve
+        val (x1,w1) = KKTSystem(H,A,q,b,kktType).solve(debug)
 
         val q1 = -(H*x1+A.t*w1)
         val b1 = A*x1
@@ -142,14 +140,15 @@ object KktTest {
       * @param tol tolerance (L2-norm) in forward and backward error
       * @return true if both forward and backward error (L2-norm) are less than tol, else false.
       */
-    def testPositiveDefinite(n:Int,p:Int,tol:Double):Boolean = {
+    def testPositiveDefinite(n:Int,p:Int,tol:Double, debug:Boolean):Boolean = {
 
-        println("\nSolving random KKT system:")
+        println("\n\nSolving random KKT system in dimensions n="+n+", p="+p)
         // uniform in (-1,1)
         val Q:DenseMatrix[Double] = DenseMatrix.tabulate(n,n)((i,j) => -5+10*Math.random())
+        val L = lowerTriangular(Q)
+        (0 until n).map(i => L(i,i) = L(i,i)+Math.sqrt(n))    // improve conditioning
 
-        val M:DenseMatrix[Double] = Q*Q.t      // positive definite with probability 1
-        (0 until n).map(i => M(i,i) = M(i,i)+20.0)    // improve conditioning
+        val M:DenseMatrix[Double] = L*L.t      // positive definite with probability 1
 
         // make exactly symmetric (processor or openblas problem?)
         val H = (M+M.t)*0.5
@@ -160,7 +159,7 @@ object KktTest {
         val x = DenseVector.tabulate(n)(i => -1+2*Math.random())     // uniform in (-1,1)
         val w = DenseVector.tabulate(p)(i => -2+4*Math.random())     // uniform in (-2,2)
 
-        testPositiveDefinite(H,A,x,w,tol)
+        testPositiveDefinite(H,A,x,w,tol,debug)
     }
 
 
@@ -169,9 +168,9 @@ object KktTest {
       *      Ax = b
       * where H is nxn and A is pxn.
       */
-    def testPositiveDefinite(m:Int,n:Int,p:Int,tol:Double):Boolean = {
+    def testPositiveDefinite(m:Int,n:Int,p:Int,tol:Double,debug:Boolean):Boolean = {
 
-        val results = (0 until m).map(i => testPositiveDefinite(n,p,tol))
+        val results = (0 until m).map(i => testPositiveDefinite(n,p,tol,debug))
         results.forall(p => p)
     }
 }

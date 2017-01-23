@@ -119,7 +119,15 @@ The equilibration of H in the KKTSystem solver seems to increase the condition n
 But it is still too small to cause such inaccuracy.
 Thus there must be some other problem with the KKT code.
 
+#--------------------------------------------------------------
+2017-01-23:|
+--------------
 
-
+KKTSystem.solvePD:
+when Ruiz equilibration is switched off (i.e. unmodified blockSolve is used) works
+flawlessly with condition numbers of H as large as 2e6.
+Ruiz equilibration cuts the condition numbers in half but then the accuracy of the
+solution goes down badly.
+There must therefore be a BUG in the transformation to and from the equilibrated system.
 
 

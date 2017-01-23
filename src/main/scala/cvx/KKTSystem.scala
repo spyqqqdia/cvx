@@ -40,11 +40,14 @@ class KKTSystem(
 
 
     /** Solution in case of kktType=0, i.e. M=H.
+      *
+      * @param debug if set to true the condition number of the matrix H after
+      *              equilibration is printed.
       * @return pair of solutions (x,w)
       */
-    private def solveType0:(DenseVector[Double],DenseVector[Double]) =  try {
+    private def solveType0(debug:Boolean=false):(DenseVector[Double],DenseVector[Double]) =  try {
 
-        KKTSystem.solvePD(M,A,q,b)
+        KKTSystem.solvePD(M,A,q,b,debug)
 
     } catch {
 
@@ -52,19 +55,23 @@ class KKTSystem(
 
             val K = M+A*A.t
             val z = q-A.t*b
-            KKTSystem.solvePD(K,A,z,b)
+            KKTSystem.solvePD(K,A,z,b,debug)
         }
     }
     /** Solution in case of kktType=1, i.e. M=L, where H=LL' is positive definite
       * and L is lower triangular. No equilibration of H performed.
+      *
       * @return pair of solutions (x,w)
       */
-    private def solveType1:(DenseVector[Double],DenseVector[Double]) =  KKTSystem.solveWithCholFactor(M,A,q,b)
+    private def solveType1(debug:Boolean=false):(DenseVector[Double],DenseVector[Double]) =
+        KKTSystem.solveWithCholFactor(M,A,q,b,debug)
 
     /** Solution of the system in the following form:
+      *
       * @return pair of solutions (x,w)
       */
-    def solve:(DenseVector[Double],DenseVector[Double]) = if(kktType==1) solveType1 else solveType0
+    def solve(debug:Boolean=false):(DenseVector[Double],DenseVector[Double]) =
+        if(kktType==1) solveType1(debug) else solveType0(debug)
 }
 object KKTSystem {
 
@@ -99,7 +106,7 @@ object KKTSystem {
       */
     def solveWithCholFactor(
         L:DenseMatrix[Double], A:DenseMatrix[Double],
-        q:DenseVector[Double], b:DenseVector[Double]
+        q:DenseVector[Double], b:DenseVector[Double], debug:Boolean=false
     ):(DenseVector[Double],DenseVector[Double]) =  {
 
         val n=L.cols
@@ -118,9 +125,10 @@ object KKTSystem {
         val Hinv_q:DenseVector[Double] = X(::,p)              // inv(H)q
 
         val R = A*Hinv_At                                     // A*inv(H)*A', pxp matrix
-        val symmErr = Math.sqrt(sum((R-R.t):*(R-R.t)))
-        if(symmErr>1e-11) println("\nsolveWithCholFactor: symmErr(R) = "+symmErr+"\n")
-
+        if(debug) {
+            val symmErr = Math.sqrt(sum((R - R.t) :* (R - R.t)))
+            if (symmErr > 1e-12) println("solveWithCholFactor: symmErr(R) = " + symmErr)
+        }
         val S = (R+R.t)*0.5                                   // make exactly symmetric
         val K = cholesky(S)                                   // S = KK'
         val z = -(b+A*Hinv_q)                                 // z = -(b+inv(H)q)
@@ -136,21 +144,21 @@ object KKTSystem {
       *     Hx+A'w = -q  and  Ax = b
       * assuming that H is positive definite using block elimination
       * and no equilibration of H.
+      *
       * @return pair of solutions (x,w)
       */
     def blockSolve(
         H:DenseMatrix[Double], A:DenseMatrix[Double],
-        q:DenseVector[Double], b:DenseVector[Double]
+        q:DenseVector[Double], b:DenseVector[Double], debug:Boolean=false
     ):(DenseVector[Double],DenseVector[Double]) = {
 
         val n=H.cols
         assert(H.rows==n,"Matrix M not square, n=M.cols="+n+", M.rows="+H.rows)
         assert(A.cols==n,"A.cols="+A.cols+" not equal to n=M.rows="+H.rows)
-        val p=A.rows   // number of equalities
 
         try{
             val L = cholesky(H)                                   // M=H
-            solveWithCholFactor(L,A,q,b)
+            solveWithCholFactor(L,A,q,b,debug)
 
         } catch {
 
@@ -165,29 +173,38 @@ object KKTSystem {
     /** Solution of
       *     Hx+A'w = -q  and  Ax = b
       * assuming that H is positive definite with equilibration of H.
+      *
+      * @param debug if set to true, the condition number of the matrix H after
+      *              equilibration is printed.
       * @return pair of solutions (x,w)
       */
     private def solvePD(
         H:DenseMatrix[Double], A:DenseMatrix[Double],
-        q:DenseVector[Double], b:DenseVector[Double]
+        q:DenseVector[Double], b:DenseVector[Double], debug:Boolean = false
     ):(DenseVector[Double],DenseVector[Double]) = {
 
         val n=H.cols
         assert(H.rows==n,"Matrix M not square, n=M.cols="+n+", M.rows="+H.rows)
         assert(A.cols==n,"A.cols="+A.cols+" not equal to n=M.rows="+H.rows)
 
-        val eq = MatrixUtils.ruizEquilibrate(H)         // Q=DMD
-        val Q = eq._2; val d = eq._1                    // D=diag(d)
+        val eq = MatrixUtils.ruizEquilibrate(H)
+        val Q = eq._2
+        val d = eq._1 // Q=DMD, D=diag(d)
+
+        if(debug) {
+            val condQ = MatrixUtils.conditionNumber(Q)
+            println("Condition number of Q=equilibrated(H): " + MathUtils.round(condQ, 1))
+        }
 
         // B = AD = A*diag(d), multiply row_i(A) with d_i
-        val B = DenseMatrix.tabulate(A.rows,A.cols)((i,j) => d(i)*A(i,j))
+        val B = DenseMatrix.tabulate(A.rows, A.cols)((i, j) => d(i) * A(i, j))
         // D*q
-        val Dq = DenseVector.tabulate(n)(i => d(i)*q(i))
+        val Dq = DenseVector.tabulate(n)(i => d(i) * q(i))
 
-        val (y,w) = blockSolve(Q,B,Dq,b)
+        val (y, w) = blockSolve(Q,B,Dq,b,debug)
         // x = Dy = diag(d)y
-        val x = DenseVector.tabulate(n)(i => d(i)*y(i))
-        (x,w)
+        val x = DenseVector.tabulate(n)(i => d(i) * y(i))
+        (x, w)
     }
 
 
