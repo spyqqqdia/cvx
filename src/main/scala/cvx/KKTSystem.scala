@@ -196,8 +196,8 @@ object KKTSystem {
             println("Condition number of Q=equilibrated(H): " + MathUtils.round(condQ, 1))
         }
 
-        // B = AD = A*diag(d), multiply row_i(A) with d_i
-        val B = DenseMatrix.tabulate(A.rows, A.cols)((i, j) => d(i) * A(i, j))
+        // B = AD = A*diag(d), multiply col_j(A) with d_j
+        val B = DenseMatrix.tabulate(A.rows, A.cols)((i, j) => d(j) * A(i, j))
         // D*q
         val Dq = DenseVector.tabulate(n)(i => d(i) * q(i))
 

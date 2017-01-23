@@ -171,6 +171,8 @@ does not work, the difference to blockSolve is only the Ruiz equilibration.
 In the test examples equilibration reduces the condition number by half.
 Thus there must be a bug in the transformation toi the equilibrated system.
 
+BUG is fixed, status: working!
+
 
 
 

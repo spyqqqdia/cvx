@@ -130,4 +130,4 @@ Ruiz equilibration cuts the condition numbers in half but then the accuracy of t
 solution goes down badly.
 There must therefore be a BUG in the transformation to and from the equilibrated system.
 
-
+BUG is fixed, status: working!
