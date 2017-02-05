@@ -10,6 +10,8 @@ import breeze.linalg.{DenseMatrix, DenseVector, _}
  */
 abstract class Constraint(val id:String, val dim:Int, val ub:Double){
 
+    self: Constraint =>
+
     def valueAt(x:DenseVector[Double]):Double
 	def gradientAt(x:DenseVector[Double]):DenseVector[Double]
     def hessianAt(x:DenseVector[Double]):DenseMatrix[Double]
@@ -23,7 +25,8 @@ abstract class Constraint(val id:String, val dim:Int, val ub:Double){
 	/** @return ub-g(x).*/
 	def margin(x:DenseVector[Double]):Double = ub-valueAt(x)
 
-	/** This constraint restricted to values of the original variable x of the form x=z+Fu
+
+    /** This constraint restricted to values of the original variable x of the form x=z+Fu
 	  * now viewed as a constraint on the variable u in dimension dim-p, where p is the rank
       * of F.
 	  * F is assumed to be of full rank and this condition is not checked.
@@ -43,11 +46,11 @@ abstract class Constraint(val id:String, val dim:Int, val ub:Double){
         val reducedID = id+"_reduced"
         new Constraint(reducedID,reducedDim,ub) {
 
-            override def valueAt(u: DenseVector[Double]) = super.valueAt(z + F * u)
+            override def valueAt(u: DenseVector[Double]) = self.valueAt(z + F * u)
 
-            override def gradientAt(u: DenseVector[Double]) = F.t * super.gradientAt(z + F * u)
+            override def gradientAt(u: DenseVector[Double]) = F.t * self.gradientAt(z + F * u)
 
-            override def hessianAt(u: DenseVector[Double]) = (F.t * super.hessianAt(z + F * u)) * F
+            override def hessianAt(u: DenseVector[Double]) = (F.t * self.hessianAt(z + F * u)) * F
         }
     }
 

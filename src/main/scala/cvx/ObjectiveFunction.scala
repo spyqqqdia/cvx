@@ -7,6 +7,8 @@ import breeze.linalg.{DenseMatrix, DenseVector, _}
  */
 abstract class ObjectiveFunction(val dim:Int){
 
+    self: ObjectiveFunction =>
+
     def valueAt(x:DenseVector[Double]):Double
 	def gradientAt(x:DenseVector[Double]):DenseVector[Double]
     def hessianAt(x:DenseVector[Double]):DenseMatrix[Double]
@@ -33,9 +35,9 @@ abstract class ObjectiveFunction(val dim:Int){
         val  rDim = dim-F.cols
         new ObjectiveFunction(rDim){
 
-            override def valueAt(u:DenseVector[Double]) = super.valueAt(z+F*u)
-            override def gradientAt(u:DenseVector[Double]) = F.t*super.gradientAt(z+F*u)
-            override def hessianAt(u:DenseVector[Double]) = (F.t*super.hessianAt(z+F*u))*F
+            override def valueAt(u:DenseVector[Double]) = self.valueAt(z+F*u)
+            override def gradientAt(u:DenseVector[Double]) = F.t*self.gradientAt(z+F*u)
+            override def hessianAt(u:DenseVector[Double]) = (F.t*self.hessianAt(z+F*u))*F
         }
     }
 }

@@ -131,3 +131,13 @@ solution goes down badly.
 There must therefore be a BUG in the transformation to and from the equilibrated system.
 
 BUG is fixed, status: working!
+
+
+#--------------------------------------------------------------
+2017-02-04:|
+--------------
+
+The OptimizationProblem should get a list of (inequality) Constraints as well as an
+optional EqualityConstraints object which then determine which BarrierSolver is used.
+
+

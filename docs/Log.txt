@@ -189,6 +189,14 @@ docs/cvx_notes: minor rewrite.
 Status: does not compile.
 
 
+--------------------------------------------------------------
+2017-02-04:|
+-------------
+
+Fixed the compilation problem.
+Status: compiles.
+
+
 
 
 
