@@ -11,417 +11,204 @@ import breeze.linalg.{DenseMatrix, DenseVector, _}
 // This is the reason why we do not put this operation into the constraints themselves.
 
 /** Solver for constrained convex optimization using the barrier method.
+  * C.samplePoint will be used as the starting point of the optimization.
   *
-  * @param C open convex set known to contain the minimizer
+  * @param C domain of definition of the barrier function.
+  * @param eqs Optional equality constraint(s) of the form Ax=b
   * @param pars see [SolverParams]
   */
-abstract class BarrierSolver(val objF:ObjectiveFunction, val C:ConvexSet with SamplePoint, val pars:SolverParams)
+abstract class BarrierSolver(
+  val C:ConvexSet, val startingPoint:DenseVector[Double],
+  val eqs:Option[EqualityConstraint], val pars:SolverParams, val logger:Logger
+)
 extends Solver {
- 
-    val dim=C.dim
 
-	def startingPoint:DenseVector[Double] = C.samplePoint
-	def barrierFunction(t:Double,x:DenseVector[Double]):Double
-    def gradientBarrierFunction(t:Double,x:DenseVector[Double]):DenseVector[Double]
-	def hessianBarrierFunction(t:Double,x:DenseVector[Double]):DenseMatrix[Double]
-	/** Number m of inequality constraints. */
-	def numConstraints:Int
+  //  check if the pieces fit together
+  assert(C.isInSet(startingPoint),"Starting point x not in set C, x:\n"+startingPoint+"\n")
+  eqs.map(eqCnt => {
 
-	def checkDim(x:DenseVector[Double]):Unit =
-		assert(x.length==dim,"Dimension mismatch x.length="+x.length+" unequal to dim="+dim)
+    val A:DenseMatrix[Double] = eqCnt.A
+    assert(C.dim==A.cols,  "\n\nDimension mismatch: C.dim = "+C.dim+", A.cols = "+A.cols+"\n")
+  })
 
-	/** Find the location $x$ of the minimum of f=objF over C by the newton method
-	  * starting from the starting point x0.
-	  *
-	  * @return Solution object: minimizer with additional info.
-	  */
-	def solve:Solution = {
-	
-	    val tol=pars.tol // tolerance for duality gap
-		val mu = 10.0    // factor to increase parameter t in barrier method.
-		var t = 1.0
-		var x = startingPoint       // iterates x=x_k
-		var sol:Solution = null   // solutions at parameter t
-	    while(numConstraints/t>=tol){
-		
-		    // solver for barrier function at fixed parameter t
-			val objF_t = new ObjectiveFunction(dim){
 
-				def valueAt(x:DenseVector[Double]) = { checkDim(x); barrierFunction(t,x) }
-				def gradientAt(x:DenseVector[Double]) = { checkDim(x); gradientBarrierFunction(t,x) }
-				def hessianAt(x:DenseVector[Double]) = { checkDim(x); hessianBarrierFunction(t,x) }
-			}
-			val solver = new UnconstrainedSolver(objF_t,C,pars){
-			
-			    override def startingPoint = x
-			}
-		    sol = solver.solve()
-			x = sol.x
-			t = mu*t
-		}
-	    sol
-	}
+  override val dim:Int = C.dim
+
+  def barrierFunction(t:Double,x:DenseVector[Double]):Double
+  def gradientBarrierFunction(t:Double,x:DenseVector[Double]):DenseVector[Double]
+  def hessianBarrierFunction(t:Double,x:DenseVector[Double]):DenseMatrix[Double]
+  /** Number m of inequality constraints. */
+  def numConstraints:Int
+
+  def checkDim(x:DenseVector[Double]):Unit =
+    assert(x.length==dim,"Dimension mismatch x.length="+x.length+" unequal to dim="+dim)
+
+  private def logStep(t:Double):Unit = {
+
+    val border = "\n****************************************************************\n"
+    val content =    "**           BarrierSolver: step t = "+t+"                  **"
+    val msg = "\n"+border+content+border+"\n"
+    println(msg)
+    logger.println(msg)
+  }
+
+  /** Find the location $x$ of the minimum of f=objF over C by the newton method
+    * starting from the starting point x0 with no equality constraints.
+    *
+    * @return Solution object: minimizer with additional info.
+    */
+  def solveWithoutEQs(debugLevel:Int=0):Solution = {
+
+    val tol=pars.tol // tolerance for duality gap
+    val mu = 10.0    // factor to increase parameter t in barrier method.
+    var t = 1.0
+    var x = startingPoint       // iterates x=x_k
+    var sol:Solution = null   // solutions at parameter t
+    while(numConstraints/t>=tol){
+
+      if(debugLevel>2) logStep(t)
+      // solver for barrier function at fixed parameter t
+      val objF_t = new ObjectiveFunction(dim){
+
+        def valueAt(x:DenseVector[Double]):Double = { checkDim(x); barrierFunction(t,x) }
+        def gradientAt(x:DenseVector[Double]):DenseVector[Double] = { checkDim(x); gradientBarrierFunction(t,x) }
+        def hessianAt(x:DenseVector[Double]):DenseMatrix[Double] = { checkDim(x); hessianBarrierFunction(t,x) }
+      }
+      val solver = new UnconstrainedSolver(objF_t,C,x,pars,logger)
+      sol = solver.solve(debugLevel)
+      x = sol.x
+      t = mu*t
+    }
+    sol
+  }
+  /** Find the location $x$ of the minimum of f=objF over C with equality constraints Ax=b
+    * by iteratively solving the KKT system with backtracking line search starting from the
+    * starting point x0.
+    *
+    * @return Solution object: minimizer with additional info.
+    */
+  def solveWithEQs(A:DenseMatrix[Double],b:DenseVector[Double],debugLevel:Int=0):Solution = {
+
+    val tol=pars.tol // tolerance for duality gap
+    val mu = 10.0    // factor to increase parameter t in barrier method.
+    var t = 1.0
+    var x = startingPoint     // iterates x=x_k
+    var sol:Solution = null   // solutions at parameter t
+    while(numConstraints/t>=tol){
+
+      if(debugLevel>2) logStep(t)
+      // solver for barrier function at fixed parameter t
+      val objF_t = new ObjectiveFunction(dim){
+
+        def valueAt(x:DenseVector[Double]):Double = { checkDim(x); barrierFunction(t,x) }
+        def gradientAt(x:DenseVector[Double]):DenseVector[Double] = { checkDim(x); gradientBarrierFunction(t,x) }
+        def hessianAt(x:DenseVector[Double]):DenseMatrix[Double] = { checkDim(x); hessianBarrierFunction(t,x) }
+      }
+      val solver = EqualityConstrainedSolver(objF_t,C,x,A,b,pars,logger)
+      sol = solver.solve(debugLevel)
+      x = sol.x
+      t = mu*t
+    }
+    sol
+  }
+  def solve(debugLevel:Int=0):Solution =
+    if(eqs.isDefined) solveWithEQs(eqs.get.A,eqs.get.b,debugLevel) else solveWithoutEQs(debugLevel)
 }
 
 
 /** Some factory functions.*/
 object BarrierSolver {
 
-	/** BarrierSolver for minimization without equality constraints.
-	  */
-	def apply(objF:ObjectiveFunction, cnts:ConstraintSet with FeasiblePoint, pars:SolverParams): BarrierSolver = {
+  /** BarrierSolver for minimization with or without equality constraints Ax=b.
+    *
+    * @param cnts set of inequality constraints.
+    * @param pars see [SolverParams].
+    */
+  def apply(
+    objF: ObjectiveFunction, cnts: ConstraintSet with FeasiblePoint,
+    eqs: Option[EqualityConstraint], pars: SolverParams, logger:Logger
+  ): BarrierSolver = {
 
-		val Feas = cnts.strictlyFeasibleSet
-		val C = ConvexSet.addSamplePoint(Feas,cnts.feasiblePoint)
-		new BarrierSolver(objF,C,pars){
+    val Feas = cnts.strictlyFeasibleSet
+    val C = ConvexSet.addSamplePoint(Feas, cnts.feasiblePoint)
+    new BarrierSolver(C, cnts.feasiblePoint, eqs, pars, logger) {
 
-			def numConstraints = cnts.constraints.length
-			def barrierFunction(t:Double,x:DenseVector[Double]):Double =
-				cnts.constraints.foldLeft(t*objF.valueAt(x))((sum:Double,cnt:Constraint) => {
+      def numConstraints:Int = cnts.constraints.length
 
-					val d = cnt.ub - cnt.valueAt(x)
-					if (d <= 0)
-						throw new IllegalArgumentException("x not strictly feasible, d = "+d+", x:\n"+x)
-					sum-Math.log(d)
-				})
-			def gradientBarrierFunction(t:Double,x:DenseVector[Double]):DenseVector[Double] =
-				cnts.constraints.foldLeft(objF.gradientAt(x)*t)((sum:DenseVector[Double],cnt:Constraint) => {
+      def barrierFunction(t: Double, x: DenseVector[Double]): Double =
+        cnts.constraints.foldLeft(t * objF.valueAt(x))((sum: Double, cnt: Constraint) => {
 
-					val d = cnt.ub - cnt.valueAt(x)
-					val G = cnt.gradientAt(x)
-					if (d <= 0)
-						throw new IllegalArgumentException("x not strictly feasible, d = "+d+", x:\n"+x)
-					sum+G/d
-				})
-			def hessianBarrierFunction(t:Double,x:DenseVector[Double]):DenseMatrix[Double] =
-				cnts.constraints.foldLeft(objF.hessianAt(x)*t)((sum:DenseMatrix[Double],cnt:Constraint) => {
+          val d = cnt.ub - cnt.valueAt(x)
+          if (d <= 0)
+            throw new IllegalArgumentException("x not strictly feasible, d = " + d + ", x:\n" + x)
+          sum - Math.log(d)
+        })
 
-				val d = cnt.ub - cnt.valueAt(x)
-				val G = cnt.gradientAt(x)
-				val H = cnt.hessianAt(x)
-				if (d <= 0)
-					throw new IllegalArgumentException("x not strictly feasible, d = "+d+", x:\n"+x)
+      def gradientBarrierFunction(t: Double, x: DenseVector[Double]): DenseVector[Double] =
+        cnts.constraints.foldLeft(objF.gradientAt(x) * t)((sum: DenseVector[Double], cnt: Constraint) => {
 
-				val GGt = G*G.t
-				sum+GGt/(d*d)+H/d
-			})
-		}
-	}
-	/** Version of solver bs which operates on the changed variable u related to the original variable
-	  *  as x = z0+Fu.
-	  *  This solves the minimization problem of bs under the additional constraint that
-	  * x is of the form z0+Fu and operates on the variable u. Results are reported using the variable x.
-	  *
-	  * @param sol solution space of Ax=b (then z0=sol.z0, F=sol.F).
-	  */
-	private def variableChangedSolver(bs:BarrierSolver, sol:SolutionSpace): BarrierSolver = {
+          val d = cnt.ub - cnt.valueAt(x)
+          val G = cnt.gradientAt(x)
+          if (d <= 0)
+            throw new IllegalArgumentException("x not strictly feasible, d = " + d + ", x:\n" + x)
+          sum + G / d
+        })
 
-		// pull the domain bs.C back to the u variable
-		val C = bs.C
-		val z0 = sol.z0
-		val F = sol.F
-		val dim_u = F.cols
-		val x0 = bs.startingPoint
-		val u0 = sol.parameter(x0)      // u0 with x0 = z0+F*u0
+      def hessianBarrierFunction(t: Double, x: DenseVector[Double]): DenseMatrix[Double] =
+        cnts.constraints.foldLeft(objF.hessianAt(x) * t)((sum: DenseMatrix[Double], cnt: Constraint) => {
 
-		val D = new ConvexSet(dim_u) with SamplePoint {
+          val d = cnt.ub - cnt.valueAt(x)
+          val G = cnt.gradientAt(x)
+          val H = cnt.hessianAt(x)
+          if (d <= 0)
+            throw new IllegalArgumentException("x not strictly feasible, d = " + d + ", x:\n" + x)
 
-			def isInSet(u:DenseVector[Double]) = C.isInSet(z0+F*u)
-			def samplePoint = u0
-		}
+          val GGt = G * G.t
+          sum + GGt / (d * d) + H / d
+        })
+    }
+  }
+  /** Version of solver bs which operates on the dimension reduced variable u related to
+    * the original variable as x = z0+Fu.
+    * This solves the minimization problem of bs under the additional constraint that
+    * x is of the form z0+Fu and operates on the variable u. Results are reported using the variable x.
+    *
+    * The intended application is to problems with equality constraints Ax=b, where the solution
+    * spoace of the equality constraints is parametrized as x=z0+Fu, u unconstrained.
+    *
+    * @param sol solution space of Ax=b (then z0=sol.z0, F=sol.F).
+    */
+  def reducedSolver(bs:BarrierSolver, sol:SolutionSpace, logger:Logger): BarrierSolver = {
 
-		new BarrierSolver(bs.objF,D,bs.pars){
+    // pull the domain bs.C back to the u variable
+    val C = bs.C
+    val z0 = sol.z0
+    val F = sol.F
+    val dim_u = F.cols
+    val x0 = bs.startingPoint
+    val u0 = sol.parameter(x0)      // u0 with x0 = z0+F*u0
 
-			def numConstraints = bs.numConstraints
-			def barrierFunction(t:Double,u:DenseVector[Double]) = bs.barrierFunction(t,z0+F*u)
-			def gradientBarrierFunction(t:Double,u:DenseVector[Double]) = F.t*bs.gradientBarrierFunction(t,z0+F*u)
-			def hessianBarrierFunction(t:Double,u:DenseVector[Double]) = (F.t*bs.hessianBarrierFunction(t,z0+F*u))*F
+    val D = new ConvexSet(dim_u) {
 
-			override def solve() = {
-
-				// 'super': with new X { ... } we automatically extend X
-				val sol = super.solve
-				new Solution(z0+F*sol.x,sol.gap,sol.normGrad,sol.iter,sol.maxedOut)
-			}
-		}
-	}
-
-    /** BarrierSolver for minimization with equality constraints Ax=b, A is mxn with m < n and full rank m,
-      * when no inequality constraints are present.
-      * The solver will solve the system as x = z0 + Fu, and perform the minimization after a change of variables
-      * x --> u.
-      * It is assumed that the strictly feasible point returned by [ineqs.feasiblePoint] also satisfies
-      * the equality constraints.
-      */
-    def apply(objF:ObjectiveFunction, eqs:EqualityConstraints, pars:SolverParams): UnconstrainedSolver = {
-
-        val sol = eqs.solutionSpace
-        val F:DenseMatrix[Double] = sol.F
-        val z0:DenseVector[Double] = sol.z0
-        val dim_u = F.cols    // dimension of u-variable
-        val dim_x = F.rows    // dimension of original x-variable
-
-        //check if z0 has appropriate dimension (F is then automatically correct)
-        assert(z0.size == dim_x, "Dimension mismatch: z0.size="+z0.size+" not equal dim(x)="+dim_x)
-
-        UnconstrainedSolver(objF,eqs,pars)
+      def isInSet(u:DenseVector[Double]):Boolean = C.isInSet(z0+F*u)
+      def samplePoint = Some(u0)
     }
 
+    new BarrierSolver(D,u0,None,bs.pars,logger){
 
-	/** BarrierSolver for minimization with equality constraints Ax=b, A is mxn with m < n and full rank m,
-	  * when a strictly feasible point for the inequalities, which also satisfies the equality constraints,
-	  * is known.
-	  * The solver will solve the system as x = z0 + Fu, and perform the minimization after a change of variables
-	  * x --> u.
-	  * It is assumed that the strictly feasible point returned by [ineqs.feasiblePoint] also satisfies
-	  * the equality constraints.
-	  */
-	def apply(
-        objF:ObjectiveFunction, ineqs:ConstraintSet with FeasiblePoint, eqs:EqualityConstraints, pars:SolverParams
-    ): BarrierSolver = {
+      def numConstraints:Int = bs.numConstraints
+      def barrierFunction(t:Double,u:DenseVector[Double]):Double = bs.barrierFunction(t,z0+F*u)
+      def gradientBarrierFunction(t:Double,u:DenseVector[Double]):DenseVector[Double] =
+        F.t*bs.gradientBarrierFunction(t,z0+F*u)
+      def hessianBarrierFunction(t:Double,u:DenseVector[Double]):DenseMatrix[Double] =
+        (F.t*bs.hessianBarrierFunction(t,z0+F*u))*F
 
-		val x0 = ineqs.feasiblePoint
-		assert(eqs.isSatisfiedBy(x0))
+      override def solve(debugLevel:Int):Solution = {
 
-
-		val sol = eqs.solutionSpace
-		val F:DenseMatrix[Double] = sol.F
-		val z0:DenseVector[Double] = sol.z0
-		val dim_u = F.cols    // dimension of u-variable
-		val dim_x = F.rows    // dimension of original x-variable
-
-		//check if z0 has appropriate dimension (F is then automatically correct)
-		assert(z0.size == dim_x, "Dimension mismatch: z0.size="+z0.size+" not equal dim(x)="+dim_x)
-		// check if all constraints have the same dimension as x
-		assert(
-			ineqs.constraints.forall(cnt => cnt.dim==dim_x),
-			"Dimension mismatch: not all constraints have dimension dim(x)"
-		)
-		// the solver without equality constraints
-		val bsNoEqs = apply(objF,ineqs,pars)
-		// change variables x = z0+Fu
-		variableChangedSolver(bsNoEqs,sol)
-	}
-
-
-	//--------- Feasibility Analysis: basic algorithm ----------------//
-
-
-	/** Barrier solver for phase I feasibility analysis according to basic algorithm,
-	  *  [boyd], 11.4.1, p579. No equality constraints.
-	  */
-	private def phase_I_Solver(cnts:ConstraintSet,pars:SolverParams):BarrierSolver = {
-
-		val feasObjF = ConstraintSet.phase_I_ObjectiveFunction(cnts)
-		val feasCnts = ConstraintSet.phase_I_Constraints(cnts)
-
-		apply(feasObjF,feasCnts,pars)
-	}
-
-
-
-	/** Phase I feasibility analysis according to basic algorithm, [boyd], 11.4.1, p579
-	  *  using a BarrierSolver on the feasibility problem. No equality constraints.
-	  *
-	  * @param cnts constraints to be anaylzed for feasibility
-	  * @param pars solver parameters, see [SolverParams].
-	  */
-	private def phase_I_Analysis(cnts:ConstraintSet, pars:SolverParams): FeasibilityReport = {
-
-		val feasBS = phase_I_Solver(cnts,pars)
-		val sol = feasBS.solve
-
-		val dim = cnts.dim
-		val w_feas = sol.x                  // w = c(x,s)
-		val x_feas = w_feas(0 until dim)    // unclear how many constraints that satisfies, so we check
-		val s_feas = w_feas(dim)            // if s_feas < 0, all constraints are strictly satisfied.
-		val s = Vector[Double](1)
-		s(0)=s_feas
-		val isStrictlySatisfied = s_feas < 0
-		val violatedCnts = cnts.constraints.filter(!_.isSatisfiedStrictly(x_feas))
-
-		FeasibilityReport(x_feas,s,isStrictlySatisfied,violatedCnts)
-	}
-
-
-	/** Phase I feasibility analysis according to basic algorithm, [boyd], 11.4.1, p579
-	  *  using a BarrierSolver on the feasibility problem.
-	  *  With equality constraints parameterized as x=z0+Fu.
-	  *  Reports feasible candidate as u0 not as x0 = z0+Fu0.
-	  *
-	  * @param ineqs inequality constraints
-	  * @param eqs equality constraints
-	  * @param pars solver parameters, see [SolverParams].
-	  */
-	private def phase_I_Analysis(ineqs:ConstraintSet, eqs:EqualityConstraints, pars:SolverParams): FeasibilityReport = {
-
-		val n = ineqs.dim
-		val solEqs = eqs.solutionSpace
-		val F:DenseMatrix[Double] = eqs.F
-		val z0 = eqs.z0
-		assert(n==F.rows,"Dimension mismatch F.rows="+F.rows+" not equal to n=dim(problem)="+n)
-
-		val k=F.cols     // dimension of variable u in x=z0+Fu
-
-		val solverNoEqs = phase_I_Solver(ineqs,pars)
-		// change variables x = z0+Fu
-		val solver = variableChangedSolver(solverNoEqs,solEqs)
-		val sol = solver.solve
-
-		val w_feas = sol.x             // w = c(u,s), dim(u)=m, s scalar
-		val u_feas = w_feas(0 until k)
-		val x_feas = z0+F*u_feas       // unclear how many constraints that satisfies, so we check
-		val s_feas = w_feas(k)         // if s_feas < 0, all constraints are strictly satisfied.
-		val s = Vector[Double](1)
-		s(0)=s_feas
-		val isStrictlySatisfied = s_feas < 0
-		val violatedCnts = ineqs.constraints.filter(!_.isSatisfiedStrictly(x_feas))
-
-		FeasibilityReport(u_feas,s,isStrictlySatisfied,violatedCnts)
-	}
-
-
-	//--------- Feasibility Analysis via sum of infeasibilities ----------------//
-
-
-	/** Barrier solver for phase I feasibility analysis according to more detailled sum of infeasibilities
-	  *  algorithm, [boyd], 11.4.1, p579. No equality constraints.
-	  */
-	private def phase_I_Solver_SOI(cnts:ConstraintSet,pars:SolverParams):BarrierSolver = {
-
-		val feasObjF = ConstraintSet.phase_I_SOI_ObjectiveFunction(cnts)
-		val feasCnts = ConstraintSet.phase_I_SOI_Constraints(cnts)
-		apply(feasObjF,feasCnts,pars)
-	}
-
-	/** Phase I feasibility analysis according to soi (sum of infeasibilities) algorithm,
-	  *  [boyd], 11.4.1, p580 using a BarrierSolver on the feasibility problem. This approach
-	  *  generates points satisfying more constraints than the basic method, if the problem is infeasible.
-	  *  No equality constraints.
-	  *
-	  * @param cnts constraints to be anaylzed for feasibility
-	  * @param pars solver parameters, see [SolverParams].
-	  */
-	def phase_I_Analysis_SOI(cnts:ConstraintSet, pars:SolverParams): FeasibilityReport = {
-
-		val p = cnts.numConstraints
-		val n = cnts.dim
-		val solver = phase_I_Solver_SOI(cnts,pars)
-		val sol = solver.solve
-
-		val w_feas = sol.x                     // w = c(x,s),  dim(x)=n, s_j=g_j(x), j<p
-		val x_feas = w_feas(0 until n)         // unclear how many constraints that satisfies, so we check
-		val s_feas = w_feas(n until n+p)       // if s_feas(j) < 0, for all j<p, then all constraints are strictly satisfied.
-		val isStrictlySatisfied = (0 until n).forall(j => s_feas(j) < 0)
-		val violatedCnts = cnts.constraints.filter(!_.isSatisfiedStrictly(x_feas))
-
-		FeasibilityReport(x_feas,s_feas,isStrictlySatisfied,violatedCnts)
-	}
-
-
-	/** Phase I feasibility analysis according to soi (sum of infeasibilities) algorithm,
-	  *  [boyd], 11.4.1, p580 using a BarrierSolver on the feasibility problem. This approach
-	  *  generates points satisfying more constraints than the basic method, if the problem is infeasible.
-	  *  With equality constraints.
-	  *
-	  * @param ineqs inequality constraints to be anaylzed for feasibility
-	  * @param eqs inequality constraints to be anaylzed for feasibility
-	  * @param pars solver parameters, see [SolverParams].
-	  */
-	private def phase_I_Analysis_SOI(
-		ineqs:ConstraintSet, eqs:EqualityConstraints, pars:SolverParams
-	): FeasibilityReport = {
-
-		val p = ineqs.numConstraints
-		val n = ineqs.dim
-		val solEqs = eqs.solutionSpace
-		val F:DenseMatrix[Double] = eqs.F
-		val z0:DenseVector[Double] = eqs.z0
-		assert(n==F.rows,"Dimension mismatch F.rows="+F.rows+" not equal to n=dim(problem)="+n)
-
-		val k=F.cols     // dimension of variable u in change of variables x = z0+Fu
-
-		val solverNoEqs = phase_I_Solver_SOI(ineqs,pars)
-		// change variables x = z0+Fu
-		val solver = variableChangedSolver(solverNoEqs,solEqs)
-		val sol = solver.solve
-
-		val w_feas = sol.x                 // w = c(u,s),   dim(u)=m, s_j=g_j(x), j<p
-		val u_feas = w_feas(0 until k)
-		val x_feas = z0+F*u_feas           // unclear how many constraints that satisfies, so we check
-		val s_feas = w_feas(k until k+p)   // if s_feas(j) < 0, for all j<p, then all constraints are strictly satisfied.
-		val isStrictlySatisfied = (0 until p).forall(j => s_feas(j) < 0)
-		val violatedCnts = ineqs.constraints.filter(!_.isSatisfiedStrictly(x_feas))
-
-		FeasibilityReport(x_feas,s_feas,isStrictlySatisfied,violatedCnts)
-	}
-
-
-	//---------- Solvers, when no feasible points are known ----------------- //
-
-	/** Barrier solver for minimization under the inequality constraints in ineqs when no
-	  * _strictly feasible point_ for the constraints ineqs is known. Will then perform
-	  * a feasibility analysis.
-	  *
-	  * If set to false, the simple analysis will be carried out ([boyd], section 11.4.1, p579).
-	  * @param pars solver parameters (see [SolverParams] applied to both the feasibility and
-	  * minimization problem.
-	  * @param printFeas print the variable s of the feasibilty analysis on feasibility failure
-	  * (we need this parameter mainly to avoid signature collision with apply above)
-	  */
-	def apply(objF:ObjectiveFunction, cnts:ConstraintSet, pars:SolverParams, printFeas:Boolean):BarrierSolver = {
-
-		val feasibilityReport: FeasibilityReport = BarrierSolver.phase_I_Analysis(cnts,pars)
-
-
-		if(!feasibilityReport.isStrictlyFeasible && printFeas){
-
-			print("\nFeasibility variable s: ")
-			print(feasibilityReport.s); print("\n")
-			throw new InfeasibleProblemException(feasibilityReport)
-		}
-
-		val x0 = feasibilityReport.x0
-        // check if this is really a feasible point
-        assert(cnts.isSatisfiedStrictlyBy(x0),"Inequality constraints not strictly satisfied")
-
-		val feasCnts = cnts.addFeasiblePoint(x0)
-		apply(objF,feasCnts,pars)
-	}
-
-
-	/** Barrier solver for minimization under the inequality constraints in ineqs and equality constraints in eqs
-	  * when no _strictly feasible point_ for the constraints ineqs is known. Will then perform a feasibility analysis.
-	  *
-	  * If set to false, the simple analysis will be carried out ([boyd], section 11.4.1, p579).
- *
-	  * @param pars solver parameters (see [SolverParams] applied to both the feasibility and
-	  * minimization problem.
-	  * @param printFeas print the variable s of the feasibilty analysis on feasibility failure
-	  * (we need this parameter mainly to avoid signature collision with apply above)
-	  */
-	def apply(
-		objF:ObjectiveFunction, ineqs:ConstraintSet, eqs:EqualityConstraints, pars:SolverParams, printFeas:Boolean
-    ):BarrierSolver = {
-
-		val feasibilityReport: FeasibilityReport = BarrierSolver.phase_I_Analysis(ineqs,eqs,pars)
-
-
-		if(!feasibilityReport.isStrictlyFeasible && printFeas){
-
-			print("\nFeasibility variable s:\n")
-			print(feasibilityReport.s)
-			throw new InfeasibleProblemException(feasibilityReport)
-		}
-
-		val x0 = feasibilityReport.x0
-
-        // check if this is really a feasible point
-        assert(ineqs.isSatisfiedStrictlyBy(x0),"Inequality constraints not strictly satisfied")
-        assert(eqs.isSatisfiedBy(x0),"Equality constraints not strictly satisfied")
-
-		val feasCnts = ineqs.addFeasiblePoint(x0)
-		apply(objF,feasCnts,eqs,pars)
-	}
-
+        // 'super': with new X { ... } we automatically extend X
+        val sol = super.solve(debugLevel)
+        Solution(z0+F*sol.x,sol.dualityGap,0,sol.normGrad,sol.iter,sol.maxedOut)
+      }
+    }
+  }
 }

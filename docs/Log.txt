@@ -198,5 +198,157 @@ Status: compiles.
 
 
 
+#----------------------------------------------------------------------------------------
+2017-10-09:|
+-------------
+
+Major code rewrite:
+
+Equality constraints generally now expressed as Ax=b with matrix A and vector b
+handed over as optional parameters:
+A:Option[DenseMatrix[Double]], b:Option[DenseVector[Double]]
+
+__BarrierSolver.scala:
+
+Simplified: delegates to UnconstrainedSolver if no equality constraints present
+and to EqualityConstrainedSolver (new class) if equality constraints in the form
+Ax=b are present.
+Solution by elimination of the equality constraints no longer pursued as the main
+option, but the object BarrierSolver has a method to allocate such a solver.
+
+__ConstraintSet.scala:
+
+This now contains methods to allocate the solvers for the various feasibility problems
+and to do the feasibility analysis.
+Status: under construction.
+
+
+__ConvexSet.scala:
+
+Simplified: the trait SamplePoint eliminated and instead a member function
+::samplePoint:Option[DenseVector[Double]]
+implemented.
+
+
+
+#----------------------------------------------------------------------------------------
+2017-10-11:|
+-------------
+
+Constraints.scala:
+The probability constraints for dist_KL minimization all implemented.
+
+Code rewrite complete, the old problems run successfully.
+One test problems has no feasible point and requires feasibility analysis:
+test/scala/OptimizationProblems.minX1_no_FP
+This problem runs to solution.
+
+
+#----------------------------------------------------------------------------------------
+2017-10-16:|
+-------------
+
+Added a logger to all solvers which can now write to log files.
+__MatrixUtils.solveWithPreconditioning:
+fixed the problem of zero rows (both left and right hand side) in a naive fashion,
+see below.
+
+Status:
+
+Currently the problem of zero rows in the KKT system is solved by making the diagonal
+element in each zero row equal to one. Since the corresponding right hand sides are zero also,
+it follows that the corresponding variable is set to zero.
+
+This may lead to a system with no solutions (probability zero in the generic case).
+If the system has a solution, then this solution will satisfy all the original equations
+hence is useful.
+
+__OptimizationProblems.kl_1:
+does find a feasible point and the optimal solution.
+Note: it proves that our intuition is false: probability inequalities that are
+not fulfilled by the uniform distribution will _not in general_ be satisfied with
+equality at the optimum.
+This means that an analytic solution has to be computed using dimension reduction
+based on symmetry and minimization of the dimension reduced function which can only be
+done explicitly in simple cases.
+
+
+#----------------------------------------------------------------------------------------
+2017-10-17:|
+-------------
+
+Implemented logging throughout the solution chain.
+Corrected the analytic solution for OptimizationProblems.kl_1
+Status: working.
+
+New problem __OptimizationProblems.kl_2:
+
+exactly like OptimizationProblems.kl_1 except the probability constraints
+are now equalities instead of inequalities.
+Thus the hessian is nearly diagonal since only the constraints x_j>0
+contribute to the barrier function.
+
+Leads to singular KKT-system, unclear why.
+
+
+
+#----------------------------------------------------------------------------------------
+2017-10-18:|
+-------------
+
+Wrote out the condition numbers of the matrices arising in the solution of problems
+OptimizationProblem.kl_1 and OptimizationProblem.kl_2.
+In folder docs/log/ConditionNumbers.
+
+New KL-problem (infeasible) implemented.
+Removed bug from UnconstrainedSolver.solve and EqualityConstrainedSolver.solve
+(now breaking out of loop when Newton decrement is not > tol,
+previously ran through the entire loop until iter=maxIter to no purpose).
+
+Replaced parameter debug:Boolean with debugLevel:Int.
+Details about condition numbers are now only printed if debugLevel>2.
+No debug output if debugLevel=0 (default).
+
+Status: compiles and runs, inexplicable singularity in some KKTSystems,
+see ToDo.txt.
+
+#----------------------------------------------------------------------------------------
+2017-11-01:|
+-------------
+
+Added an equation solver based on SVD to MatrixUtils. Will compute a candidate solution
+even in the singular case (by sharp cutoff of singular values below threshold 1e-14)
+then check if it solves the system Ax=b to within tolerance ||Ax-b||<tol.
+
+Added that solution path to KKTSystem.solve (in case the solution based on block elimination
+and Cholesky factorization fails).
+
+Status: working.
+
+
+
+#----------------------------------------------------------------------------------------
+2017-11-02:|
+-------------
+
+Added object ConstraintSets (probability constraints  a*P(A) <= a*pA,
+b*P(B) <= b*pB, where a,b, are signs to control the direction of the inequality.
+
+Added object FeasibilityTests. Has one test doing simple and SOI feasibility analysis
+on an infeasible ConstraintSet as above.
+
+Status: simple feasibility analysis works but SOI analysis does not work
+(IndexOutOfBounds on DenseVector).
+
+
+
+
+
+
+
+
+
+
+
 
 

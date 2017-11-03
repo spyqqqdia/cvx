@@ -141,3 +141,224 @@ The OptimizationProblem should get a list of (inequality) Constraints as well as
 optional EqualityConstraints object which then determine which BarrierSolver is used.
 
 
+
+####################################################################################################
+Design break:|
+###############
+
+
+https://github.com/spyqqqdia/cvx
+
+
+Approach is wrong:
+
+_OptimizationProblem_
+
+has a solver as basic ingredient,
+should be the other way around:
+OptimizationProblem has objective function and ConstraintSet
+and then computes solvers for the problem
+
+
+_ConstraintSet_:
+
+Allocates the phase_I and phase_I_SOI optimization problems,
+then solves these and returns a feasibility report.
+
+To do this the ConstraintSet has methods to turn itself
+(return) the ConstraintSet for the phase_I and phase_I_SOI
+optimization problems.
+
+
+_Solvers (BarroerSolver)_:
+
+With this each Solver can assume that it has a feasible point
+and does not have to concern itself with feasibility analysis.
+
+
+#----------------------------------------------------
+Using self type annotation:|
+-----------------------------
+
+generally take some of the static functions out of the companion objects
+and into the corresponding classes
+
+
+_Constraint_:
+the methods to turn the Constraint into its phase_I form.
+Move the method to turn a constraint into tis phase_I_SOI form into the class
+ConstraintSet, since we need the full context of the constraint set to do this
+(number of all constraints and index of particular constraint).
+
+
+
+
+#-------------------------------------------------------------------------------------------
+2017-10-09:|
+-------------
+
+First: Clean up ConstraintSet.scala
+Clean up the tests to conform to the new signatures.
+
+Modify FeasibilityReport to include ||Ax-b|| in case of equality constraints.
+
+Write tests cases based on Kullback-Leibler distane minimization with known solution
+(because of symmetry) or known infeasibility (because of probabilistic inequalities).
+
+
+
+#-------------------------------------------------------------------------------------------
+2017-10-10:|
+-------------
+
+Do we have to do something special if the set of inequality constraints is empty?
+
+Add on expectation, moment and probability inequality constraints to the
+Constraints object.
+
+
+
+#----------------------------------------------------------------------------------------
+2017-10-11:|
+-------------
+
+Implement feasible dist_KL problems with known analytic solutions
+and some which are known to be infeasible.
+
+
+#----------------------------------------------------------------------------------------
+2017-10-12:|
+-------------
+
+ConstraintSet.phase_I_Analysis:
+
+(A) The phase I problem can lead to a singular KKT system under reasonable conditions.
+To see this consider a case where the side conditions are linear (hence Hessian zero)
+and do not depend on some of the variables.
+The Hessian of the barrier function (cvx.pdf, p40 (44)) then has zero rows.
+
+Currently this leads to an exception in
+    MatrixUtils$.ruizEquilibrate(MatrixUtils.scala:152)
+	at MatrixUtils$.solveWithPreconditioning(MatrixUtils.scala:190)
+
+as the preconditioner does not tolerate a zero row in the Hessian H
+(if there are no equality conditions).
+
+If there are no equality conditions then a zero row in the Hessian H
+leads to a singular system which has zeros on the right hand side, so that it
+is still solvable, but we have not implemented a solution for such a system.
+
+The code in MatrixUtils$.solveWithPreconditioning needs to be adapted to cope
+with this case also.
+
+The problem occurs for example with the test problem
+OptimizationProblems.kl_1 if we remove the probability conditions
+x_j>0 and sum_jx_j=1 from the list of conditions.
+
+(B) The barrier solver for the phase I problem does not deal with the
+equality constraints correctly:
+   dimension mismatch, e.g. in OptimizationProblems.kl_1
+What should we do with these?
+We could disregard them in phase I and return a feasible point satisfying
+only the inequality constraints, then hope that a full Newton step
+is taken in the solution of the original KKT system (which implies that the
+equality constraints are satisfied automatically).
+
+
+#----------------------------------------------------------------------------------------
+2017-10-16:|
+-------------
+
+__EqualityConstraint:
+
+implement the function ::phase_I_SOI_EqualityConstraint: EqualityConstraint
+
+__OptimizationProblems.kl_1:
+work out the solution for general n, heuristic is that the probability condition
+on the big set (j>=n/2) must be hit with equality.
+
+
+#----------------------------------------------------------------------------------------
+2017-10-17:|
+-------------
+
+__EqualityConstraint:
+implement the function ::phase_I_SOI_EqualityConstraint: EqualityConstraint
+
+Implement bigger, randomly generated KL_problems to see how fast/slow we are
+with the KKT system solution without native libraries.
+
+!!__OptimizationProblems.kl_2
+Figure out why this leads to a singular KKT system in the phase I analysis.
+The hessian H of the barrier function in KKTSystem::blockSolve really is singular!
+See also Log.txt.
+
+Note: this system has only the positivity constraints x_j>0 as inequalities.
+In phase I analysis the j-th constraint each of depends on the j-th variable
+and the new variable s (the last variable) only. Thus the hessian of the constraint
+is nonzero only on the diagonal and the last row and column.
+
+The objective function only depends on the variable s, so the hessian has only
+one nonzero entry (last diagonal element). Consequently the hessian of the barrier
+function has the same structure as that of the constraints. This is indeed what we
+see in the log file BUT this matrix is singular
+(subtract all other rows from the last one).
+
+It is hard to believe that the constraints x_j>0 lead to a singular hessian
+for the barrier function. BUG suspected.
+
+
+#----------------------------------------------------------------------------------------
+2017-10-18:|
+-------------
+
+Figure out why the phase I analysis for the OptimizationProblems.kl_1
+and OptimizationProblems.kl_3 run into a singular KKT system.
+
+__BUG___ detected: Ruiz equilibration leads from a positive definite matrix H
+to one which has a slightly negative eigenvalue!!!!
+Then the corresponding KKTSystem is flagged as singular, see
+Logs/ConstraintSet_phase_I_log.txt
+
+
+#----------------------------------------------------------------------------------------
+2017-11-01:|
+-------------
+
+KKTSystem.solve:
+tries the block elimination with Cholesky factorization. If this fails
+regularizes the system with the trick in Boyd. This will fail if the system is
+singular. In this case we go to SVD. Check that all this is proper, i.e. no
+regularization which distorts the system too much so solutions are no longer
+Newton steps in a _descent direction_.
+This could happen if we were to use simple regularization by adding eps*I
+to the singular (but positive semidefinite) Hessian H.
+
+Is likely correct.
+
+_tolerances_:
+
+Currently we have only one tolerance parameter to handle all tolerances:
+for constraints
+for the duality gap (termination criterion in barrier solver)
+for norm of gradient (as termination criterion in case of interior point solution).
+
+It may be useful to distinguish between these tolerance since in particular the
+tolerance for the duality gap often has to be reduced to avoid running into a
+singular KKT system.
+
+
+----------------------------------------------------------------------------------------
+2017-11-02:|
+-------------
+
+SOI analysis does not work (IndexOutOfBounds on DenseVector).
+Run the feasibility tests in Runner.
+
+ 
+ 
+
+
+
+
+

@@ -1,6 +1,6 @@
 package cvx
 
-import breeze.linalg.{DenseVector, Vector}
+import breeze.linalg.{DenseVector, Vector, max}
 
 /** Result of phase_I feasibility analysis.*/
 case class FeasibilityReport(
@@ -24,4 +24,21 @@ case class FeasibilityReport(
     isStrictlyFeasible:Boolean,
     /** List of constraints which x0 does not satisfy strictly.*/
     constraintsViolated:Seq[Constraint]
-)
+)   {
+
+  /** Report if a feasible point with feasibility tolerance tol has been found.
+   */
+  def toString(tol:Double):String = {
+
+      if(isStrictlyFeasible)
+                  "\nStrictly feasible point found:\n"+x0
+      else if (max(s)>tol) {
+
+        val str:String = "\nProblem not feasible within tolerance "+tol+
+          "\nFound point x0:\n" + x0 + "\nviolates constraints:\n"
+        str+constraintsViolated.foldLeft("")((acc: String, ct) => acc + "\n" + ct.id) + "\n"
+
+      }
+      else "\nCannot determine if problem is feasible.\n"
+  }
+}

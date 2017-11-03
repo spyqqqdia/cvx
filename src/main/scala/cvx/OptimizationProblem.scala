@@ -7,152 +7,87 @@ import breeze.linalg.{DenseVector, _}
 /**
   * Created by oar on 12/2/16.
   *
-  * Constrained or unconstrained optimization problem. Contains objective function and abstract constraint
-  * (convex set C).
+  * Constrained or unconstrained optimization problem.
   *
-  * @param dim number of independent variables x_j.
-  * @param solver solver used to find the minimizer.
+  * @param solver Solver for the problem
   */
-class OptimizationProblem(val id:String, val dim:Int, val solver:Solver) {
+class OptimizationProblem(
+  val id:String, val objectiveFunction: ObjectiveFunction, val solver:Solver,
+  val logger:Logger
+) {
 
-    def objF:ObjectiveFunction = solver.objF
-    def solve:Solution = solver.solve
+  def solve(debugLevel:Int=0):Solution = solver.solve(debugLevel)
 
+  /** Add the known solution to the minimization problem.
+    * For testing purposes.
+    */
+  def addSolution(optSol:KnownMinimizer): OptimizationProblem with KnownMinimizer  =
+  new OptimizationProblem(id,objectiveFunction,solver,logger) with KnownMinimizer {
+
+    def isMinimizer(x:DenseVector[Double],tol:Double):Boolean = optSol.isMinimizer(x,tol)
+    def minimumValue:Double = optSol.minimumValue
+  }
 }
 
 /** Factory functions to allocate problems and select the solver to use.
-  *
   */
 object OptimizationProblem {
 
 
-    /** Allocates an optimization problem constrained only by $x\in C$, where C is an open convex set
-      * known to contain a minimizer (typically the full Euclidean space).
-      *
-      * @param id ID for problem
-      * @param dim dimension of independent variable
-      * @param objF objective function
-      * @param pars solver parameters, see [SolverParams].
-      * @return problem minimizing objective function under the constraint $x\in C$ applying the parameters in pars
-      * and starting the iteration at C.samplePoint.
-      */
-    def unconstrained(
-        id:String, dim:Int, objF:ObjectiveFunction, C: ConvexSet with SamplePoint, pars:SolverParams
-    ): OptimizationProblem = {
+  /** Allocates an optimization problem constrained only by $x\in C$, where C is an open convex set
+    * known to contain a minimizer (typically the full Euclidean space).
+    *
+    * @param id ID for problem
+    * @param objF objective function
+    * @param pars solver parameters, see [SolverParams].
+    * @return problem minimizing objective function under the constraint $x\in C$ applying the parameters in pars
+    * and starting the iteration at C.samplePoint.
+    */
+  def apply(
+              id:String,
+              objF:ObjectiveFunction,
+              startingPoint:DenseVector[Double],
+              C: ConvexSet,
+              pars:SolverParams,
+              logger:Logger
+  ): OptimizationProblem = {
 
-        assert(dim==objF.dim && dim==C.dim)
-        val solver = UnconstrainedSolver(objF,C,pars)
-        new OptimizationProblem(id,dim,solver)
-    }
-
-
-    /** Allocates an optimization problem with inequality constraints (no equality constraints) using
-      * the barrier method if a strictly feasible point for the constraints is known.
-      * Then phase I analysis in setting up the solver is not needed.
-      *
-      * @param id ID for problem
-      * @param dim dimension of independent variable
-      * @param objF objective function
-      * @param ineqs inequality constraints
-      * @param pars solver parameters, see [SolverParams].
-      * @return problem minimizing objective function under constraints applying the parameters in pars
-      * and starting the iteration at ineqs.feasiblePoint.
-      */
-    def withBarrierMethod(
-        id:String, dim:Int, objF:ObjectiveFunction, ineqs: ConstraintSet with FeasiblePoint, pars:SolverParams
-    ): OptimizationProblem = {
-
-        assert(dim==objF.dim && dim==ineqs.dim)
-        val solver = BarrierSolver(objF,ineqs,pars)
-        new OptimizationProblem(id,dim,solver)
-    }
-
-    /** Allocates an optimization problem with equality and inequality constraints using
-      * the barrier method if a strictly feasible point for the constraints is known.
-      * Then phase I analysis in setting up the solver is not needed.
-      *
-      * @param id ID for problem
-      * @param dim dimension of independent variable
-      * @param objF objective function
-      * @param ineqs inequality constraints
-      * @param pars solver parameters, see [SolverParams].
-      * @return problem minimizing objective function under constraints applying the parameters in pars
-      * and starting the iteration at ineqs.feasiblePoint.
-      */
-    def withBarrierMethod(
-        id:String, dim:Int, objF:ObjectiveFunction, ineqs: ConstraintSet with FeasiblePoint, eqs:EqualityConstraints,
-        pars:SolverParams
-    ): OptimizationProblem = {
-
-        assert(dim==objF.dim && dim==ineqs.dim)
-        val solver = BarrierSolver(objF,ineqs,eqs,pars)
-        new OptimizationProblem(id,dim,solver)
-    }
+    assert(objF.dim == C.dim,
+      "Dimension mismatch objF.dim = "+objF.dim+", C.dim = "+C.dim+"\n"
+    )
+    val solver = UnconstrainedSolver(objF,C,startingPoint,pars,logger)
+    new OptimizationProblem(id,objF,solver,logger)
+  }
 
 
-    /** Allocates an optimization problem with inequality constraints (no equality constraints) using
-      * the barrier method if no strictly feasible point for the constraints is known.
-      * Then phase I analysis to find a starting point for the iterations will be performed.
-      *
-      * @param id ID for problem
-      * @param dim dimension of independent variable
-      * @param objF objective function
-      * @param ineqs inequality constraints
-      * @param pars solver parameters, see [SolverParams].
-      * If set to false, the simple analysis will be carried out ([boyd], section 11.4.1, p579).
-      * @param printFeas print the value of the variable s in the simple feasibility analysis
-      *                  if no feasible point is found.
-      * @return problem minimizing objective function under constraints applying the parameters in pars
-      * and starting the iteration at ineqs.feasiblePoint.
-      */
-    def withBarrierMethod(
-        id:String, dim:Int, objF:ObjectiveFunction, ineqs: ConstraintSet, pars:SolverParams, printFeas:Boolean
-    ): OptimizationProblem = {
+  /** Allocates an optimization problem with inequality constraints and optional equality constraints
+    * using a barrier solver for both the actual solution and the feasibility analysis.
+    *
+    * @param id name for problem
+    * @param objF objective function
+    * @param ineqs inequality constraints
+    * @param eqs optional equality constraint(s) in the form Ax=b
+    * @param pars solver parameters, see [SolverParams].
+    * @return problem minimizing objective function under constraints applying the parameters in pars
+    * and starting the iteration at ineqs.feasiblePoint.
+    */
+  def apply(
+              id:String,
+              objF:ObjectiveFunction,
+              ineqs: ConstraintSet,
+              eqs:Option[EqualityConstraint],
+              pars:SolverParams,
+              logger:Logger,
+              debugLevel:Int=0
+  ): OptimizationProblem = {
 
-        assert(dim==objF.dim && dim==ineqs.dim)
-        val solver = BarrierSolver(objF,ineqs,pars,printFeas)
-        new OptimizationProblem(id,dim,solver)
-    }
-
-
-    /** Allocates an optimization problem with inequality and equality constraints using
-      * the barrier method if no strictly feasible point for the constraints is known.
-      * Then phase I analysis to find a starting point for the iterations will be performed.
-      *
-      * @param id ID for problem
-      * @param dim dimension of independent variable
-      * @param objF objective function
-      * @param ineqs inequality constraints
-      * @param pars solver parameters, see [SolverParams].
-      * @param printFeas print the value of the variable s in the simple feasibility analysis
-      *                  if no feasible point is found.
-      * If set to false, the simple analysis will be carried out ([boyd], section 11.4.1, p579).
-      * @return problem minimizing objective function under constraints applying the parameters in pars
-      * and starting the iteration at ineqs.feasiblePoint.
-      */
-    def withBarrierMethod(
-        id:String, dim:Int, objF:ObjectiveFunction, ineqs: ConstraintSet, eqs:EqualityConstraints, pars:SolverParams,
-        printFeas:Boolean
-    ): OptimizationProblem = {
-
-        assert(dim==objF.dim && dim==ineqs.dim)
-        val solver = BarrierSolver(objF,ineqs,eqs,pars,printFeas)
-        new OptimizationProblem(id,dim,solver)
-    }
+    assert(objF.dim==ineqs.dim,"\n\nobjF.dim = "+objF.dim+", ineqs.dim = "+ineqs.dim+"\n")
+    eqs.map(eqCnt => assert(eqCnt.dim==objF.dim,"\n\neqCnt.dim = "+eqCnt.dim+", objF.dim = "+objF.dim+"\n"))
+    val solver = BarrierSolver(objF,ineqs.withFeasiblePoint(eqs,pars,debugLevel),eqs,pars,logger)
+    new OptimizationProblem(id,objF,solver,logger)
+  }
 
 
-    /** Add the known solution to the minimization problem.
-      * For testing purposes.
-      */
-    def addSolution(problem:OptimizationProblem,optSol:KnownMinimizer):
-    OptimizationProblem with KnownMinimizer  =
-        new OptimizationProblem(problem.id,problem.dim,problem.solver) with KnownMinimizer {
-
-            def isMinimizer(x:DenseVector[Double],tol:Double) = optSol.isMinimizer(x,tol)
-            def minimumValue = optSol.minimumValue
-
-    }
 }
-
 
 

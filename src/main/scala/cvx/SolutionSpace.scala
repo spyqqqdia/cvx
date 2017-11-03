@@ -19,20 +19,20 @@ import breeze.linalg.{DenseMatrix, DenseVector, _}
   */
 class SolutionSpace(val A:DenseMatrix[Double], val b:DenseVector[Double]){
 
-    assert(A.rows==b.length)
-    assert(A.rows < A.cols)
-    val sol = MatrixUtils.solveUnderdetermined(A,b)
-    val z0 = sol._1
-    val F = sol._2
+  assert(A.rows==b.length)
+  assert(A.rows < A.cols)
+  val sol:(DenseVector[Double],DenseMatrix[Double]) = MatrixUtils.solveUnderdetermined(A,b)
+  val z0:DenseVector[Double] = sol._1
+  val F:DenseMatrix[Double] = sol._2
 
-    /** If Ax0=b then x0 = z0 + Fu0 and so, since F'F=I (orthonormal columns) we have
-      * F'(x0-z0)=F'Fu0=u0.
-      * @return if Ax0=b returns u0 such that x0 = z0 + Fu0.
-      */
-    def parameter(x0:DenseVector[Double]) = F.t*(x0-z0)
+  /** If Ax0=b then x0 = z0 + Fu0 and so, since F'F=I (orthonormal columns) we have
+    * F'(x0-z0)=F'Fu0=u0.
+    * @return if Ax0=b returns u0 such that x0 = z0 + Fu0.
+    */
+  def parameter(x0:DenseVector[Double]):DenseVector[Double] = F.t*(x0-z0)
 }
 
 object SolutionSpace {
 
-    def apply(A:DenseMatrix[Double], b:DenseVector[Double]) = new SolutionSpace(A,b)
+  def apply(A:DenseMatrix[Double], b:DenseVector[Double]) = new SolutionSpace(A,b)
 }

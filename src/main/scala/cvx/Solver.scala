@@ -19,16 +19,11 @@ import breeze.linalg.{DenseMatrix, DenseVector, NotConvergedException, _}
   */
 trait Solver {
 
-    /** Objective function the solver works on.*/
-    def objF:ObjectiveFunction
-    /** Find the location $x$ of the minimum of f=objF over C by the newton method
-      * starting from the starting point x0.
-      *
-      * @return Solution object (minimizer with additional info.
-      */
-    def solve:Solution
-
-
+  def startingPoint:DenseVector[Double]
+  /** @return Solution object (minimizer with additional info.
+    */
+  def solve(debugLevel:Int=0):Solution
+  def dim:Int = startingPoint.length
 }
 
 /**
@@ -48,4 +43,3 @@ trait Solver {
   *                If this is smaller than sqrt(delta), the regularization will be applied.
   */
 case class SolverParams(maxIter:Int,alpha:Double,beta:Double,tol:Double,delta:Double)
-

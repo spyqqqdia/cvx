@@ -14,10 +14,10 @@ import breeze.linalg.{DenseMatrix, DenseVector, _}
 class EqualityConstraints(val A:DenseMatrix[Double], val b:DenseVector[Double]){
 
     assert(A.rows < A.cols, "m=A.rows="+A.rows+" is not less than n=A.cols="+A.cols)
-	val dim = A.cols - A.rows
+	val dim:Int = A.cols - A.rows
 	val solutionSpace = SolutionSpace(A,b)
-	val F = solutionSpace.F
-	val z0 = solutionSpace.z0
+	val F:DenseMatrix[Double] = solutionSpace.F
+	val z0:DenseVector[Double] = solutionSpace.z0
 
 	def isSatisfiedBy(x:DenseVector[Double]):Boolean = norm(A*x-b) < 1e-14*A.rows
 }
