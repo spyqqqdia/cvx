@@ -342,9 +342,15 @@ Status: simple feasibility analysis works but SOI analysis does not work
 
 
 
+#----------------------------------------------------------------------------------------
+2017-11-05:|
+-------------
 
+Implemented EqualityConstraint.phase_I_SOI_EqualityConstraint.
+The phase I SOI analysis in the FeasibilityTest now goes through if the tolerance
+is lowered to tol=1e-6.
 
-
+Status: working.
 
 
 

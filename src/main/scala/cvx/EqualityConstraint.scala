@@ -41,11 +41,13 @@ class EqualityConstraint(val A:DenseMatrix[Double], val b:DenseVector[Double]){
     EqualityConstraint(B,b)
   }
   /** The equality constraints mapped to the dimension of phase I SOI analysis
+    * @param p number of inequality constraints the phase I SOI analysis is applied to.
     */
-  def phase_I_SOI_EqualityConstraint: EqualityConstraint = {
+  def phase_I_SOI_EqualityConstraint(p:Int): EqualityConstraint = {
 
-    //--FIX ME
-    null
+    val zeroCols = DenseMatrix.zeros[Double](A.rows,p)
+    val B = DenseMatrix.horzcat(A,zeroCols)
+    EqualityConstraint(B,b)
   }
   def printSelf():Unit = {
 

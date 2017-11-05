@@ -11,7 +11,7 @@ object Runner extends App {
 
     println("Doing test problems."); Console.flush()
 
-    val debugLevel=0
+    val debugLevel=3
 
     val doTestMatrixUtils = false
     val doKktTests = false
@@ -26,7 +26,7 @@ object Runner extends App {
     val maxIter = 200           // max number of Newton steps computed
     val alpha = 0.05            // line search descent factor
     val beta = 0.75             // line search backtrack factor
-    val tolSolver = 1e-8        // tolerance for norm of gradient, duality gap
+    val tolSolver = 1e-6        // tolerance for norm of gradient, duality gap
     val tolSolution = 1e-2      // tolerance for solution identification
     val delta = 1e-8            // regularization A -> A+delta*I if ill conditioned
     val pars = SolverParams(maxIter,alpha,beta,tolSolver,delta)

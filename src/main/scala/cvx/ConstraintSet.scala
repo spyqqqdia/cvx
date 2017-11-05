@@ -271,7 +271,7 @@ abstract class ConstraintSet(val dim:Int, val constraints:Seq[Constraint]) {
 
     val p = numConstraints
     val n = dim
-    val phase_I_SOI_eqs:Option[EqualityConstraint] = eqs.map(eq => eq.phase_I_SOI_EqualityConstraint)
+    val phase_I_SOI_eqs:Option[EqualityConstraint] = eqs.map(eq => eq.phase_I_SOI_EqualityConstraint(p))
     val solver = phase_I_Solver_SOI(phase_I_SOI_eqs,pars)
     val sol = solver.solve(debugLevel)
 
