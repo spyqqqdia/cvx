@@ -356,9 +356,12 @@ SOI analysis does not work (IndexOutOfBounds on DenseVector).
 Run the feasibility tests in Runner.
 
  
- 
+----------------------------------------------------------------------------------------
+2017-11-05:|
+-------------
 
-
+EqualityConstraint.phase_I_SOI_EqualityConstraint
+is not implemented (returns null leading to null pointer exception).
 
 
 

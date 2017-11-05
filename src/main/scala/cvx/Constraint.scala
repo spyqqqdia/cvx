@@ -99,6 +99,7 @@ object Constraint {
     */
   def phase_I_SOI(cnt:Constraint,p:Int,j:Int):Constraint = new Constraint(cnt.id+"_phase_I",cnt.dim+p,cnt.ub){
 
+    assert(j<p,"\nj = "+j+" is bigger than p = "+p)
     // u=(x,s_1,...,s_p) is the new variable, note dim = cnt.dim+p
 
     /** The variables of the original problem.*/

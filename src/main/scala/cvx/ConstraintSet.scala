@@ -122,14 +122,16 @@ abstract class ConstraintSet(val dim:Int, val constraints:Seq[Constraint]) {
 
     val n = dim
     val p = numConstraints
+    val cnts = constraints
     val x = pointWhereDefined
+    val newDim = n + p
 
-    new ConstraintSet(n+p,Constraint.phase_I_SOI_Constraints(n,this.constraints)) with FeasiblePoint {
+    new ConstraintSet(newDim,Constraint.phase_I_SOI_Constraints(n,this.constraints)) with FeasiblePoint {
 
       // new variable u = (x,s) = (x_1,...,x_n,s_1,...,s_p), where n=dim
       // feasibility if s_j > g_j(x) where g_j(x) <= ub_j is the jth original constraint
-      def feasiblePoint:DenseVector[Double] = DenseVector.tabulate[Double](dim)(
-        j => if (j<n) x(j) else 1+constraints(j-n).valueAt(x)
+      def feasiblePoint:DenseVector[Double] = DenseVector.tabulate[Double](newDim)(
+        j => if (j<n) x(j) else 1+cnts(j-n).valueAt(x)
       )
       def pointWhereDefined:DenseVector[Double] = feasiblePoint
     }

@@ -47,12 +47,12 @@ object ConstraintSets {
     val ct2 = Constraints.expectation_lt_r(I_B*sgnB,pB*sgnB,id2)
 
     // set up the constraints
-    val positivityCnts:List[Constraint] =
+    val cnts:List[Constraint] =
     ct2::ct1::Constraints.allCoordinatesPositive(n)
 
     // point where all constraints are defined
     val x = DenseVector.tabulate[Double](n)(j=>1.0/n)
-    ConstraintSet(n,positivityCnts,x)
+    ConstraintSet(n,cnts,x)
   }
 
 }
