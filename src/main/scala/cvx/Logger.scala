@@ -5,7 +5,7 @@ import java.io.PrintWriter
 
 
 
-/** Created by vagrant on 09.02.17.
+/** Created by oar on 09.02.17.
   */
 class Logger(val logFilePath: String) {
 

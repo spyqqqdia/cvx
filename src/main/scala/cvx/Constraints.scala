@@ -4,7 +4,7 @@ import breeze.linalg.{DenseMatrix, DenseVector}
 import breeze.numerics.pow
 
 /**
-  * Created by vagrant on 10.10.17.
+  * Created by oar on 10.10.17.
   *
   * Some constraints we will use repeatedly.
   */

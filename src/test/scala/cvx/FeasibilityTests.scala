@@ -3,7 +3,7 @@ package cvx
 import breeze.linalg.DenseVector
 
 /**
-  * Created by vagrant on 02.11.17.
+  * Created by oar on 02.11.17.
   */
 object FeasibilityTests {
 

@@ -364,4 +364,23 @@ EqualityConstraint.phase_I_SOI_EqualityConstraint
 is not implemented (returns null leading to null pointer exception).
 
 
+----------------------------------------------------------------------------------------
+2017-11-07:|
+-------------
+
+Implement the regularization from the Neumaier paper in MatrixUtils.svdSolve.
+We should also do the following: if the solution with block elimination is carried out in the
+KKTsystem we need to check the accuracy of the solution and switch to SVD with regularization
+in case it is not satisfactory.
+
+Neumaier paper:
+ARNOLD NEUMAIER, SOLVING ILL-CONDITIONED AND SINGULAR LINEAR SYSTEMS:
+A TUTORIAL ON REGULARIZATION
+
+homepage:
+https://www.mat.univie.ac.at/~neum/
+regtutorial:
+https://www.mat.univie.ac.at/~neum/ms/regtutorial.pdf
+
+
 

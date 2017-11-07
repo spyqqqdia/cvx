@@ -3,7 +3,7 @@ package cvx
 import breeze.linalg.DenseVector
 
 /**
-  * Created by vagrant on 02.11.17.
+  * Created by oar on 02.11.17.
   *
   * Here we collect some feasible and infeasible constraint sets for
   * discrete probabilities (variable x satisfying x_j>0, sum_jx_j=1 is

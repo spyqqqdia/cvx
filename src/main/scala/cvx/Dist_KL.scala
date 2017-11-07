@@ -6,7 +6,7 @@ import breeze.numerics.log
 
 
 /**
-  * Created by vagrant on 10.10.17.
+  * Created by oar on 10.10.17.
   *
   * Kullback-Leibler distance
   *
