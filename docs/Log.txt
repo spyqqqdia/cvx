@@ -354,6 +354,17 @@ Status: working.
 
 
 
+#----------------------------------------------------------------------------------------
+2017-11-09:|
+-------------
+
+MathUtils expanded, the logarithmic GLM score function used in SVD regularization with its derivatives implemented.
+See docs/cvx_notes.pdf
+
+Status: minimization by solving g'(t)=0 with Newton's method does not work since it can happen that
+g(t) is deceasing.
+
+
 
 
 

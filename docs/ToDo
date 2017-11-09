@@ -383,4 +383,21 @@ regtutorial:
 https://www.mat.univie.ac.at/~neum/ms/regtutorial.pdf
 
 
+#----------------------------------------------------------------------------------------
+2017-11-09:|
+-------------
+
+Implement the SVD regularization in the KKTsystem solution.
+Needs analysis.
+
+We should scan the SVD solution formula for problems:
+u_j'b large while sigma_j small, only then act on it.
+
+GLM score function minimization does not yet work.
+Minimization via solution of g'(t)=0 does not always work since g(t) can be decreasing
+Then t will be large, Delta will be small and no regularization takes place.
+Does this ony happen when we do not have a problem?
+Explore in R-prototype.
+
+
 
