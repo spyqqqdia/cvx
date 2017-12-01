@@ -2,6 +2,8 @@ package cvx
 
 import breeze.linalg.DenseVector
 
+import scala.collection.mutable.ListBuffer
+
 /**
   * Created by oar on 02.11.17.
   *
@@ -13,6 +15,8 @@ import breeze.linalg.DenseVector
   * and dist_KL minimization.
   */
 object ConstraintSets {
+
+  val rng = scala.util.Random
 
   /** Constraint for probabilities x_0,...,x_{n-1}  on
     * Omega={0,1,2,...,n-1} as follows:
@@ -47,12 +51,38 @@ object ConstraintSets {
     val ct2 = Constraints.expectation_lt_r(I_B*sgnB,pB*sgnB,id2)
 
     // set up the constraints
-    val cnts:List[Constraint] =
-    ct2::ct1::Constraints.allCoordinatesPositive(n)
+    val cnts:List[Constraint] = ct2::ct1::Constraints.allCoordinatesPositive(n)
 
     // point where all constraints are defined
     val x = DenseVector.tabulate[Double](n)(j=>1.0/n)
     ConstraintSet(n,cnts,x)
+  }
+
+  /** A set of p random linear constraints of the form a'(x-x0)<=e
+    * and q random quadratic constraints of the form 0.5*||R(x-x0)||²<=e
+    * with random upper bounds e>0 and vector a respectively matrix R
+    * with entries uniformly random in [-1,1].
+    */
+  def randomConstraintSet(x0:DenseVector[Double],p:Int,q:Int):ConstraintSet = {
+
+    val cts = ListBuffer[Constraint]()
+    for(j <- 1 to p){
+
+      val e = 0.1+0.1*rng.nextDouble()
+      val id = "Random linear constraint_"+j
+      cts += Constraints.randomLinearIneqConstraint(id,x0,e)
+    }
+    for(j <- 1 to q){
+
+      val e = 0.2*(1+rng.nextDouble())
+      val id = "Random quadratic constraint_"+j
+      cts += Constraints.randomQuadraticIneqConstraint(id,x0,e)
+    }
+    val dim = x0.length
+    // point where all constraints are defined, don't use x0 here
+    // since some of the test optimizations have the optimum at x0
+    val u = DenseVector.zeros[Double](dim)
+    ConstraintSet(dim,cts,u)
   }
 
 }

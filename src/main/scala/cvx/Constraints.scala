@@ -1,7 +1,9 @@
 package cvx
 
-import breeze.linalg.{DenseMatrix, DenseVector}
+import breeze.linalg.{DenseMatrix, DenseVector, norm}
 import breeze.numerics.pow
+
+import scala.collection.mutable.ListBuffer
 
 /**
   * Created by oar on 10.10.17.
@@ -10,6 +12,7 @@ import breeze.numerics.pow
   */
 object Constraints {
 
+  val rng = scala.util.Random
   /** Constraints: all x_j>0, j=1,...,n.
     *
     * @param n dimension of problem.
@@ -105,5 +108,146 @@ object Constraints {
     LinearConstraint(id,dim,r,0,w)
   }
 
+  /** The constraint a'(x-x0)<=e. This is satisfied by the point x=x0 if and
+    * only if e>=0.
+    */
+  def linearIneqConstraint(id:String,x0:DenseVector[Double],a:DenseVector[Double],e:Double):LinearConstraint = {
 
+    val dim:Int = x0.length
+    assert(a.length==dim,"\nLengths of vectors x0 and v not equal, x0.length = "+dim+", v.length = "+a.length+".\n")
+    LinearConstraint(id,dim,e,-(a dot x0),a)
+  }
+  /** The constraint a'(x-x0)<=e with a vector a with uniformly random components in [-1,1].
+    * This is satisfied by the point x=x0 if and only if e>=0.
+    */
+  def randomLinearIneqConstraint(id:String,x0:DenseVector[Double],e:Double):LinearConstraint = {
+
+    val a = MatrixUtils.randomVector(x0.length,-1.0,1.0)
+    linearIneqConstraint(id,x0,a,e)
+  }
+
+
+  /** The constraint 05*||R(x-x0)||²<=e. This is infeasible if e<0, has only one solution x=x0 if e=0 (then expect
+    * problems) and defines a nonempty open convex set containing x0 if e>0.
+    */
+  def quadraticIneqConstraint(id:String,x0:DenseVector[Double],R:DenseMatrix[Double],e:Double):QuadraticConstraint = {
+
+    val dim=x0.length
+    assert(R.rows==dim,"\nDimension mismatch R.rows = "+R.rows+" not equal to x0.length = "+dim+".\n")
+
+    val Rx0 = R*x0
+    val norm_Rx0 = norm(Rx0)
+    val r = norm_Rx0*norm_Rx0/2
+
+    val a:DenseVector[Double] = -R.t*Rx0
+    val P:DenseMatrix[Double] = R.t*R
+
+    QuadraticConstraint(id,dim,e,r,a,P)
+  }
+  /** The constraint 05*||R(x-x0)||²<=e where the matrix R has entries uniformly random in [-1,1].
+    * This is infeasible if e<0, has only one solution x=x0 if e=0 (then expect problems) and defines
+    * a nonempty open convex set containing x0 if e>0.
+    */
+  def randomQuadraticIneqConstraint(id:String,x0:DenseVector[Double],e:Double):QuadraticConstraint = {
+
+    val dim = x0.length
+    val R = MatrixUtils.randomMatrix(dim,dim,-1.0,1.0)
+    quadraticIneqConstraint(id,x0,R,e)
+  }
+
+  /** An equality constraint Ax=b satisfied by x=x0, where the matrix A has m rows
+    * with entries uniformly random in [-1,1] (and then of course b=Ax0).
+    *
+    * @param x0: must have length >= 2.
+    */
+  def randomEqualityConstraint(id:String,x0:DenseVector[Double],m:Int):EqualityConstraint = {
+
+    val n = x0.length
+    assert(n>=2,"\nx0.length = "+n+" not >= 2.\n")
+    val A = MatrixUtils.randomMatrix(m,n,-1.0,1.0)
+    val b = A*x0
+    EqualityConstraint(A,b)
+  }
+
+  /*******************************************************************/
+  /********************** Special constraints ************************/
+  /*******************************************************************/
+
+  /** List of linear inequality constraints r+Qx <= ub, where here "<="
+    * is interpreted component by component.
+    * In other words this is the list of constraints
+    *    r_i + row_i(Q)'x <= ub_i,  i < A.rows.
+    */
+  def linearInequalityConstraints(
+    r:DenseVector[Double], Q:DenseMatrix[Double], ub:DenseVector[Double]
+  ):List[LinearConstraint] = {
+
+    assert(r.length==Q.rows && r.length==ub.length)
+    val res0 = ListBuffer[LinearConstraint]()
+    val n = Q.rows
+    for(i <- 0 until n){
+
+      val id = "LinCnt"+i
+      val dim = Q.cols
+      val a:DenseVector[Double] = Q(i,::).t
+      val cnt_j = LinearConstraint(id,dim,ub(i),r(i),a)
+      res0 += cnt_j
+    }
+    res0.toList
+  }
+
+  /** The constraint |x_0|+...+|x_{n-1}| <= ub, where n is the full
+    * dimension of the variable x (all x_j involved) resolved as a list
+    * of constraints
+    *  a_0x_0 +...+ a_{n-1}x_{n-1} <= ub,
+    * where the coefficient vector (a_0,...,a_{n-1}) runs through all
+    * combinations of signs +1,-1.
+    * Note: this list has length pow(2,n) so can only be applied to
+    * small n!!
+    */
+  def sumAbsoluteValuesBoundedBy(n:Int,ub:Double):List[LinearConstraint] = {
+
+    val m:Int = pow(2,n)
+    val r = DenseVector.zeros[Double](m)
+    val Q = MatrixUtils.signCombinationMatrix(n)
+    val ubs = DenseVector.tabulate[Double](m)(j => ub)
+    linearInequalityConstraints(r,Q,ubs)
+  }
+  /** The constraint |x_p|+...+|x_{q-1}| <= ub acting on a vector
+    * of variables x=(x_0,...,x_{n-1}).
+    *
+    * This is resolved as a list of constraints
+    *  a_px_p +...+ a_{q-1}x_{q-1} <= ub,
+    * where the coefficient vector (a_p,...,a_{q-1}) runs through all
+    * combinations of signs +1,-1.
+    * Note: this list has length pow(2,q-p) so can only be applied to
+    * small values of q-p!!
+    */
+  def sumAbsoluteValuesBoundedBy(n:Int,p:Int,q:Int,ub:Double):List[LinearConstraint] = {
+
+    val m:Int = pow(2,q-p)
+    assert(q-p<=16,"\nTrying to allocate too many constraints, number = "+m+".\n")
+    val r = DenseVector.zeros[Double](m)
+    val Q = MatrixUtils.signCombinationMatrix(n,p,q)
+    val ubs = DenseVector.tabulate[Double](m)(j => ub)
+    linearInequalityConstraints(r,Q,ubs)
+  }
+
+  /** The constraints |x_j|<=ub(j), j=0,...,n-1, resolved as
+    *  x_j<=ub_j and -x_j<=ub_j, j=0,...,n-1.
+    *
+    * @param n dimension of variable x
+    * @param ub vector of upper bounds for |x_j|.
+    */
+  def absoluteValuesBoundedBy(n:Int,ub:DenseVector[Double]):List[LinearConstraint] = {
+
+    assert(ub.length==n && ub.forall(_>=0))
+    val res0 = ListBuffer[LinearConstraint]()
+    for(j <- 0 until n){
+
+      val cnts_j = sumAbsoluteValuesBoundedBy(n,j,j+1,ub(j))   // |x_j| <= ub(j)
+      res0++cnts_j
+    }
+    res0.toList
+  }
 }

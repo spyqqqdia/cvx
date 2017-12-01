@@ -23,22 +23,38 @@ case class FeasibilityReport(
     /** Flag if x0 satisfies all constraints strictly. */
     isStrictlyFeasible:Boolean,
     /** List of constraints which x0 does not satisfy strictly.*/
-    constraintsViolated:Seq[Constraint]
+    constraintSet:ConstraintSet,
+    /** ||Ax0-b|| if equality constraints are present, None else.*/
+    equalityConstraintError:Option[Double]
 )   {
+
+  /** List of constraints not satisfied with tolerance tol. */
+  def violatedConstraints(tol:Double):List[Constraint] =
+    constraintSet.constraints.filter(!_.isSatisfiedWithTolerance(x0,tol)).toList
+
+  def isFeasible(tol:Double):Boolean =
+    (max(s)<tol && equalityConstraintError.getOrElse(0.0) < tol)
+
+  def reasonWhyInfeasible(tol:Double):String =
+    if (!isFeasible(tol)) {
+
+      val str:String = "\nProblem not feasible within tolerance "+tol+
+        "\nFound point x0:\n" + x0 + "\nviolates constraints:\n"
+
+      str+violatedConstraints(tol).foldLeft("")((acc: String, ct) => acc + "\n"+ct.id) +
+        "\nEqualityContraints, error: "+equalityConstraintError.getOrElse(0)+"\n"
+    } else
+      "\nCannot determine if problem is feasible.\n"
+
 
   /** Report if a feasible point with feasibility tolerance tol has been found.
    */
-  def toString(tol:Double):String = {
+  def toString(tol:Double):String =
 
       if(isStrictlyFeasible)
-                  "\nStrictly feasible point found:\n"+x0
-      else if (max(s)>tol) {
+        "\nStrictly feasible point found:\n"+x0
+      else if(isFeasible(tol))
+        "\nFound point feasible up to tolerance tol = "+tol+":\n"+x0
+      else reasonWhyInfeasible(tol)
 
-        val str:String = "\nProblem not feasible within tolerance "+tol+
-          "\nFound point x0:\n" + x0 + "\nviolates constraints:\n"
-        str+constraintsViolated.foldLeft("")((acc: String, ct) => acc + "\n" + ct.id) + "\n"
-
-      }
-      else "\nCannot determine if problem is feasible.\n"
-  }
 }

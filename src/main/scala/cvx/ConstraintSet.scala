@@ -1,6 +1,7 @@
 package cvx
 
-import breeze.linalg.{DenseMatrix, DenseVector, norm, sum}
+import breeze.linalg.{DenseMatrix, DenseVector, max, norm, sum}
+import breeze.numerics.abs
 
 /** Holder for a sequence of constraints with some additional methods.
   */
@@ -16,13 +17,13 @@ abstract class ConstraintSet(val dim:Int, val constraints:Seq[Constraint]) {
     */
   def pointWhereDefined: DenseVector[Double]
 
-  def numConstraints:Int = constraints.size
+  def numConstraints = constraints.size
   def isSatisfiedStrictlyBy(x:DenseVector[Double]):Boolean = constraints.forall(_.isSatisfiedStrictly(x))
 
   /** Set of points where the constraints are satisfied strictly. */
   def strictlyFeasibleSet = new ConvexSet(dim) {
 
-    def isInSet(x: DenseVector[Double]):Boolean = {
+    def isInSet(x: DenseVector[Double]) = {
 
       assert(x.length == dim)
       constraints.forall(cnt => cnt.isSatisfiedStrictly(x))
@@ -37,8 +38,8 @@ abstract class ConstraintSet(val dim:Int, val constraints:Seq[Constraint]) {
     assert(constraints.forall(_.isSatisfiedStrictly(x0)))
     new ConstraintSet(dim,constraints) with FeasiblePoint {
 
-      def pointWhereDefined:DenseVector[Double] = x0
-      def feasiblePoint:DenseVector[Double] = x0
+      def pointWhereDefined = x0
+      def feasiblePoint = x0
     }
   }
 
@@ -77,9 +78,11 @@ abstract class ConstraintSet(val dim:Int, val constraints:Seq[Constraint]) {
     new ConstraintSet(1+n,constraints.map(cnt => Constraint.phase_I(cnt))) with FeasiblePoint {
 
       val x0:DenseVector[Double] = self.pointWhereDefined
-      val y0:Double = self.constraints.map(_.valueAt(x0)).max  // max_j g_j(x0)
-      def feasiblePoint:DenseVector[Double] = DenseVector.tabulate[Double](1+n)(j => if (j<n) x0(j) else 1+y0 )
-      def pointWhereDefined:DenseVector[Double] = feasiblePoint
+      // recall inequality constraints have the form g_j(x) <= ub_j and are replaced with
+      // g_j(x)-s <= ub_j. This can be satisfied with any s > g_j(x)-ub_j
+      val y0:Double = self.constraints.map(cnt => cnt.valueAt(x0)-cnt.ub).max // max_j g_j(x0)
+      def feasiblePoint = DenseVector.tabulate[Double](1+n)(j => if (j<n) x0(j) else 1+y0 )
+      def pointWhereDefined = feasiblePoint
     }
   }
 
@@ -113,7 +116,7 @@ abstract class ConstraintSet(val dim:Int, val constraints:Seq[Constraint]) {
     * positivity constraints for the additional variables, see [Constraint..phase_I_SOI_Constraints].
     * [boyd], 11.4.1, p580.
     * Recall: one new variable s_j for each constraint g_j(x) <= ub_j which is then replaced with
-    * g_j(x)-s<=ub.
+    * g_j(x)-s_j<=ub.
     *
     * For these we can always find a point at which all these constraints are satisfied.
     * The member function _samplePoint_ returns such a point.
@@ -122,18 +125,20 @@ abstract class ConstraintSet(val dim:Int, val constraints:Seq[Constraint]) {
 
     val n = dim
     val p = numConstraints
-    val cnts = constraints
     val x = pointWhereDefined
-    val newDim = n + p
+    val newDim = n+p
 
     new ConstraintSet(newDim,Constraint.phase_I_SOI_Constraints(n,this.constraints)) with FeasiblePoint {
 
+      val cnts = self.constraints
       // new variable u = (x,s) = (x_1,...,x_n,s_1,...,s_p), where n=dim
-      // feasibility if s_j > g_j(x) where g_j(x) <= ub_j is the jth original constraint
-      def feasiblePoint:DenseVector[Double] = DenseVector.tabulate[Double](newDim)(
-        j => if (j<n) x(j) else 1+cnts(j-n).valueAt(x)
+      // each constraint g_j(x) <= ub_j is replaced with g_j(x)-s_j <= ub_j
+      // and this can be satisfied with any s_j > g_j(x)-ub_j.
+      // Recall also that s_j >= 0 is required
+      val feasiblePoint = DenseVector.tabulate[Double](newDim)(
+        j => if (j<n) x(j) else scala.math.max(0.5,1+cnts(j-n).valueAt(x)-cnts(j-n).ub)
       )
-      def pointWhereDefined:DenseVector[Double] = feasiblePoint
+      def pointWhereDefined = feasiblePoint
     }
   }
 
@@ -181,12 +186,25 @@ abstract class ConstraintSet(val dim:Int, val constraints:Seq[Constraint]) {
     val w_feas = sol.x                  // w = c(x,s)
     val x_feas = w_feas(0 until dim)    // unclear how many constraints that satisfies, so we check
     val s_feas = w_feas(dim)            // if s_feas < 0, all constraints are strictly satisfied.
-    val s = DenseVector[Double](1)
-    s(0)=s_feas
-    val isStrictlySatisfied = s_feas < 0
+
+    // for the equality constraints use the stricter pars.tol not pars.tolEqSolve which is for
+    // the ill conditioned KKT systems
+    val eqError = eqs.map(eqs => eqs.errorAt(x_feas))
+    val isStrictlySatisfied = s_feas < 0.0 && eqError.getOrElse(0.0) < pars.tol
     val violatedCnts = constraints.filter(!_.isSatisfiedStrictly(x_feas))
 
-    FeasibilityReport(x_feas,s,isStrictlySatisfied,violatedCnts)
+    val s = DenseVector[Double](1)
+    s(0)=s_feas
+    val report = FeasibilityReport(x_feas,s,isStrictlySatisfied,this,eqError)
+
+    if(debugLevel>1){
+      val logFilePath = "logs/ConstraintSet_phase_I_log.txt"
+      val logger = Logger(logFilePath)
+      val msg = "\nConstraintSet.phase_I_Analysis, result:\n"+report.toString(pars.tol)
+      logger.println(msg)
+      println(msg); Console.flush()
+    }
+    report
   }
 
 
@@ -222,12 +240,26 @@ abstract class ConstraintSet(val dim:Int, val constraints:Seq[Constraint]) {
     val u_feas = w_feas(0 until k)
     val x_feas = z0+F*u_feas       // unclear how many constraints that satisfies, so we check
     val s_feas = w_feas(k)         // if s_feas < 0, all constraints are strictly satisfied.
-    val s = DenseVector[Double](1)
-    s(0)=s_feas
-    val isStrictlySatisfied = s_feas < 0
     val violatedCnts = constraints.filter(!_.isSatisfiedStrictly(x_feas))
 
-    FeasibilityReport(u_feas,s,isStrictlySatisfied,violatedCnts)
+    // here equality constraints are always present, so no Option
+    // for the equality constraints use the stricter pars.tol not pars.tolEqSolve which is for
+    // the ill conditioned KKT systems
+    val eqError = eqs.errorAt(x_feas)
+    val isStrictlySatisfied = (s_feas < 0.0) && (eqError < pars.tol)
+
+    val s = DenseVector[Double](1)
+    s(0)=s_feas
+    val report = FeasibilityReport(x_feas,s,isStrictlySatisfied,this,Some(eqError))
+
+    if(debugLevel>1){
+      val logFilePath = "logs/ConstraintSet_phase_I_log.txt"
+      val logger = Logger(logFilePath)
+      val msg = "\nConstraintSet.phase_I_Analysis, result:\n"+report.toString(pars.tol)
+      logger.println(msg)
+      println(msg); Console.flush()
+    }
+    report
   }
 
   //--------- Feasibility Analysis via sum of infeasibilities ----------------//
@@ -278,15 +310,29 @@ abstract class ConstraintSet(val dim:Int, val constraints:Seq[Constraint]) {
     val w_feas = sol.x                     // w = c(x,s),  dim(x)=n, s_j=g_j(x), j<p
     val x_feas = w_feas(0 until n)         // unclear how many constraints that satisfies, so we check
     val s_feas = w_feas(n until n+p)       // if s_feas(j) < 0, for all j<p, then all constraints are strictly satisfied.
-    val isStrictlySatisfied = (0 until n).forall(j => s_feas(j) < 0)
     val violatedCnts = constraints.filter(!_.isSatisfiedStrictly(x_feas))
 
-    FeasibilityReport(x_feas,s_feas,isStrictlySatisfied,violatedCnts)
+    // for the equality constraints use the stricter pars.tol not pars.tolEqSolve which is for
+    // the ill conditioned KKT systems
+    val eqError = eqs.map(eqs => eqs.errorAt(x_feas))
+    val isStrictlySatisfied = (0 until n).forall(j => s_feas(j) < 0) && (eqError.getOrElse(0.0) < pars.tol)
+
+    val report = FeasibilityReport(x_feas,s_feas,isStrictlySatisfied,this,eqError)
+
+    if(debugLevel>1){
+      val logFilePath = "logs/ConstraintSet_phase_I_log.txt"
+      val logger = Logger(logFilePath)
+      val msg = "\nConstraintSet.phase_I_Analysis, result:\n"+report.toString(pars.tol)
+      logger.println(msg)
+      println(msg); Console.flush()
+    }
+    report
   }
 
   /** Returns a version of itself with a feasible point added.
     * If it already has one, returns itself, otherwise performs a simple feasibility
-    * analysis and adds a feasible point if possible, otherwise throws InfeasibleException.
+    * analysis and adds a feasible point if possible, otherwise throws
+    * InfeasibleProblemException.
     * This feasible point satisfies the constraints only up to tolerance pars.tol.
     *
     * @param eqs optional equality constraints in the form Ax=b.
@@ -304,10 +350,10 @@ abstract class ConstraintSet(val dim:Int, val constraints:Seq[Constraint]) {
         val feasibilityReport: FeasibilityReport = phase_I_Analysis(eqs,pars,debugLevel)
         val x0 = feasibilityReport.x0
         val s = feasibilityReport.s
-        val violatedConstraints = feasibilityReport.constraintsViolated
+        val violatedConstraints = feasibilityReport.violatedConstraints(tol)
         val eqResidual = eqs.map(eqCnt => norm(eqCnt.A*x0-eqCnt.b))
 
-        if (s(0) > tol) throw InfeasibleException(x0, violatedConstraints, eqResidual)
+        if (!feasibilityReport.isFeasible(tol)) throw new InfeasibleProblemException(feasibilityReport,tol)
         addFeasiblePoint(x0)
     }
   }
@@ -324,7 +370,7 @@ object ConstraintSet {
     * @return the ConstraintSet with constraints in theConstraints
     */
   def apply(dim:Int, theConstraints:Seq[Constraint],x0:DenseVector[Double]) =
-  new ConstraintSet(dim,theConstraints){ def pointWhereDefined:DenseVector[Double] = x0 }
+  new ConstraintSet(dim,theConstraints){ def pointWhereDefined = x0 }
 
 
 }

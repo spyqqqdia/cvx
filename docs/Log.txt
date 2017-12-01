@@ -1,202 +1,3 @@
-#--------------------------------------------------------------
-2016-12-03:|
--------------
-
-Fixed numerous bugs including errors in docs/cvx_notes, hessian of test function in example.
-Added
-    MatrixUtils.solveWithPreconditioning
-solver for positive semidefinite system Hx=b (regularized to (H+delta*I)x=b if nearly singular.
-
-Rewrote UnconstrainedSolver to use this solver for the Newton step.
-Added tests for all the linear equation solvers.
-
-Status: compiles and runs, all tests working.
-
-
-#--------------------------------------------------------------
-2016-12-06:|
--------------
-
-Numerous new classes (Solution, ObjectiveFunction, Solver,...) to clean up current state.
-Started with BarrierSolver.
-
-Status: unfinished.
-Code compiles, but the new versions of Type1 power test functions do not work with the UnconstrainedSolver,
-output on test. Some items in the solution object empty?
-
-The normSquared test function does work.
-
-
-#--------------------------------------------------------------
-2016-12-09_a:|
----------------
-
-Massive rewrite. Added Traits SamplePoint (of convex set), FeasiblePoint (of constraint set),
-SolutionSpace reworked, finished BarrierSolver.
-
-Status: code compiles, completely untested, known bug of 2016-12-06 unresolved.
-Probably full of bugs.
-
-
-#--------------------------------------------------------------
-2016-12-10:|
--------------
-
-Renamed TestFunction --> MinimizationProblem, some changes (e.g contains objective Function as value etc.)
-
-#--------------------------------------------------------------
-2016-12-11:|
--------------
-
-Consolidated solver parameters (maxIter, alpha,...) into case class.
-Finished BarrierSolver, OptimizationProblem.
-
-Code compiles, equation solving tests go through.
-Minimization solvers totally untested.
-
-
-
-#--------------------------------------------------------------
-2016-12-16:|
--------------
-
-Renamed:
-OptimizationSolution ---> KnownMinimizer
-Solution ---> SolverResult
-
-Finished: power function problems and standard list of OptimizationProblems
-(in OptimizationProblems).
-Some bugfixes, especially in MatrixUtils.solveWithPreconditioning, where we have to
-catch all Exceptions on the first try (could be breeze.linalg.NonConvergedException and not only
-our own LinSolveException) to get into the catch block where we do the regularization.
-
-Status: compiles, test of standard problems goes through.
-
-
-#--------------------------------------------------------------
-2016-12-17:|
--------------
-
-Removed some bugs in constructing the phase_I versions of Constraints,
-most notably
-     Constraint::phase_I, phase_I_SOI
-the hessianAt(x) did not return hess but the subslice as result of the subslice assigment.
-Parameter signature simplified (parameter dim eliminated, is taken directly from the constraint set).
-
-New optimization problem
-                     OptimizationProblems.minX1
-with constraints implemented. Fails the test: backtracking line search runs into the boundary
-of the feasible region, then the barrier function throws an excpetion as it is evaluated at a point
-which is not strictly feasible.
-
-
-#--------------------------------------------------------------
-2016-12-18:|
--------------
-
-Put minX1 at the head of the list of test problems.
-Minimal changes in UnconstrainedSolver::solve.
-Problem minX1 fails test as backtracking line search does not reach sufficient decrease.
-Objective function or gradient of the problem or the barrier solver must be messed up.
-
-#--------------------------------------------------------------
-2017-01-14:|
--------------
-
-Fixed bug in the Barriersolver for minimization without equality constraints.
-(sign in the computation of the Hessian).
-The problem is localized to this one function and should fix the issue everywhere.
-
-With this the the test problem OptimizationProblems.minX1 is solved correctly.
-Status: all test problems implemented so far (uncontstrained + minX1) work correctly.
-
-
-#--------------------------------------------------------------
-2017-01-14A:|
---------------
-
-Moved SOI feasibility analysis into the constraint sets.
-The BarrierSolvers now always use simple feasibility analysis.
-
-Reason: SOI feasibility analysis is not guaranteed to deliver a feasible point
-when applied trivially. More sophisticated application is needed as described
-in ConstraintSet.doSOIAnalysis.
-
-Fixed some BUGs in the feasibility solvers. These seem to be working.
-
-Status: test program go through, no known bugs.
-
-
---------------------------------------------------------------
-2017-01-22:|
--------------
-
-Fixed BUG in MatrixUtils.triangularSolve, added test for same in MatrixUtilsTests.
-New class KKTSystem.
-Solution relies on MatrixUtils.triangularSolve, forward errors a little large in the (random)
-test problems, particularly absolute errors.
-This could be a problem when this is extended to the system for the infeasible start
-primal-dual method since we will then not get the residuals convergent to zero. So we cannot
-use the size of the residuals as a termination criterion.
-
-The errors are too small to indicate a programming bug.
-Apparently the test matrices are ill conditioned, the construction H=LL' ensures that the
-condition number of H is much worse than that of L.
-
---------------------------------------------------------------
-2017-01-23:|
--------------
-
-Added file docs/KKT.pdf
-
-Added computation of the condition number of H to the KKT tests (via SVD).
-These are not that large (about 1600). In light of these condition numbers the solutions are
-remarkably inaccurate.
-Maybe we need to compute the condition numbers of the whole KKT matrix.
-
---------------------------------------------------------------
-2017-01-23A:|
---------------
-
-Eliminated minor bugs in KktTest setup.
-Added parameter debug to KKTSystem solveType0 to print the condition number
-of the matrix H after equilibration.
-
-
-Experiments:
-KKTSystem.solveWithCholFactor: works
-KKTSystem.blockSolve: works with condition numbers of 2e6, no problems.
-KKTSystem.solvePD:
-does not work, the difference to blockSolve is only the Ruiz equilibration.
-In the test examples equilibration reduces the condition number by half.
-Thus there must be a bug in the transformation toi the equilibrated system.
-
-BUG is fixed, status: working!
-
-
---------------------------------------------------------------
-2017-02-03:|
--------------
-
-Split up the Constraints, each class in its own file.
-Constraints, ObjectiveFunction: added reduction method.
-
-Implementation of ::reduced does not compile.
-may have to be moved to the companion object.
-
-docs/cvx_notes: minor rewrite.
-
-Status: does not compile.
-
-
---------------------------------------------------------------
-2017-02-04:|
--------------
-
-Fixed the compilation problem.
-Status: compiles.
-
-
 
 #----------------------------------------------------------------------------------------
 2017-10-09:|
@@ -341,28 +142,116 @@ Status: simple feasibility analysis works but SOI analysis does not work
 (IndexOutOfBounds on DenseVector).
 
 
-
 #----------------------------------------------------------------------------------------
-2017-11-05:|
+2017-11-21:|
 -------------
 
-Implemented EqualityConstraint.phase_I_SOI_EqualityConstraint.
-The phase I SOI analysis in the FeasibilityTest now goes through if the tolerance
-is lowered to tol=1e-6.
+BugFix in KKTData:
+on DenseVector the operation :+ (append an element) is defined
+and compiles but has no effect!
+Therefore we had to switch to Vector[Int] for the type of the nullIndices.
 
-Status: working.
+Added KktTest.testKktSystemReduction
+
+
+KKTSystem: all solvers: added tolerance to parameters.
+MatrixUtils:  added logger, debuglevel to svdSolve.
+
+Status: new parameter signatures are only consistent within MatrixUtils and
+KKTSystem. Needs to be fixed elsewhere, do a compile and look at the errors.
+
+
+#----------------------------------------------------------------------------------------
+2017-11-22:|
+-------------
+
+Numerous changes in Solvers, SolverParams, routines in MatrixUtils.
+
+Files affected:
+KKTData, KKTSystem, MatrixUtils, MatrixUtilsTests,
+SolverParams, UnconstrainedSolver, EqualityConstrainedSolver,
+KktTest, MinimizationTests, Runner
+
+Status: compiles and runs.
+Problem dist_KL_2 fails to observe the constraint sum(x_j)=1
 
 
 
 #----------------------------------------------------------------------------------------
-2017-11-09:|
+2017-11-23:|
 -------------
 
-MathUtils expanded, the logarithmic GLM score function used in SVD regularization with its derivatives implemented.
-See docs/cvx_notes.pdf
+Changes in feasibility reporting, debugging output.
 
-Status: minimization by solving g'(t)=0 with Newton's method does not work since it can happen that
-g(t) is deceasing.
+Files affected:
+InfeasibleProblemException, FeasibilityReport,
+EqualityConstraint, Constraint, ConstraintSet,
+KKTSystem, MatrixUtils, MatrixUtilsTests
+
+
+#----------------------------------------------------------------------------------------
+2017-11-28:|
+-------------
+
+KKTSystem.solveType0:
+moved to the transformed system (H -> H+A'A) immediately.
+This fixed the problem with OptimizationProblems.kl_2
+
+Fixed up MatrixUtils.solveSVD some more.
+Now computes the distance min_x||Ax-b|| and checks if this is below
+the tolerance.
+
+Fixed Bug in feasibility report (::reasonWhyInfeasible).
+
+Status: all tests of minimization problems go through correctly except
+the random power problems.
+
+Added some Constraints and Objective Functions for test cases.
+Files affected:
+Constraints, ObjectiveFunctions, QuadraticObjectiveFunction.
+
+
+#----------------------------------------------------------------------------------------
+2017-11-29:|
+-------------
+
+Added random feasibility tests.
+Files affected:
+MatrixUtils, Constraints, ConstraintSet, FeasibilityTests.
+
+Status:
+All working except:
+Phase_I_Analysis_SOI fails on
+FeasibilityTest.checkRandomFeasibleConstraints
+in the case where we have too many additional equalities.
+Currently we have 3 additional equalities and 20 variables.
+This goes through.
+
+
+#----------------------------------------------------------------------------------------
+2017-11-30:|
+-------------
+
+Added more constraints in Constraints (sum of absolute values).
+For this signCombinationMatrix in MatrixUtils.
+MatrixUtils reorganized.
+
+Files affected:
+MatrixUtils, Constraints, MatrixUtilsTests, Runner
+
+Status:
+Compiles and runs,
+Phase I SOI analysis fails on random feasible quadratic and linear constraints.
+Standard problems: optimization fails for random power problems.
+
+
+
+
+
+
+
+
+
 
 
 

@@ -28,8 +28,12 @@ class QuadraticObjectiveFunction(
   }
   checkSymmetric(P,1e-13)
 
-  def valueAt(x:DenseVector[Double]):Double = { checkDim(x); r + (a dot x) + (x dot (P*x))/2 }
-  def gradientAt(x:DenseVector[Double]):DenseVector[Double] = { checkDim(x); a+P*x }
-  def hessianAt(x:DenseVector[Double]):DenseMatrix[Double] = { checkDim(x); P }
+  def valueAt(x:DenseVector[Double]) = { checkDim(x); r + (a dot x) + (x dot (P*x))/2 }
+  def gradientAt(x:DenseVector[Double]) = { checkDim(x); a+P*x }
+  def hessianAt(x:DenseVector[Double]) = { checkDim(x); P }
+}
+object QuadraticObjectiveFunction {
 
+  def apply(dim:Int, r:Double, a:DenseVector[Double], P:DenseMatrix[Double]) =
+    new QuadraticObjectiveFunction(dim,r,a,P)
 }

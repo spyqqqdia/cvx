@@ -3,5 +3,5 @@ package cvx
 /**
   * Created by oar on 12/10/16.
   */
-class InfeasibleProblemException(val report:FeasibilityReport)
-  extends Exception("Feasibility of problem could not be established.")
+class InfeasibleProblemException(val report:FeasibilityReport,tol:Double)
+  extends Exception("\nNo feasible point found:\n"+report.toString(tol)+"\n\n")

@@ -30,10 +30,10 @@ class UnconstrainedSolver(
     *
     * @return Solution object: minimizer with additional info
     */
-  def solve(debugLevel:Int=0):Solution = {
+  def solve(debugLevel:Int):Solution = {
 
     val maxIter = pars.maxIter; val alpha=pars.alpha; val beta=pars.beta
-    val tol=pars.tol; val delta=pars.delta
+    val tol=pars.tol; val tolEqSolve=pars.tolEqSolve; val delta=pars.delta
 
     val breakDown = NotConvergedException.Breakdown
     var iter = 0
@@ -47,7 +47,13 @@ class UnconstrainedSolver(
       val H = objF.hessianAt(x)
       val n = H.rows
 
-      val d = MatrixUtils.solveWithPreconditioning(H,-y,delta)        // newton  step
+      // newton  step
+      val d = try {
+        MatrixUtils.solveWithPreconditioning(H, -y, tolEqSolve, debugLevel)
+      } catch {
+
+        case e: Exception => MatrixUtils.svdSolve(H,-y,logger,tolEqSolve,debugLevel)
+      }
 
       val q = d dot y
       newtonDecrement = -q/2
@@ -123,7 +129,7 @@ object UnconstrainedSolver {
     // override solve to report x instead of u
     new UnconstrainedSolver(objF,C,z0,pars,logger) {
 
-      override def solve(debugLevel:Int=0):Solution = {
+      override def solve(debugLevel:Int=0) = {
 
         val sol = super.solve(debugLevel)
         val u = sol.x; val x = z0+F*u

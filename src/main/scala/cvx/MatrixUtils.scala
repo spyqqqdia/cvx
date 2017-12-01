@@ -1,7 +1,8 @@
 package cvx
 
-import breeze.linalg.{DenseMatrix, DenseVector,qr, _}
-import breeze.numerics.{abs}
+import breeze.linalg.eigSym.EigSym
+import breeze.linalg.{DenseMatrix, DenseVector, qr, _}
+import breeze.numerics.{abs, _}
 import org.netlib.util.intW
 import com.github.fommil.netlib.LAPACK.{getInstance => lapack}
 
@@ -11,8 +12,176 @@ import com.github.fommil.netlib.LAPACK.{getInstance => lapack}
   */
 object MatrixUtils {
 
+  val rng = scala.util.Random
+
+  /*************************************************************/
+  /******************* Matrix generation ***********************/
+  /*************************************************************/
+
+  /** A vector in dimension n with uniformly random entries from the
+    * intervall [a,b].
+    */
+  def randomVector(n:Int,a:Double,b:Double):DenseVector[Double] =
+    DenseVector.tabulate[Double](n)(j => a+(b-a)*rng.nextDouble())
+
+  /** An nxm matrix with uniformly random entries from the
+    * intervall [a,b].
+    */
+  def randomMatrix(n:Int,m:Int,a:Double,b:Double):DenseMatrix[Double] =
+    DenseMatrix.tabulate[Double](n,m)((i,j) => a+(b-a)*rng.nextDouble())
+
+  /** Diagonal nxn matrix (interpretation of diagonal as singular values
+    * of some other matrix) with exponentially declining diagonal elements
+    * d_j such that d_1=1 and d_n=1/condNum.
+    * If dimKernel>0, then the dimKernel smallest (last) diagonal elements
+    * are set to zero.
+    */
+  def diagonalMatrix(n:Int,condNum:Double,dimKernel:Int):DenseMatrix[Double] = {
+
+    val rho = log(condNum)/n
+    val d = DenseVector.tabulate[Double](n)(j => exp(-j*rho))
+    for(j <- ((n-dimKernel) until n)) d(j) = 0.0
+    diag(d)
+  }
+
+  /** A random nxn orthogonal matrix.
+    */
+  def randomOrthogonalMatrix(n:Int):DenseMatrix[Double] = {
+
+    val r = scala.util.Random
+    val A = randomMatrix(n,n,-1,1)
+    val Q = A*A.t
+    eigSym(Q).eigenvectors     // matrix with eigenvectors in columns
+  }
+
+  /** A matrix with m columns containing all combinations of signs +1, -1.
+    * Note: this matrix has pow(2,m) rows!!
+    */
+  def signCombinationMatrix(m:Int):DenseMatrix[Double] = {
+
+    assert(m>=1,"\nm must be at least 1 but is m = "+m+"\n")
+    if(m==1) DenseMatrix((1.0,-1.0)).t
+    else {
+
+      val sgnM = signCombinationMatrix(m-1)
+      val n = sgnM.rows
+      val n_ones = DenseVector.ones[Double](n)
+      val col1 = DenseVector.vertcat(n_ones,-n_ones).toDenseMatrix.t
+      val sgnM2 = DenseMatrix.vertcat(sgnM,sgnM)
+      assert(sgnM2.rows==col1.rows)
+      DenseMatrix.horzcat(col1,sgnM2)
+    }
+  }
+
+  /** A matrix with n columns where columns j in [p,q) contain
+    * all combinations of signs +1, -1, all other entries being zero.
+    *
+    * The intended application is the resolution of a constraint
+    *   |x_p|+...+|x_{q-1}| <= ub into linear constraints
+    *    a_px_p +...+ a_{q-1}x_{q-1} <= ub,
+    * where the coefficient vector (a_p,...,a_{q-1}) runs through all
+    * such combinations of signs.
+    *
+    * Note: this matrix has pow(2,q-p) rows!!
+    *
+    * @param n: n>=1
+    * @param p: p>=0
+    * @param q: p<=q<=n.
+    */
+  def signCombinationMatrix(n:Int,p:Int,q:Int):DenseMatrix[Double] = {
+
+    assert(n>=1 && q<=n && p<=q && p>=0)
+    val sgnM = signCombinationMatrix(q-p)
+    val rows = sgnM.rows
+    val res0 = if(p==0) sgnM else {  // tack on the block of zeros on the left
+
+      val preBlock = DenseMatrix.zeros[Double](rows,p)
+      DenseMatrix.horzcat(preBlock,sgnM)
+    }
+    // if q==n no zeros on right
+    if(q==n) res0 else {  // tack on the block of zeros on the right
+
+      val postBlock = DenseMatrix.zeros[Double](rows,n-q)
+      DenseMatrix.horzcat(res0,postBlock)
+    }
+  }
+
+
+  /****************************************************/
+  /******************* Printing ***********************/
+  /****************************************************/
+
+
+  /** Print the vector with a Logger (to the log file of the Logger).
+    */
+  def print(vec: DenseVector[Double],logger:Logger,digits:Int):Unit = {
+
+    val n = vec.length
+    var i=0
+    while(i<n){
+
+      val suffix:String = if(i<n-1) ", " else "\n"
+      logger.print(MathUtils.round(vec(i),digits).toString+suffix)
+      i+=1
+    }
+  }
+
+
+  /** Print the matrix with a Logger (to the log file of the Logger).
+    */
+  def print(matrix: DenseMatrix[Double],logger:Logger,digits:Int):Unit = {
+
+    val n = matrix.rows; val m = matrix.cols
+    var i=0
+    while(i<n){
+      var j=0
+      while(j<m){
+        val suffix:String = if(j<m-1) ", " else "\n"
+        logger.print(MathUtils.round(matrix(i,j),digits).toString+suffix)
+        j+=1
+      }
+      i+=1
+    }
+  }
+
+  /** Print the vector with a Logger (to the log file of the Logger).
+    */
+  def print(vec: DenseVector[Double],digits:Int):Unit = {
+
+    val n = vec.length
+    var i=0
+    while(i<n){
+
+      val suffix:String = if(i<n-1) ", " else "\n"
+      Console.print(MathUtils.round(vec(i),digits).toString+suffix)
+      i+=1
+    }
+  }
+
+  /** Print the matrix with a Logger (to the log file of the Logger).
+    */
+  def print(matrix: DenseMatrix[Double],digits:Int):Unit = {
+
+    val n = matrix.rows; val m = matrix.cols
+    var i=0
+    while(i<n){
+      var j=0
+      while(j<m){
+        val suffix:String = if(j<m-1) ", " else "\n"
+        Console.print(MathUtils.round(matrix(i,j),digits).toString+suffix)
+        j+=1
+      }
+      i+=1
+    }
+  }
+
+
+  /********************************************************/
+  /******************* Miscellaneous***********************/
+  /********************************************************/
+
   /** HS-norm sqrt(sum(A_ij*A_ij)).*/
-  def normHS(A:DenseMatrix[Double]):Double = Math.sqrt(sum(A:*A))
+  def normHS(A:DenseMatrix[Double]) = Math.sqrt(sum(A:*A))
 
   /** @return norm(Q-Q-t) < tol.*/
   def checkSymmetric(Q:DenseMatrix[Double],tol:Double):Boolean = {
@@ -32,6 +201,12 @@ object MatrixUtils {
     val sigma = svdH.singularValues
     max(sigma)/min(sigma)
   }
+
+
+  /************************************************************/
+  /******************* Equation solving ***********************/
+  /************************************************************/
+
 
   /** Solves the equation Ax=b where A is a lower, upper or diagonal matrix
     * by calling lapack.DTRTRS.
@@ -148,12 +323,12 @@ object MatrixUtils {
     var i=0
     while(i<n){
 
-      val f_i = Math.sqrt(max(abs(Q(i,::).t)))
-      if(f_i==0) throw new IllegalArgumentException("row_"+i+"(H) is zero.")
+      var f_i = Math.sqrt(max(abs(Q(i,::).t)))
+      if(f_i==0) f_i=1.0
       d(i)=1.0/f_i
       i+=1
     }
-    Q = (d*d.t):*H                         // outer(d,d) eltwise-* Q
+    Q = (d*d.t):*H                         // outer(d,d) eltwise-* H
 
     // five rounds of l_2-norm equilibration
     var k=0
@@ -171,67 +346,51 @@ object MatrixUtils {
     *
     * First we precondition the matrix H by replacing H --> Q=DHD, where D is a suitable diagonal matrix
     * (algorithm of Ruiz), then using Cholesky factorization on the preconditioned matrix Q.
-    *
-    * If Q is found to be singular, it is regularized via Q --> Q + delta*I.
-    * If the Cholesky factor L has a diagonal element with |L_ii|<sqrt(delta), the same
-    * regularization will be carried out.
-    *
-    * For a rationale see docs/cvx_notes.pdf, section Regularization.
-    *
-    * WARNING: we have to deal with the case that the matrix H has zero rows.
-    * This can happen for example in a KKT system for phase one analysis if the constraints
-    * do not depend on some variables. The right hand side of the KKT system is then also zero
-    * so that a solution exists.
-    * We cannot deal with this problem in a naive fashion, such as replacing H with H+delta*I,
-    * since then the solution will not be a descent direction for the minimization problem.
+    * Throws LinSolveException if the Cholesky factorization fails (i.e. if H is not positive definite).
     *
     * @return solution vector x
     */
-  def solveWithPreconditioning(H:DenseMatrix[Double], b:DenseVector[Double], delta:Double): DenseVector[Double] = {
+  def solveWithPreconditioning(
+      H:DenseMatrix[Double], b:DenseVector[Double], tol:Double, debugLevel:Int
+  ): DenseVector[Double] = {
 
     val m = b.length
     val n = H.rows
     assert(n==H.cols,"Matrix H not square: H.rows="+n+", H.cols="+H.cols)
     assert(m==n,"length(b) = "+m+" is not equal to H.rows="+H.rows)
 
-    //-- FIX ME: If H has zero rows we make the diagonal entry of each zero row equal to one
-    // this might still lead to a singular matrix and is a lazy hack
-    val M = H.copy
-    var i=0
-    while(i<n){ if(max(abs(M(i,::).t))<1e-14) M(i,i)=1.0; i=i+1; }
+    val eqH = ruizEquilibrate(H); val d = eqH._1; val Q = eqH._2  // diag(d)*M*diag(d)
 
-    val eqM = ruizEquilibrate(M); val d = eqM._1; val Q = eqM._2  // diag(d)*M*diag(d)
-
-    //trying the Cholesky factorization of Q=LL'
-    var L: DenseMatrix[Double] = null
     try {
 
-      L = cholesky(Q)
-      // check if |L_ii|>=eps, if not throw exception to be caught below
-      (0 until L.rows).map(i =>
-        if(Math.abs(L(i,i))<Math.sqrt(delta)) throw LinSolveException(H,b,L)
-      )
+      val L = cholesky(Q)
+      // Set D=diag(d), rewrite Hx=b as HDu=b with x=Du, then multiply with D to obtain Qu=DHDu=Db,
+      // i.e. LL'u=Db, solve as Lw=Db, w=L'u. Finally get x=Du
+      val w = MatrixUtils.forwardSolve(L, d :* b)
+      val u = MatrixUtils.backSolve(L.t, w)
+      val x = d :* u // the solution
+
+      // throw LinSolveException if the solution is not accurate to tolerance,
+      val err = norm(H * x - b)
+      val f = Math.sqrt(H.rows + H.cols) // scaling the tolerated error
+      if (err > tol * f) {
+
+        val src = "\nMatrixUtils.solveWithPreconditioning: error exceeds tolerance:\n"
+        val problem = "With f = sqrt(H.rows+H.cols) = " + f + " we have ||Hx-b||/f = " + err / f + ".\n"
+        val msg = src + problem
+        if (debugLevel > 1) {
+          println(msg); Console.flush()
+        }
+        throw LinSolveException(H, b, L, msg)
+      }
+      x
 
     } catch {
 
-      // try Cholesky factorization of H+delta*I
-      case e: Exception => try {
-
-        val I = DenseMatrix.eye[Double](Q.rows)
-        L = cholesky(Q + I * delta)
-
-      } catch {
-
-        case e: NotConvergedException => throw LinSolveException(H,b,L,
-          "Matrix H not positive semidefinite, equilibrated matrix Q=Q(H):\n"+Q
-        )
+        case e:Exception =>
+          val msg = "MatrixUtils.solveWithPreconditioning: Cholesky factorization of H failed.\n"
+          throw LinSolveException(H,b,null,msg)
       }
-    }
-    // Set D=diag(d), rewrite Hx=b as HDu=b with x=Du, then multiply with D to obtain Qu=DHDu=Db,
-    // i.e. LL'u=Db, solve as Lw=Db, w=L'u. Finally get x=Du
-    val w = MatrixUtils.forwardSolve(L,d:*b)
-    val u = MatrixUtils.backSolve(L.t,w)
-    d:*u
   }
 
   /** Solves underdetermined systen Ax=b where A is an mxn matrix with m < n and full rank m,
@@ -268,67 +427,131 @@ object MatrixUtils {
     (z0,F)
   }
 
-  /** Print the vector with a Logger (to the log file of the Logger).
-    */
-  def print(vec: DenseVector[Double],logger:Logger,digits:Int):Unit = {
-
-    val n = vec.length
-    var i=0
-    while(i<n){
-
-        val suffix:String = if(i<n-1) ", " else "\n"
-        logger.print(MathUtils.round(vec(i),digits).toString+suffix)
-        i+=1
-    }
-  }
-
-  /** Print the matrix with a Logger (to the log file of the Logger).
-    */
-  def print(matrix: DenseMatrix[Double],logger:Logger,digits:Int):Unit = {
-
-    val n = matrix.rows; val m = matrix.cols
-    var i=0
-    while(i<n){
-      var j=0
-      while(j<m){
-        val suffix:String = if(j<m-1) ", " else "\n"
-        logger.print(MathUtils.round(matrix(i,j),digits).toString+suffix)
-        j+=1
-      }
-      i+=1
-    }
-  }
 
 
-  /** Solve the system Mu=q via SVD decomposition of the matrix M.
-    * This is expensive but can lead to a solution even if the matrix M
-    * is singular (depending on the right hand side).
+  /** Returns a bad right hand side b for a symmetric,
+    * positive definite system Ax=b.
     *
-    * In fact we will compute a candidate solution even if there are zero singular values
-    * (by sharp cutoff of the singular values below 1e-14). We then checks if the candidate
-    * satisfies the system to within the desired tolerance. If not a LinSolveException is
-    * thrown.
+    * Let A = UDV' denote the singular value decomposition of A,
+    * with D=diag(s_j) the diagonal matrix with the singular values s_j of A
+    * and  u_j = col_j(U).
     *
-    * @param tol tolerated size of ||Mw-q|| where Mw=q is the KKT system.
-    * @return pair (u,nu). Here the interpretation of u=dx is the Newton step
-    *         and nu the lagrange multiplier associated with the equality constraints.
+    * b will be constructed with large components
+    *           u_j'b = rand_unif(10,100)
+    * in directions of all the u_j corresponding to nonzero
+    * singular values s_j and zero components in direction of u_j if s_j=0.
+    * This guarantees that the system Ax=b has an exact solution but
+    * the right hand side b makes the solution challenging if the system is
+    * ill conditioned.
+    *
+    * @param s: vector of singular values of A.
+    * @param U: vector of left singular vectors of A.
+    */
+    def nastyRHS(s:DenseVector[Double],U:DenseMatrix[Double]):DenseVector[Double] = {
+
+      val n = s.length
+      assert(U.rows == n && U.cols==n,"\nU.rows = "+U.rows+", U.cols = "+U.cols+" should both = "+n+"\n")
+      val  r = scala.util.Random
+      val w = DenseVector.tabulate[Double](U.rows)(j => if(s(j)>0) 1+2*r.nextDouble() else 0.0)
+      U*w
+    }
+
+
+  /** Computes the vector x0 of minimal norm minimizing the distance ||Mx-q|| and throws an
+    * UnsolvableSystemException if this distance exceeds the tolerance tol*f, where the factor
+    * f = sqrt(M.rows+M.cols) scales the acceptable error with the matrix size.
+    *
+    * If the system Mx=q has a solution then x0 will be the solution of minimal norm.
+    * Uses the SVD of A. First the norm ||Mx0-q|| is computed
+    * (for this we do not need x0, see docs/svdSolve.pdf, eq(3)) and
+    * we check if this is less than the tolerance tol.
+    * If ||Mx0-q||>=tol an UnsolvableSystemException is thrown.
+    * Otherwise we first try the straightforward
+    * solution (docs/svdSolve.pdf, eq(2)) using all positive singular values.
+    * If this fails to solve the system within tolerance tol, we proceed to regularization
+    * along the lines of docs/cvx_notes.pdf, section ???. If this also fails, an
+    * UnsolvableSystemException is thrown.
+    *
+    * @param tol tolerated size of ||Mx0-q|| is tol*f, where f=sqrt(M.rows+M.cols).
+    * @return solution x0
     */
   def svdSolve(
-    M: DenseMatrix[Double], q: DenseVector[Double], tol:Double
-  ):DenseVector[Double] = {
+    M: DenseMatrix[Double], q: DenseVector[Double],
+    logger:Logger, tol:Double, debugLevel:Int
+  ) = {
 
-    val svd.SVD(u,s,v) = svd(M)
-    // the solution in the form docs/svdSolve.pdf, eq(1)
-    val n = M.rows
-    var w = DenseVector.zeros[Double](n)
-    var j=0
-    while(j<n){
+    val n = M.rows; val m = M.cols; val f = Math.sqrt(n+m)
+    assert(q.length==n,
+      "\nminimumNormSolution: incompatible dimensions in Mx=q, M.rows = "+n+", q.length = "+q.length+"\n"
+    )
 
-      if(abs(s(j))>1e-14) w += v(::,j)*(u(::,j) dot q)/s(j)
-      j+=1
+    val svd.SVD(u, s, v) = svd(M)
+    // compute min_x||Mx-q||=||q-proj_q||, where proj_q is
+    // the projection of q onto range of M, docs/svdSolve.pdf, eq(3)
+    val a = DenseVector.tabulate[Double](n)(j => if (s(j) > 0) u(::, j) dot q  else 0.0)
+    val proj_q = u*a
+    val minDist = norm(q-proj_q)    // min_x||Mx-q||
+    if(minDist>tol*f) {
+
+      val msg = "\nsvdSolve: min_x||Mx-q||/f = "+minDist/f+" > tol = "+tol+
+                ", where f = sqrt(A.rows+A.cols) = "+f+".\n"
+      throw new UnsolvableSystemException(msg)
     }
-    val error = norm(M*w-q)
-    if(error>tol) throw LinSolveException(M,q,null,"\nUnsolvable KKT system, error (in norm): "+error)
-    w
+    // now minDist<=tol and the system is solvable to within tolerance at least theoretically
+    // but we may have numeric problems
+    // first the straightforward solution in the form docs/svdSolve.pdf, eq(1)
+    val z = DenseVector.tabulate[Double](n)(j => if (s(j) > 0) ((u(::, j) dot q) / s(j)) else 0.0)
+    val w = v*z // the solution
+    var error = norm(M * w - q)
+    var optSol = w
+    var minError = error
+    // if this error is too large we need to regularize the system
+    if (error > tol * f) {
+
+      if (debugLevel > 0) {
+
+        val problem = "\nmatrixUtils.svdSolve: error ||Mw-q||/f = " + error / f +
+                      " > tol, where f = sqrt(M.rows+M.cols) = "+f+".\n"
+        val next = "Trying regularization.\n"
+        val msg = problem + next
+        println(msg)
+        Console.flush()
+        logger.println(msg)
+      }
+      // try a couple of regularizations similar to docs/cvx_notes.pdf ??? with p=1
+      val deltas = Vector[Double](1e-14, 1e-12, 1e-10, 1e-8, 1e-6, 1e-4, 1e-2, 1e-1, 1.0, 10.0, 100, 1000)
+      for (delta <- deltas) {
+
+        val z = DenseVector.tabulate[Double](n)(j => {
+
+          val sj=s(j); val sj_num = sj*sj*sj; val sj_denom = sj_num*sj
+          if (abs(s(j)) > 0) sj_num*(u(::, j) dot q) / (sj_denom+delta*delta) else 0.0
+        })
+        val w = v*z // the solution
+
+        error = norm(M * w - q)
+        if (error < minError) {
+          minError = error
+          optSol = w
+        }
+
+        // log what's going on
+        if (debugLevel > 1) {
+
+          val msg = "delta = " + delta + ",\t\terror ||Mw-q||/f = " + MathUtils.round(error/f,2) +
+                    ",\t\twhere f = sqrt(M.rows+M.cols) = "+MathUtils.round(f,2)+"."
+          println(msg)
+          Console.flush()
+          logger.println(msg)
+        }
+      }
+      if (minError > tol * M.rows) {
+
+        val problem = "\nsolveSVD: system not solvable within tolerance tol = "+tol+":\n"
+        val size = "error ||Mw-q||/f = " + minError / f + ", where f = sqrt(M.rows+M.cols) = "+f+".\n"
+        throw UnsolvableSystemException(problem + size)
+      }
+    }
+    optSol
   }
 }

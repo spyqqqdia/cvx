@@ -37,7 +37,7 @@ extends Solver {
   def solve(debugLevel:Int):Solution = {
 
     val maxIter = pars.maxIter; val alpha=pars.alpha; val beta=pars.beta
-    val tol=pars.tol; val delta=pars.delta
+    val tol=pars.tol; val tolEqSolve=pars.tolEqSolve; val delta=pars.delta
 
     val breakDown = NotConvergedException.Breakdown
     var iter = 0
@@ -55,8 +55,7 @@ extends Solver {
 
       // FIX ME: the solution step
       val KKTS = KKTSystem(H,A,y,eqDiff)
-      val d:DenseVector[Double] = KKTS.solve(logger,debugLevel)._1
-
+      val d:DenseVector[Double] = KKTS.solve(logger,tolEqSolve,debugLevel)._1
 
       val q = d dot y
       newtonDecrement = -q/2
@@ -96,7 +95,7 @@ extends Solver {
         x = x + d*t
         y = objF.gradientAt(x)
         normGrad = norm(y)
-        eqDiff = if(t<1.0) b-A*x else DenseVector.zeros[Double](b.length)
+        eqDiff = b-A*x
       }
       iter+=1
     }

@@ -1,6 +1,7 @@
 package cvx
 
 import breeze.linalg.{DenseVector, _}
+import breeze.numerics.abs
 
 
 /**
@@ -50,8 +51,9 @@ object OptimizationProblems {
 
     val startingPoint = DenseVector.tabulate[Double](dim)(j=>1+j)
     val objF = ObjectiveFunctions.normSquared(dim)
-    val maxIter = 200; val alpha = 0.1; val beta = 0.5; val tol = 1e-8; val delta = 1e-8
-    val pars = SolverParams(maxIter,alpha,beta,tol,delta)
+    val maxIter = 200; val alpha = 0.1; val beta = 0.5; val delta = 1e-8
+    val tol = 1e-8; val tolEqSolve = 1e-8; val tolFeas = 1e-9
+    val pars = SolverParams(maxIter,alpha,beta,tol,tolEqSolve,tolFeas,delta)
 
     OptimizationProblem(id,objF,startingPoint,C,pars,logger)
   }
@@ -99,8 +101,8 @@ object OptimizationProblems {
     val C = ConvexSet.fullSpace(n)
     val minimizer = new KnownMinimizer {
 
-      def isMinimizer(x:DenseVector[Double],tol:Double):Boolean = norm(A*x)<tol
-      def minimumValue:Double = 0.0
+      def isMinimizer(x:DenseVector[Double],tol:Double) = norm(A*x)<tol
+      def minimumValue = 0.0
     }
     val problem = OptimizationProblem(id,objF,startingPoint,C,pars,logger)
     problem.addSolution(minimizer)
@@ -146,9 +148,9 @@ object OptimizationProblems {
     // objective f(x0,x1)=x0
     val objF = new ObjectiveFunction(dim){
 
-      def valueAt(x:DenseVector[Double]):Double = x(0)
-      def gradientAt(x:DenseVector[Double]):DenseVector[Double] = DenseVector(1.0,0.0)
-      def hessianAt(x:DenseVector[Double]):DenseMatrix[Double] = DenseMatrix.zeros[Double](dim,dim)
+      def valueAt(x:DenseVector[Double]) = x(0)
+      def gradientAt(x:DenseVector[Double]) = DenseVector(1.0,0.0)
+      def hessianAt(x:DenseVector[Double]) = DenseMatrix.zeros[Double](dim,dim)
     }
 
     // set of inequality constraints
@@ -157,9 +159,9 @@ object OptimizationProblems {
     val ub = 0.0 // upper bound
     val ct1 = new Constraint("x2>=exp(x1)",dim,ub){
 
-      def valueAt(x:DenseVector[Double]):Double = Math.exp(x(0))-x(1)
-      def gradientAt(x:DenseVector[Double]):DenseVector[Double] = DenseVector(Math.exp(x(0)),-1.0)
-      def hessianAt(x:DenseVector[Double]):DenseMatrix[Double] = DenseMatrix((Math.exp(x(0)),0.0),(0.0,0.0))
+      def valueAt(x:DenseVector[Double]) = Math.exp(x(0))-x(1)
+      def gradientAt(x:DenseVector[Double]) = DenseVector(Math.exp(x(0)),-1.0)
+      def hessianAt(x:DenseVector[Double]) = DenseMatrix((Math.exp(x(0)),0.0),(0.0,0.0))
     }
     // linear inequality x1 <= r+k*x0
     val e = Math.exp(1.0); val r = 0.5*(e+1/e); val k = 0.5*(e-1/e)
@@ -207,9 +209,9 @@ object OptimizationProblems {
     // objective f(x0,x1)=x0
     val objF = new ObjectiveFunction(dim){
 
-      def valueAt(x:DenseVector[Double]):Double = x(0)
-      def gradientAt(x:DenseVector[Double]):DenseVector[Double] = DenseVector(1.0,0.0)
-      def hessianAt(x:DenseVector[Double]):DenseMatrix[Double] = DenseMatrix.zeros[Double](dim,dim)
+      def valueAt(x:DenseVector[Double]) = x(0)
+      def gradientAt(x:DenseVector[Double]) = DenseVector(1.0,0.0)
+      def hessianAt(x:DenseVector[Double]) = DenseMatrix.zeros[Double](dim,dim)
     }
 
     // set of inequality constraints
@@ -218,9 +220,9 @@ object OptimizationProblems {
     val ub = 0.0 // upper bound
     val ct1 = new Constraint("x2>=exp(x1)",dim,ub){
 
-      def valueAt(x:DenseVector[Double]):Double = Math.exp(x(0))-x(1)
-      def gradientAt(x:DenseVector[Double]):DenseVector[Double] = DenseVector(Math.exp(x(0)),-1.0)
-      def hessianAt(x:DenseVector[Double]):DenseMatrix[Double] = DenseMatrix((Math.exp(x(0)),0.0),(0.0,0.0))
+      def valueAt(x:DenseVector[Double]) = Math.exp(x(0))-x(1)
+      def gradientAt(x:DenseVector[Double]) = DenseVector(Math.exp(x(0)),-1.0)
+      def hessianAt(x:DenseVector[Double]) = DenseMatrix((Math.exp(x(0)),0.0),(0.0,0.0))
     }
     // linear inequality x1 <= r+k*x0
     val e = Math.exp(1.0); val r = 0.5*(e+1/e); val k = 0.5*(e-1/e)
@@ -308,7 +310,7 @@ object OptimizationProblems {
     val x_opt = if(1.8/n>0.12) DenseVector.tabulate[Double](n)(
       j => if(j<3) 1.8/n else if (j>=n/2) 0.2/n else (1.8*n-10.8)/(n*(n-6))
     ) else DenseVector.tabulate[Double](n)(
-      j => if(j<3) 0.12 else if (j>=n/2) 0.2/n else 1.08/(n-6)
+      j => if(j<3) 0.12 else if (j>=n/2) 0.2/n else (1.08)/(n-6)
     )
     val minimizer = KnownMinimizer(x_opt,objF)
     problem.addSolution(minimizer)
@@ -322,7 +324,7 @@ object OptimizationProblems {
     *                     P^x(A)=0.36 and P^x(B)=0.1
     * where A={0,1,2} and B={n/2,n/2+1,...,n-1}.
     *
-    * Using symmetry and it can be shown that the optimum occurs at the follwing
+    * Using symmetry and it can be shown that the optimum occurs at the following
     * probability distribution x (see docs/Dist_KL.pdf):
     * IF 1.8/n>=0.12:
     *
@@ -408,5 +410,24 @@ object OptimizationProblems {
     OptimizationProblem(id,objF,ineqs,Some(probEq),pars,logger,debugLevel)
   }
 
+  /** This is the problem
+    *      max a'x  subject to  |x_j|<=|a_j|.
+    * Obviously the maximum is assumed at x=a.
+    */
+  def maxDotProduct(a:DenseVector[Double],pars:SolverParams,debugLevel:Int):OptimizationProblem = {
+
+    val n = a.length
+    val ub = abs(a)
+    val cntList = Constraints.absoluteValuesBoundedBy(n,ub)
+    val x0 = DenseVector.zeros[Double](n)   // point where all constraints are defined
+    val ineqs = ConstraintSet(n,cntList,x0)
+
+    val id = "MaxDotProduct"
+    val logFilePath = "logs/"+id+"_log.txt"
+    val logger = Logger(logFilePath)
+
+    val objF = ObjectiveFunctions.dotProduct(a)
+    OptimizationProblem(id,objF,ineqs,None,pars,logger,debugLevel)
+  }
 
 }

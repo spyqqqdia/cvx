@@ -44,14 +44,14 @@ object MinimizationTests {
 
   } catch {
 
-    case e:Exception =>
+    case e:Exception => {
 
       print("\n\nException of class "+e.getClass+"occurred")
       print("\nMessage: "+e.getMessage)
       print("\nStacktrace:\n")
       e.printStackTrace()
       problem.logger.close()
-
+    }
   }
 
   /** Solve a list of Optimization problems where the solution may not be known
@@ -84,14 +84,14 @@ object MinimizationTests {
 
   } catch {
 
-    case e:Exception =>
+    case e:Exception => {
 
       print("\n\nException of class "+e.getClass+"occurred")
       print("\nMessage: "+e.getMessage)
       print("\nStacktrace:\n")
       e.printStackTrace()
       problem.logger.close()
-
+    }
   }
 
 
@@ -140,3 +140,6 @@ object MinimizationTests {
     runProblems(problems,tol,debugLevel)
   }
 }
+
+
+

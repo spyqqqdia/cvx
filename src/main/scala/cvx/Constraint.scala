@@ -20,6 +20,7 @@ abstract class Constraint(val id:String, val dim:Int, val ub:Double){
     assert(x.length==dim,"Dimension mismatch: x.length = "+x.length+", dim="+dim)
   def isSatisfied(x:DenseVector[Double]):Boolean = valueAt(x)<=ub
   def isSatisfiedStrictly(x:DenseVector[Double]):Boolean = valueAt(x)*(1+3e-16) < ub
+  def isSatisfiedWithTolerance(x:DenseVector[Double],tol:Double):Boolean = valueAt(x)<ub+tol
   /** @return |g(x)-ub|<tol. */
   def isActive(x:DenseVector[Double], tol:Double=1e-12):Boolean = Math.abs(valueAt(x)-ub)<tol
   /** @return ub-g(x).*/
@@ -46,9 +47,11 @@ abstract class Constraint(val id:String, val dim:Int, val ub:Double){
     val reducedID = id+"_reduced"
     new Constraint(reducedID,reducedDim,ub) {
 
-      override def valueAt(u: DenseVector[Double]):Double = self.valueAt(z + F * u)
-      override def gradientAt(u: DenseVector[Double]):DenseVector[Double] = F.t * self.gradientAt(z + F * u)
-      override def hessianAt(u: DenseVector[Double]):DenseMatrix[Double] = (F.t * self.hessianAt(z + F * u)) * F
+      override def valueAt(u: DenseVector[Double]) = self.valueAt(z + F * u)
+
+      override def gradientAt(u: DenseVector[Double]) = F.t * self.gradientAt(z + F * u)
+
+      override def hessianAt(u: DenseVector[Double]) = (F.t * self.hessianAt(z + F * u)) * F
     }
   }
 
@@ -99,12 +102,11 @@ object Constraint {
     */
   def phase_I_SOI(cnt:Constraint,p:Int,j:Int):Constraint = new Constraint(cnt.id+"_phase_I",cnt.dim+p,cnt.ub){
 
-    assert(j<p,"\nj = "+j+" is bigger than p = "+p)
     // u=(x,s_1,...,s_p) is the new variable, note dim = cnt.dim+p
 
     /** The variables of the original problem.*/
     def x(u:DenseVector[Double]):DenseVector[Double] = u(0 until dim-p)   // dim(x) = n = cnt.dim = dim-p
-
+    // g_j(x(u))-s_j
     def valueAt(u:DenseVector[Double]):Double = cnt.valueAt(x(u))-u(dim-p+j)
 
     def gradientAt(u:DenseVector[Double]):DenseVector[Double] = {
@@ -125,7 +127,8 @@ object Constraint {
 
 
   /** Turns each constraint cnt: g_j(x)<=ub_j in the list constraints into the constraint
-    *  g_j(x,s)-s_j<=ub_j for feasibility analysis via the _sum of infeasibilities_ method of
+    *         h_j(x,s) = g_j(x)-s_j <= ub_j
+    *  for feasibility analysis via the _sum of infeasibilities_ method of
     *  [boyd], 11.4.1, p580. Then adds all the constraints s_j>=0.
     *
     * The independent variable is now u=(x,s), where s=(s_1,...,s_n) and n is the number of

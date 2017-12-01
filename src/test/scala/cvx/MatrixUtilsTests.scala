@@ -143,13 +143,15 @@ object MatrixUtilsTests {
     * and right hand side b = Hx so we know the solution is x. The vector x will also be chosen
     * randomly. All random entries in (0,1).
     */
-  def testSolve(H:DenseMatrix[Double], x:DenseVector[Double], testID:String):Unit = {
+  def testSolveWithPreconditioning(H:DenseMatrix[Double], x:DenseVector[Double], testID:String):Unit = {
 
     val dim = H.rows
     val b = H*x
 
     val delta = 1e-15
-    val u = MatrixUtils.solveWithPreconditioning(H,b,delta)
+    val debugLevel = 3
+    val tolEqSolve = 1e-8
+    val u = MatrixUtils.solveWithPreconditioning(H,b,tolEqSolve,debugLevel)
 
     val errSol = norm(u-x)/norm(x)
     val errVal = norm(b-H*u)/norm(b)
@@ -162,17 +164,18 @@ object MatrixUtilsTests {
     * and right hand side b = Hx so we know the solution is x. The vector x will also be chosen
     * randomly. All random entries in (0,1).
     */
-  def testSolve(dim:Int,testID:String):Unit = {
+  def testSolveWithPreconditioning(dim:Int, testID:String):Unit = {
 
     val x = DenseVector.rand[Double](dim)
     val A = DenseMatrix.rand[Double](dim,dim)
     val S = A.t*A
     val H = S+S.t         // make symmetric (numerical issues)
-    testSolve(H,x,testID)
+    testSolveWithPreconditioning(H,x,testID)
   }
 
   /** Run reps tests testSolve(dim,"Test_j") */
-  def testSolve(dim:Int,reps:Int):Unit = for(j <- 1 to reps) testSolve(dim,"Test_"+j)
+  def testSolveWithPreconditioning(dim:Int, reps:Int):Unit =
+    for(j <- 1 to reps) testSolveWithPreconditioning(dim,"Test_"+j)
 
 
 
@@ -210,6 +213,88 @@ object MatrixUtilsTests {
     }
   }
 
+
+  /** We construct randomly some ill conditioned systems symmetric,
+    * positive definite systems Ax=b and solve them via SVD.
+    *
+    * Let A = UDV' denote the singular value decomposition of A,
+    * with D=diag(s_j) the diagonal matrix with the singular values s_j of A.
+    * The singular values of A are declining exponentially from 1.0 to 1/condNum.
+    * If dimKernel>0, the last (smallest) dimKernel singular values are set to zero.
+    *
+    * Let u_j = col_j(U). Then a right hand side b with large components
+    *           u_j'b = rand_unif(10,100)
+    * in directions of the u_j corresponding to small (but nonzero)
+    * singular values s_j is constructed which has zero components in
+    * direction u_j if s_j=0.
+    * This guarantees that the system Ax=b has an exact solution but is
+    * very ill conditioned with right hand side for which this ill conditioning
+    * is a problem.
+    *
+    * @param condNum: condition number of A (if dimKernel=0).
+    * @param dimKernel: dim(ker(A)).
+    * @param debugLevel: no debug output when set to zero,
+    *                  maximum output as soon as > 2.
+    * @param tolEqSolve: solution of Ax=b will be classified as failed
+    *                  if ||Ax-b|| > tolEqSolve*A.cols.
+    * In that case we go into the regularization loop to try to get
+    * within accepted tolerance.
+    */
+  def testSvdSolve(
+    nTests:Int, dim:Int, condNum:Double, dimKernel:Int, tolEqSolve:Double, debugLevel:Int
+  ):Unit = {
+
+    val  startMsg = "\n\n\nDoing MatrixUtilsTests.testSvdSolve in dimension "+dim+":\n"
+    println(startMsg); Console.flush()
+    val logger = Logger("logs/testSVDSolve.txt")
+    logger.println(startMsg)
+    var OK = true
+    for(nT <- 1 to nTests){
+
+      logger.println("\n\nTest "+nT+":\n")
+      val U = MatrixUtils.randomOrthogonalMatrix(dim)
+      val D = MatrixUtils.diagonalMatrix(dim,condNum,dimKernel)
+      val d = diag(D)
+      val A = (U.t*D)*U          // SVD of symmetric, positive definite matrix A
+      val b = MatrixUtils.nastyRHS(d,U)
+
+      try{
+        val  x = MatrixUtils.svdSolve(A,b,logger,tolEqSolve,debugLevel)
+      } catch {
+
+        case e:Exception =>
+          logger.println("\n"+e.getMessage()+"\n")
+          OK = false
+      }
+    }
+    if(OK) println("Finished, all tests passed within tolerance.")
+    else println("Finished, some tests failed, see logs/logs/testSVDSolve.txt")
+    Console.flush()
+  }
+
+
+  /** We print several sign combination matrices, one without additional columns
+    * and one with additional columns of zeros.
+    */
+  def testSignCombinationMatrices:Unit = {
+
+    print("\n\nsignCombinationMatrix("+4+"):\n\n")
+    val sgnM = MatrixUtils.signCombinationMatrix(4)
+    MatrixUtils.print(sgnM,digits=1)
+
+    print("\n\nsignCombinationMatrix("+4+","+2+","+3+"):\n\n")
+    val sgnM1 = MatrixUtils.signCombinationMatrix(4,2,3)
+    MatrixUtils.print(sgnM1,digits=1)
+
+    print("\n\nsignCombinationMatrix("+4+","+0+","+2+"):\n\n")
+    val sgnM2 = MatrixUtils.signCombinationMatrix(4,0,2)
+    MatrixUtils.print(sgnM2,digits=1)
+
+    print("\n\nsignCombinationMatrix("+4+","+3+","+4+"):\n\n")
+    val sgnM3 = MatrixUtils.signCombinationMatrix(4,3,4)
+    MatrixUtils.print(sgnM3,digits=1)
+  }
+
   /** Run all tests in dimension dim with reps repetitions of each test.
     */
   def runAll(dim:Int,reps:Int,tol:Double):Unit = {
@@ -217,7 +302,7 @@ object MatrixUtilsTests {
     print("\n\n Solving Ix=-b:\n")
     val I = DenseMatrix.eye[Double](dim)
     val x = DenseVector.rand[Double](dim)
-    testSolve(I,-x,"System Ix=-b")
+    testSolveWithPreconditioning(I,-x,"System Ix=-b")
 
     // run all tests for the following values of the regularizer delta:
     for(delta <- List(0.0,0.5,1.0)){
@@ -233,10 +318,13 @@ object MatrixUtilsTests {
       print("\n\n#----- Tests of backSolve Ux=b:\n")
       testBackSolve(dim,delta,reps)
       print("\n\n#----- Tests of solveWithPreconditioning Hx=b:\n")
-      testSolve(dim,reps)
+      testSolveWithPreconditioning(dim,reps)
     }
     testSolveUnderdetermined(dim,reps)
     testTriangularSolve(dim,10,reps,tol)
+    val nTests = 3; val condNum = 1e12; val debugLevel = 3; val tolEqSolve=1e-4
+    val dimKernel =  0
+    testSvdSolve(nTests,dim,condNum,dimKernel,tolEqSolve,debugLevel)
   }
 }
 

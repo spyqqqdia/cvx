@@ -1,5 +1,6 @@
 package cvx
 
+import breeze.linalg.DenseVector
 
 
 /** Main class, runs all tests from main method.
@@ -11,25 +12,28 @@ object Runner extends App {
 
     println("Doing test problems."); Console.flush()
 
-    val debugLevel=3
+    val debugLevel=2
 
     val doTestMatrixUtils = false
     val doKktTests = false
 
-    val doTestStandardProblems = false
+    val doTestStandardProblems = true
     val doMinX1 = false
     val doTestKlProblems = false
     val doTestInfeasibleKlProblems = false
-    val doFeasibilityTests = true
+    val doFeasibilityTests = false
 
     // solver parameters
     val maxIter = 200           // max number of Newton steps computed
     val alpha = 0.05            // line search descent factor
     val beta = 0.75             // line search backtrack factor
     val tolSolver = 1e-6        // tolerance for norm of gradient, duality gap
-    val tolSolution = 1e-2      // tolerance for solution identification
+    val tolEqSolve = 10         // tolerance in the solution of the KKT system
+    val tolFeas = 1e-9          // tolerance in inequality and equality constraints
     val delta = 1e-8            // regularization A -> A+delta*I if ill conditioned
-    val pars = SolverParams(maxIter,alpha,beta,tolSolver,delta)
+    val pars = SolverParams(maxIter,alpha,beta,tolSolver,tolEqSolve,tolFeas,delta)
+
+    val tolSolution = 1e-2      // tolerance for solution identification
 
 
     if(doTestMatrixUtils){
@@ -37,16 +41,21 @@ object Runner extends App {
       val dim = 100
       val reps= 10
       val tol = 1e-10
-      MatrixUtilsTests.runAll(dim,reps,tol)
+      //MatrixUtilsTests.runAll(dim,reps,tol)
+      MatrixUtilsTests.testSignCombinationMatrices
     }
 
     if(doKktTests){
 
+      val nTests = 5
       val debug = true
       val logFilePath = "logs/KktTestLog.txt"
       val logger = Logger(logFilePath)
+      val nullIndices = Vector[Int](2,5,7)
       //KktTest.testSolutionWithCholFactor(5,1000,100,1e-10,logger,debug)
-      KktTest.testPositiveDefinite(5,1000,100,1e-10,logger,debugLevel)
+      //KktTest.testPositiveDefinite(5,1000,100,1e-10,logger,debugLevel)
+      //KktTest.testSolutionPadding(nTests)
+      KktTest.testKktSystemReduction(nTests,nullIndices,logger,tolEqSolve,debugLevel)
     }
 
     if(doTestStandardProblems ){
@@ -72,6 +81,9 @@ object Runner extends App {
 
     if(doFeasibilityTests){
 
+      val p = 10; val q = 5
+      val x0 = DenseVector.tabulate[Double](10)(j => 1.0)
+      //FeasibilityTests.checkRandomFeasibleConstraints(x0,p,q,pars,debugLevel)
       FeasibilityTests.runAll(pars,debugLevel)
     }
 

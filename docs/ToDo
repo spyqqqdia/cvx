@@ -1,197 +1,3 @@
-#-----------------------------------------------------------------------
-2016-12-02:|
--------------
-
-Status: code compiles and runs but __nothing working__,
-newton steps are not descent directions, hessians of convex test functions
-often not positive semidefinite.
-
-Improve diagnostics in
-           TestUnconstrainedMinimization::testList
-print value of known global min, value at solution.
-
-Test the backsolve routine. The forwardsolve routine is already tested.
-
-Implement
-             MathUtils.solveWithPreconditioning
-for a positive semidefinite system.
-
-
-#-----------------------------------------------------------------------
-2016-12-05:|
--------------
-
-Add new Exception LinSolveException when solving Ax=b fails. Should contain
-message as well as the matrix A, the vector b instead of adding these as strings
-to the message.
-
-Add class Constraint (inequality constraint), has id, gradient, hessian, method to check
-if it is satisfied, strictly satisfied with margin of error etc.
-
-Introduce class MinimizationProblem:
-has objective function with gradient and hessian and constraints as well as a method
-allocating a solver.
-
-Rename the current TestFunctions to MinimizationProblems.
-
-Then do the BarrierSolver.
-
-#-----------------------------------------------------------------------
-2016-12-06:|
--------------
-
-Find out why the Type1 power test functions produce no output in the test.
-Complete the BarrierSolver: factory functions for versions with and without equality constraints.
-
-
-#-----------------------------------------------------------------------
-2016-12-11:|
--------------
-
-Implement the affine changed power function minmization problems, factory function
-OptimizationProblems.randomPowerProblem,
-See docs/cvx_notes.pdf, p5, Example 2.1, where all $phi_j(x) = (x*x)^q$ with q>1 to ensure
-twice continuous differentiability.
-
-
-#--------------------------------------------------------------
-2016-12-16:|
--------------
-
-Implement the constrained test problems.
-
-New optimization problem
-                     OptimizationProblems.minX1
-with constraints fails the test: backtracking line search does not reach sufficient decrease
-after 100 iterations (in UnconstrainedSolver::solve). This is only explicable if the objective function
-or the gradient are messed up.
-
-Next: implement KKT system solver with block elimination in MatrixUtils.
-
-#--------------------------------------------------------------
-2017-01-14:|
--------------
-
-Implement quadratically constrained quadratic problems (faster setup), then add many test
-problems with known solutions.
-
-
-#--------------------------------------------------------------
-2017-01-14A:|
---------------
-
-The class ConstraintSet also needs a method doSOIAnalysis which takes a set of
-equality constraints, low priority. We need some tests for SOI feasibility analysis.
-
-Simplify the various forms of the BarrierSolver.apply constructors by adding an optional feasible
-point to the ConstraintSets and a method to add a feasible point.
-The barrier solvers should now no longer assume that a feasible point is given. Instead check if
-the inequality constraint set has one and if it is in the range of the equality constraints.
-Otherwise it needs to perform a feasibility analysis to find one.
-We need to beef up the simple feasibility analysis to be able to deal with equality constraints.
-
-The simplest way may be to operate on the level of the objective function and inequality constraints
-(by restricting these to the range of the equality constraints) and not on the level of the barrier solver.
-However this is very inefficient since it implies many more matrix multiplications.
-
-The matrices are bigger (more columns) the fewer equality conditions we have -- a bad constellation.
-
-Consequently it might better to have two versions of simple feasibility analysis: one with
-and one without equality constraints. The feasibility solver with equality constraints
-needs separate implementation as only the variable x in the compound variable (x,s) is affected
-by the transformation x=Fu.
-Thus the matrix which transforms the barrier function has two blocks the second of which is the
-identity matrix. Needless to say this multiplication can be implemented more efficiently by operating on
-the blocks separately (and doing nothing on the block indexed by the s-variables).
-
-
-#--------------------------------------------------------------
-2017-01-23:|
---------------
-
-Find out what the problem is with the accuracy of the solutions of the KKT system.
-There is no problem with MatrixUtils.triangularSolve, the errors in the test cases
-with the identical matrices H=LL' are zero.
-
-Even though identical matrices L and  H=LL' are used in the test for MatrixUtils.triangularSolve
-and the KKTSystem solution, the condition numbers are worse in the KKT case (1600 versus 500).
-The equilibration of H in the KKTSystem solver seems to increase the condition number.
-But it is still too small to cause such inaccuracy.
-Thus there must be some other problem with the KKT code.
-
-#--------------------------------------------------------------
-2017-01-23:|
---------------
-
-KKTSystem.solvePD:
-when Ruiz equilibration is switched off (i.e. unmodified blockSolve is used) works
-flawlessly with condition numbers of H as large as 2e6.
-Ruiz equilibration cuts the condition numbers in half but then the accuracy of the
-solution goes down badly.
-There must therefore be a BUG in the transformation to and from the equilibrated system.
-
-BUG is fixed, status: working!
-
-
-#--------------------------------------------------------------
-2017-02-04:|
---------------
-
-The OptimizationProblem should get a list of (inequality) Constraints as well as an
-optional EqualityConstraints object which then determine which BarrierSolver is used.
-
-
-
-####################################################################################################
-Design break:|
-###############
-
-
-https://github.com/spyqqqdia/cvx
-
-
-Approach is wrong:
-
-_OptimizationProblem_
-
-has a solver as basic ingredient,
-should be the other way around:
-OptimizationProblem has objective function and ConstraintSet
-and then computes solvers for the problem
-
-
-_ConstraintSet_:
-
-Allocates the phase_I and phase_I_SOI optimization problems,
-then solves these and returns a feasibility report.
-
-To do this the ConstraintSet has methods to turn itself
-(return) the ConstraintSet for the phase_I and phase_I_SOI
-optimization problems.
-
-
-_Solvers (BarroerSolver)_:
-
-With this each Solver can assume that it has a feasible point
-and does not have to concern itself with feasibility analysis.
-
-
-#----------------------------------------------------
-Using self type annotation:|
------------------------------
-
-generally take some of the static functions out of the companion objects
-and into the corresponding classes
-
-
-_Constraint_:
-the methods to turn the Constraint into its phase_I form.
-Move the method to turn a constraint into tis phase_I_SOI form into the class
-ConstraintSet, since we need the full context of the constraint set to do this
-(number of all constraints and index of particular constraint).
-
-
-
 
 #-------------------------------------------------------------------------------------------
 2017-10-09:|
@@ -355,49 +161,76 @@ singular KKT system.
 SOI analysis does not work (IndexOutOfBounds on DenseVector).
 Run the feasibility tests in Runner.
 
- 
-----------------------------------------------------------------------------------------
-2017-11-05:|
+
+#----------------------------------------------------------------------------------------
+2017-11-21:|
 -------------
 
-EqualityConstraint.phase_I_SOI_EqualityConstraint
-is not implemented (returns null leading to null pointer exception).
+KKTSystem: all solvers: added tolerance to parameters.
+MatrixUtils:  added logger, debuglevel to svdSolve.
 
-
-----------------------------------------------------------------------------------------
-2017-11-07:|
--------------
-
-Implement the regularization from the Neumaier paper in MatrixUtils.svdSolve.
-We should also do the following: if the solution with block elimination is carried out in the
-KKTsystem we need to check the accuracy of the solution and switch to SVD with regularization
-in case it is not satisfactory.
-
-Neumaier paper:
-ARNOLD NEUMAIER, SOLVING ILL-CONDITIONED AND SINGULAR LINEAR SYSTEMS:
-A TUTORIAL ON REGULARIZATION
-
-homepage:
-https://www.mat.univie.ac.at/~neum/
-regtutorial:
-https://www.mat.univie.ac.at/~neum/ms/regtutorial.pdf
+Status: new parameter signatures are only consistent within MatrixUtils and
+KKTSystem. Needs to be fixed elsewhere, do a compile and look at the errors.
 
 
 #----------------------------------------------------------------------------------------
-2017-11-09:|
+2017-11-22:|
 -------------
 
-Implement the SVD regularization in the KKTsystem solution.
-Needs analysis.
+Problem dist_KL_2 fails to observe the constraint sum(x_j)=1
+Computation fails due to very bad condition numbers.
 
-We should scan the SVD solution formula for problems:
-u_j'b large while sigma_j small, only then act on it.
+This problem does have _inequality constraints_ for the probabilities
+(x_j>0) so is not dissimilar to problem kl_1 with no equality constraints.
 
-GLM score function minimization does not yet work.
-Minimization via solution of g'(t)=0 does not always work since g(t) can be decreasing
-Then t will be large, Delta will be small and no regularization takes place.
-Does this ony happen when we do not have a problem?
-Explore in R-prototype.
+In our problem in the very first step of the Iteration along the central path
+at the very first index t=1 the matrix H is easily seen to be singular!
+Why is that?
+
+Solved: by transforming the system via H -> H+A'A and the rest accordingly.
 
 
+#----------------------------------------------------------------------------------------
+2017-11-28:|
+-------------
 
+Status: all tests of minimization problems go through correctly except
+the random power problems. Examine what's the matter with these.
+
+Use the new random constraints in Constraints and random quadratic objective functions to
+
+(A) build ConstraintSets with known feasible point x0 and do a phase_I_Analysis on these.
+(B) Combine the Constraint sets with a quadratic objective function with global minimum
+    at x=x0, then solve the constrained problem.
+
+
+Might be a good idea to add a function randomConstraintSet to the object ConstraintSets.
+
+
+#----------------------------------------------------------------------------------------
+2017-11-29:|
+-------------
+
+Phase_I_Analysis_SOI fails on
+FeasibilityTest.checkRandomFeasibleConstraints
+in the case where we have too many additional equalities.
+Currently we have 3 additional equalities and 20 variables.
+This goes through.
+
+Write some tests of random quadratic objective functions under random
+ConstraintSets. Then import the test case from JOptimizer.
+
+
+#----------------------------------------------------------------------------------------
+2017-11-30:|
+-------------
+
+Write some tests based on sum of absolute values constraints,
+e.g. maximize  a dot x subject to |x_j|<=|a_j|.
+Might want to introduce a new method in Constraints to generate
+the list of these constraints.
+
+Status:
+Compiles and runs,
+Phase I SOI analysis fails on random feasible quadratic and linear constraints.
+Standard problems: optimization fails for random power problems.
