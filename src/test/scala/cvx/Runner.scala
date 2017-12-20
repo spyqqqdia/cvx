@@ -17,6 +17,7 @@ object Runner extends App {
     val doTestMatrixUtils = false
     val doKktTests = false
 
+    val doTestPowerProblems = false
     val doTestStandardProblems = true
     val doMinX1 = false
     val doTestKlProblems = false
@@ -27,7 +28,7 @@ object Runner extends App {
     val maxIter = 200           // max number of Newton steps computed
     val alpha = 0.05            // line search descent factor
     val beta = 0.75             // line search backtrack factor
-    val tolSolver = 1e-6        // tolerance for norm of gradient, duality gap
+    val tolSolver = 1e-7        // tolerance for norm of gradient, duality gap
     val tolEqSolve = 10         // tolerance in the solution of the KKT system
     val tolFeas = 1e-9          // tolerance in inequality and equality constraints
     val delta = 1e-8            // regularization A -> A+delta*I if ill conditioned
@@ -42,7 +43,8 @@ object Runner extends App {
       val reps= 10
       val tol = 1e-10
       //MatrixUtilsTests.runAll(dim,reps,tol)
-      MatrixUtilsTests.testSignCombinationMatrices
+      //MatrixUtilsTests.testSignCombinationMatrices
+      MatrixUtilsTests.testRandomMatrixCondNum(1000,100)
     }
 
     if(doKktTests){
@@ -58,10 +60,17 @@ object Runner extends App {
       KktTest.testKktSystemReduction(nTests,nullIndices,logger,tolEqSolve,debugLevel)
     }
 
+
+    if(doTestPowerProblems ){
+
+      MinimizationTests.testPowerProblems(pars,tolSolution,debugLevel)
+    }
+
     if(doTestStandardProblems ){
 
       val dim = 100               // dimension of objective function
-      MinimizationTests.testStandardProblems(dim,pars,tolSolution,debugLevel)
+      val condNumber = 100   // condition number of matrix A
+      MinimizationTests.testStandardProblems(dim,condNumber,pars,tolSolution,debugLevel)
     }
 
     if(doMinX1){

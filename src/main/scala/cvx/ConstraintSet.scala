@@ -176,7 +176,7 @@ abstract class ConstraintSet(val dim:Int, val constraints:Seq[Constraint]) {
       eqs: Option[EqualityConstraint], pars:SolverParams, debugLevel:Int
   ): FeasibilityReport = {
 
-    if(debugLevel>0) println("\nConstraintSet: doing phase_I_Analysis.")
+    if(debugLevel>0) println("ConstraintSet: doing phase_I_Analysis:")
     Console.flush()
     // map the equalities to the dimension of the phase_I analysis:
     val phase_I_eqs:Option[EqualityConstraint] = eqs.map(eq => eq.phase_I_EqualityConstraint)
@@ -200,7 +200,7 @@ abstract class ConstraintSet(val dim:Int, val constraints:Seq[Constraint]) {
     if(debugLevel>1){
       val logFilePath = "logs/ConstraintSet_phase_I_log.txt"
       val logger = Logger(logFilePath)
-      val msg = "\nConstraintSet.phase_I_Analysis, result:\n"+report.toString(pars.tol)
+      val msg = report.toString(pars.tol)
       logger.println(msg)
       println(msg); Console.flush()
     }
@@ -298,7 +298,7 @@ abstract class ConstraintSet(val dim:Int, val constraints:Seq[Constraint]) {
     eqs:Option[EqualityConstraint], pars:SolverParams, debugLevel:Int
   ): FeasibilityReport = {
 
-    if(debugLevel>0) println("\nConstraintSet: doing phase_I_SOI_Analysis.")
+    if(debugLevel>0) println("ConstraintSet: doing phase_I_SOI_Analysis:")
     Console.flush()
 
     val p = numConstraints
@@ -322,7 +322,7 @@ abstract class ConstraintSet(val dim:Int, val constraints:Seq[Constraint]) {
     if(debugLevel>1){
       val logFilePath = "logs/ConstraintSet_phase_I_log.txt"
       val logger = Logger(logFilePath)
-      val msg = "\nConstraintSet.phase_I_Analysis, result:\n"+report.toString(pars.tol)
+      val msg = report.toString(pars.tol)
       logger.println(msg)
       println(msg); Console.flush()
     }

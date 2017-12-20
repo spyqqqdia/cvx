@@ -18,15 +18,28 @@ class OptimizationProblem(
 
   def solve(debugLevel:Int=0):Solution = solver.solve(debugLevel)
 
-  /** Add the known solution to the minimization problem.
+  /** Add the known (unique) solution to the minimization problem.
     * For testing purposes.
     */
   def addSolution(optSol:KnownMinimizer): OptimizationProblem with KnownMinimizer  =
   new OptimizationProblem(id,objectiveFunction,solver,logger) with KnownMinimizer {
 
-    def isMinimizer(x:DenseVector[Double],tol:Double):Boolean = optSol.isMinimizer(x,tol)
-    def minimumValue:Double = optSol.minimumValue
+    override def theMinimizer: DenseVector[Double] = optSol.theMinimizer
+    def isMinimizer(x:DenseVector[Double],tol:Double) = optSol.isMinimizer(x,tol)
+    def minimumValue = optSol.minimumValue
   }
+
+  /** Add the known solutions to the minimization problem. List must contain
+    * all solutions. For testing purposes.
+    */
+  def addSolutions(sols:List[DenseVector[Double]]): OptimizationProblem with KnownMinimizer  =
+    new OptimizationProblem(id,objectiveFunction,solver,logger) with KnownMinimizer {
+
+      assert(!sols.isEmpty,"\naddSolutions: no solutions provided.\n")
+      override def theMinimizer: DenseVector[Double] = sols(0)
+      def isMinimizer(x:DenseVector[Double],tol:Double) = min(sols.map(sol => norm(x-sol))) < tol
+      def minimumValue = min(sols.map(sol => objectiveFunction.valueAt(sol)))
+    }
 }
 
 /** Factory functions to allocate problems and select the solver to use.

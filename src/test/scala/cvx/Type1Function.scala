@@ -1,6 +1,7 @@
 package cvx
 
 import breeze.linalg.{DenseMatrix, DenseVector, _}
+import breeze.numerics.abs
 /**
   * Created by oar on 12/2/16.
   *
@@ -24,11 +25,11 @@ import breeze.linalg.{DenseMatrix, DenseVector, _}
 abstract class Type1Function(val A:DenseMatrix[Double],val alpha:DenseVector[Double])
   extends ObjectiveFunction(A.cols) {
 
-  val m:Int = A.rows
+  val m = A.rows
   assert(m<=A.cols,"A.rows<=A.cols required, but A.rows="+A.rows+", A.cols="+A.cols)
   assert(alpha.length==m,"k=alpha.length must equal A.rows but k="+alpha.length+", A.rows="+A.rows)
   // coefficients must be positive
-  assert((0 until m).forall(j => alpha(j)>0))
+  assert(alpha.forall(_>0),"\nCoefficients alpha_j must be >0 but alpha = "+alpha)
 
   /** Function phi_j as in docs/cvx_notes, section Hessian, example 1.*/
   def phi(j:Int,u:Double):Double
@@ -38,7 +39,7 @@ abstract class Type1Function(val A:DenseMatrix[Double],val alpha:DenseVector[Dou
   def d2phi(j:Int,u:Double):Double
 
   /** Global minimizers are the solutions of Ax=0. */
-  def isMinimizer(x:DenseVector[Double],tol:Double):Boolean = norm(A*x)<tol*Math.sqrt(sum(A:*A))
+  def isMinimizer(x:DenseVector[Double],tol:Double) = norm(A*x)<tol*Math.sqrt(sum(A:*A))
   /** Minimum value of the objective function: sum_j\phi_j(0).*/
   def globalMin:Double = (0 until m).map(j => alpha(j)*phi(j,0)).sum
 
@@ -81,25 +82,27 @@ abstract class Type1Function(val A:DenseMatrix[Double],val alpha:DenseVector[Dou
 object Type1Function {
 
 
-  /** $f(x)=\sum_j\alpha_j[(a_j\cdot x)^2]^q$, where $a_j=row_j(A)$.
-    * Here we should have q>1 for this to be twice continuously differentiable.
+  /** $f(x)=\sum_j\alpha_j(a_j\cdot x)^^{2q}$, where $a_j=row_j(A)$.
+    * Here $u^^{2q}=(u*u)^^q$ is defined for $u<0$ also and we need q>1
+    * for this to be twice continuously differentiable.
     *
     * The dimension of this function is n=A.cols. We must have m=A.rows <= n.
     */
-  def powerTestFunction(A:DenseMatrix[Double], alpha:DenseVector[Double], q:Double):Type1Function = {
+  def powerFunction(A:DenseMatrix[Double], alpha:DenseVector[Double], q:Double):Type1Function = {
 
-    assert(q>=1,"q="+q+" is < 1.")
+    assert(q>1,"q="+q+" is not > 1.")
     assert(A.rows <= A.cols,"m=A.rows="+A.rows+" does not satisfy m<=A.cols="+A.cols)
     new Type1Function(A: DenseMatrix[Double], alpha: DenseVector[Double]) {
 
-      def id:String = "Type 1 power test function with q=" + MathUtils.round(q,3)
-      def phi(j: Int, u: Double):Double = Math.pow(u * u, q)
-      def dphi(j: Int, u: Double):Double = {
+      def id = "Type 1 power test function with q=" + MathUtils.round(q,3)
+      def phi(j: Int, u: Double) = if(abs(u)<1e-14) 0.0 else Math.pow(u * u, q)
+      def dphi(j: Int, u: Double) = {
 
-        val y = (2*q)*Math.pow(u * u, q - 0.5)
+        val y = if(abs(u)<1e-14) 0.0 else (2*q)*Math.pow(u * u, q - 0.5)
         if (u>0) y else -y
       }
-      def d2phi(j: Int, u: Double):Double = (2*q)*(2*q-1)*Math.pow(u * u, q - 1)
+      def d2phi(j: Int, u: Double) =
+        if(abs(u)<1e-14) 0.0 else (2*q)*(2*q-1)*Math.pow(u * u, q - 1)
     }
   }
 
@@ -108,7 +111,7 @@ object Type1Function {
     *
     * @param dim dimension will be dim, A will be dim x dim
     */
-  def randomPowerTestFunction(dim:Integer,m:Int,q:Double):Type1Function = {
+  def randomPowerFunction(dim:Integer, m:Int, q:Double):Type1Function = {
 
     assert(q>1,"q="+q+" is not > 1.")
     assert(m<=dim)
@@ -117,6 +120,6 @@ object Type1Function {
     for(i <- 0 until m) A(i,i)+=1.0
 
     val alpha = DenseVector.rand[Double](m)
-    powerTestFunction(A,alpha,q)
+    powerFunction(A,alpha,q)
   }
 }

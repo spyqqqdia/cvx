@@ -326,5 +326,37 @@ object MatrixUtilsTests {
     val dimKernel =  0
     testSvdSolve(nTests,dim,condNum,dimKernel,tolEqSolve,debugLevel)
   }
+
+  /** We allocate N nxn matrices with uniformly random entries from [-1,1]
+    * and compute the condition number before and after Ruiz equilibration.
+    * These condition numbers are collected and written to files
+    * condNum.txt and ruizCondNum.txt
+    *
+    * The purpose is to verify that random matrices have bad condition numbers.
+    */
+  def testRandomMatrixCondNum(N:Int,n:Int):Unit = {
+
+    val condNums = DenseVector.zeros[Double](N)
+    val condNumsRuiz = DenseVector.zeros[Double](N)
+    println("Computing condition numbers: ")
+    val d=N/20
+    for(k <- 0 until N ){
+
+      if(k%d==0) print("*")
+      val A = MatrixUtils.randomMatrix(n,n,-1.0,1.0)
+      condNums(k)=MatrixUtils.conditionNumber(A)
+      val rA = MatrixUtils.ruizEquilibrate(A)    // pair (d,Q) with Q=DAD with D=diag(d)
+      val B = rA._2
+      condNumsRuiz(k)=MatrixUtils.conditionNumber(B)
+    }
+    val logger = Logger("logs/condNums.txt")
+    MatrixUtils.print(condNums,logger,digits=1)
+    logger.close()
+    val loggerRuiz = Logger("logs/condNumsRuiz.txt")
+    MatrixUtils.print(condNumsRuiz,loggerRuiz,digits=1)
+    loggerRuiz.close()
+
+    println("\nFinished, results in logs/condNums*.\n")
+  }
 }
 

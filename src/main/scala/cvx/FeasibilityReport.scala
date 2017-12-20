@@ -52,9 +52,9 @@ case class FeasibilityReport(
   def toString(tol:Double):String =
 
       if(isStrictlyFeasible)
-        "\nStrictly feasible point found:\n"+x0
+        "Strictly feasible point found:\n"+x0
       else if(isFeasible(tol))
-        "\nFound point feasible up to tolerance tol = "+tol+":\n"+x0
+        "Found point feasible up to tolerance tol = "+tol+":\n"+x0
       else reasonWhyInfeasible(tol)
 
 }

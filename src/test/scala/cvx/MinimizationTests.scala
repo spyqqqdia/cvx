@@ -30,14 +30,16 @@ object MinimizationTests {
     val iter = sol.iter
     val maxedOut = sol.maxedOut
     val isSolution = problem.isMinimizer(x,tol)
+    val knownSolution = problem.theMinimizer
 
-    var msg = "\n\nIterations = "+iter+"; maxiter reached: "+maxedOut+"\n"
+    var msg = "Iterations = "+iter+"; maxiter reached: "+maxedOut+"\n"
     msg += "Newton decrement:  "+MathUtils.round(newtonDecrement,10)+"\n"
     msg += "norm of gradient:  "+MathUtils.round(normGrad,10)+"\n"
     msg += "value at solution y=f(x):  "+MathUtils.round(y,10)+"\n"
     msg += "value of global min:  "+MathUtils.round(y_opt,10)+"\n"
+    msg += "known minimizer:\n"+knownSolution+"\n"
+    msg += "Computed solution x:\n"+x+"\n"
     msg += "Is global solution at tolerance "+tol+": "+isSolution+"\n"
-    msg += "Solution x:\n"+x+"\n\n"
     print(msg)
     Console.flush()
     problem.logger.close()
@@ -46,7 +48,7 @@ object MinimizationTests {
 
     case e:Exception => {
 
-      print("\n\nException of class "+e.getClass+"occurred")
+      print("\n\nException "+e.getClass+" occurred")
       print("\nMessage: "+e.getMessage)
       print("\nStacktrace:\n")
       e.printStackTrace()
@@ -86,7 +88,7 @@ object MinimizationTests {
 
     case e:Exception => {
 
-      print("\n\nException of class "+e.getClass+"occurred")
+      print("\n\nException "+e.getClass+" occurred")
       print("\nMessage: "+e.getMessage)
       print("\nStacktrace:\n")
       e.printStackTrace()
@@ -94,18 +96,27 @@ object MinimizationTests {
     }
   }
 
+  /** Run the two simple power problems [OptimizationProblems.powerProblems].
+    */
+  def testPowerProblems(pars:SolverParams,tol:Double,debugLevel:Int):Unit = {
 
+    val problems = OptimizationProblems.powerProblems(pars,debugLevel)
+    runProblemsWithKnownMinimizer(problems,tol,debugLevel)
+  }
 
   /** Test the standard list, [OptimizationProblems.standardProblems] in dimension dim.
     *
     * @param dim dimension of independent variable.
+    * @param condNumber: condition number of the matrix A in the power problems.
     * @param pars parameters controlling the solver behaviour (maxIter, backtracking line search
     * parameters etc, see [SolverParams].
     * @param tol tolerance for deviation from the known solution.
     */
-  def testStandardProblems(dim:Int,pars:SolverParams,tol:Double,debugLevel:Int):Unit = {
+  def testStandardProblems(
+    dim:Int,condNumber:Double,pars:SolverParams,tol:Double,debugLevel:Int
+  ):Unit = {
 
-    val problems = OptimizationProblems.standardProblems(dim,pars,debugLevel)
+    val problems = SimpleOptimizationProblems.standardProblems(dim,condNumber,pars,debugLevel)
     runProblemsWithKnownMinimizer(problems,tol,debugLevel)
   }
 
@@ -114,8 +125,8 @@ object MinimizationTests {
 
 
     val problems = List(
-      OptimizationProblems.minX1_FP(pars,debugLevel),
-      OptimizationProblems.minX1_no_FP(pars,debugLevel)
+      SimpleOptimizationProblems.minX1_FP(pars,debugLevel),
+      SimpleOptimizationProblems.minX1_no_FP(pars,debugLevel)
     )
     runProblemsWithKnownMinimizer(problems,tol,debugLevel)
   }
@@ -139,6 +150,8 @@ object MinimizationTests {
     )
     runProblems(problems,tol,debugLevel)
   }
+
+
 }
 
 

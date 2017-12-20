@@ -1,7 +1,7 @@
 package cvx
 
 import breeze.linalg.{DenseVector, _}
-import breeze.numerics.abs
+import breeze.numerics.{abs, sqrt}
 
 
 /**
@@ -12,30 +12,6 @@ import breeze.numerics.abs
 object OptimizationProblems {
 
 
-  /** @return list of OptimizationProblems in dimension dim with known solution as follows:
-    * first the following unconstrained problems
-    *     minX1,
-    *     f(x) = x dot x, followed by
-    *     3 [randomPowerProblem]s with one dimensional solution space (m = dim-1)
-    *
-    * No constrained problems as of yet. The list will be expanded continually.
-    * @param dim common dimension of all problems, must be >= 2.
-    * @param pars parameters controlling the solver behaviour (maxIter, backtracking line search
-    * parameters etc, see [SolverParams].
-    */
-  def standardProblems(dim:Int,pars:SolverParams,debugLevel:Int):List[OptimizationProblem with KnownMinimizer] = {
-
-    var theList:List[OptimizationProblem with KnownMinimizer] = List(normSquared(dim,debugLevel))
-    for(j <- 1 to 3){
-
-      val q = 1.0+rand()
-      val m = dim-1        // rank of A, so solution space = ker(A) is one dimensional
-      val id = "Random power problem in dimension "+dim+" with m="+dim+"-1 and exponent 2*"+q
-      theList = theList :+ randomPowerProblem(id,dim,m,q,pars,debugLevel)
-    }
-    minX1_FP(pars,debugLevel) :: theList
-  }
-
   /** f(x) = (1/2)*(x dot x).*/
   def normSquared(dim:Int,C:ConvexSet,debugLevel:Int):OptimizationProblem = {
 
@@ -43,7 +19,7 @@ object OptimizationProblems {
 
     val id = "f(x) = 0.5*||x||^2  in dimension "+dim
     if(debugLevel>0) {
-      println("\n\nAllocating problem " + id)
+      println("Allocating problem " + id)
       Console.flush()
     }
     val logFilePath = "logs/"+id+"_log.txt"
@@ -67,17 +43,18 @@ object OptimizationProblems {
   }
 
   /** Unconstrained optimization problem with objective function as in docs/cvx_notes.pdf,
-    * example 2.1, p5 with all functions $\phi_j(u)=pow(u*u,q)$ with $q>1$,
+    * example 3.1, p6 with all functions $\phi_j(u)=u^^{2q}$ with $q>1$,
     * i.e. the objective function is globally defined in Euclidean space
     * of dimension dim and has the form
-    *           \[ f(x)=\sum_j \alpha_j*pow((a_j dot x)*(a_j dot x),q) \]
+    *           \[ f(x)=\sum_j \alpha_j(a_j dot x)^^{2q} \]
     * with positive coefficients $\alpha_j$, $A$ a matrix of dimension m x n, where m <= n,
-    * and $a_j=col_j(A)$.
+    * and $a_j=row_j(A)$.
     * Then $n$ is the dimension of the independent variable $x$ and the global minimum
     * is zero and is assumed at all points in the null space of A.
     * If m < dim this space is nontrivial and we can test how the algorithm behaves in such
     * a case.
     *
+    * @param q exponent must be >= 1 for differentiability.
     * @param pars parameters controlling the solver behaviour (maxIter, backtracking line search
     * parameters etc, see [SolverParams].
     */
@@ -86,8 +63,9 @@ object OptimizationProblems {
                     pars:SolverParams, debugLevel:Int
     ): OptimizationProblem with KnownMinimizer = {
 
+    assert(q>=1,"\nExponent q needs to be at least 1 but q="+q+"\n")
     if(debugLevel>0){
-      println("\n\nAllocating problem "+id)
+      println("Allocating problem "+id)
       Console.flush()
     }
     val n=A.cols; val m=A.rows
@@ -96,11 +74,12 @@ object OptimizationProblems {
     val logFilePath = "logs/"+id+"_log.txt"
     val logger = Logger(logFilePath)
 
-    val startingPoint = DenseVector.tabulate[Double](n)(j=>j*Math.sqrt(n))
-    val objF:ObjectiveFunction = Type1Function.powerTestFunction(A,alpha,q)
+    val startingPoint = DenseVector.tabulate[Double](n)(j => -10+j*Math.sqrt(n))
+    val objF:ObjectiveFunction = Type1Function.powerFunction(A,alpha,q)
     val C = ConvexSet.fullSpace(n)
     val minimizer = new KnownMinimizer {
 
+      def theMinimizer = DenseVector.zeros[Double](n)
       def isMinimizer(x:DenseVector[Double],tol:Double) = norm(A*x)<tol
       def minimumValue = 0.0
     }
@@ -108,138 +87,42 @@ object OptimizationProblems {
     problem.addSolution(minimizer)
   }
 
-  /** [powerProblem] in dimension dim with m x dim matrix A and coefficient vector alpha
-    * having random entries in (0,1). In addition 1.0 is added to the diagonal entries of
-    * A to improve the condition number.
+  /** [powerProblem] in dimension dim with dim x dim matrix A and coefficient vector alpha
+    * having random entries in (0,1).
     *
-    * @param m we must have m<=dim.
+    * @param dimKernel: dimension of solution space = ker(A).
+    * @param condNumber: condition number of A.
     */
-  def randomPowerProblem(id:String,dim:Int,m:Int,q:Double,pars:SolverParams,debugLevel:Int):
-  OptimizationProblem with KnownMinimizer = {
+  def randomPowerProblem(
+     id:String,dim:Int,dimKernel:Int,condNumber:Double,q:Double,
+     pars:SolverParams,debugLevel:Int
+  ): OptimizationProblem with KnownMinimizer = {
 
-    assert(m<=dim)
-    val A = DenseMatrix.rand[Double](m,dim)
-    for(i <- 0 until m) A(i,i)+=1.0
-    val alpha = DenseVector.rand[Double](m)
+    assert(dimKernel<=dim)
+    val A = MatrixUtils.randomMatrix(dim,condNumber)
+    val alpha = DenseVector.rand[Double](dim)
     powerProblem(id,A,alpha,q,pars,debugLevel)
   }
 
-
-  /** Objective function f(x0,x1)=x0 subject to x1>=exp(x0) and x1=a+b*x0 with constant
-    * r=0.5*(e+1/e), k=0.5*(e-1/e) chosen so that the line x1=r+k*x0 intersects x1=exp(x0)
-    * at the points x0=1,-1. The minimum is thus attained at x0=-1, x1=r-k=1/e.
-    *
-    * The constraint set of the problem is allocated with feasible point.
-    *
-    * @param pars parameters controlling the solver behaviour (maxIter, backtracking line search
-    * parameters etc, see [SolverParams].
+  /** List of power problems, the first with A the 2x2 identity matrix,
+    * the second with A={{1,0},{1,1}} and in each case q=2 and alpha=(1,1).
     */
-  def minX1_FP(pars: SolverParams,debugLevel:Int):OptimizationProblem with KnownMinimizer = {
+  def powerProblems(pars:SolverParams,debugLevel:Int):List[OptimizationProblem with KnownMinimizer] = {
 
-    val id = "f(x0,x1)=x0 on x1>=exp(x0), x1 <= r+k*x0, with feasible point."
-    if(debugLevel>0) {
-      println("\n\nAllocating problem " + id)
-      Console.flush()
-    }
-    val logFilePath = "logs/"+id+"_log.txt"
-    val logger = Logger(logFilePath)
+    val q = 2.0
+    val alpha = DenseVector(1.0,1.0)
+    val A = DenseMatrix.eye[Double](2)
 
-    val dim = 2
-    // objective f(x0,x1)=x0
-    val objF = new ObjectiveFunction(dim){
+    val id1 = "Power problem A=I_2, alpha=(1,1), q=2"
+    val p1 = powerProblem( id1,A,alpha,q,pars,debugLevel)
 
-      def valueAt(x:DenseVector[Double]) = x(0)
-      def gradientAt(x:DenseVector[Double]) = DenseVector(1.0,0.0)
-      def hessianAt(x:DenseVector[Double]) = DenseMatrix.zeros[Double](dim,dim)
-    }
-
-    // set of inequality constraints
-
-    // constraint x1 >= exp(x0)
-    val ub = 0.0 // upper bound
-    val ct1 = new Constraint("x2>=exp(x1)",dim,ub){
-
-      def valueAt(x:DenseVector[Double]) = Math.exp(x(0))-x(1)
-      def gradientAt(x:DenseVector[Double]) = DenseVector(Math.exp(x(0)),-1.0)
-      def hessianAt(x:DenseVector[Double]) = DenseMatrix((Math.exp(x(0)),0.0),(0.0,0.0))
-    }
-    // linear inequality x1 <= r+k*x0
-    val e = Math.exp(1.0); val r = 0.5*(e+1/e); val k = 0.5*(e-1/e)
-    val a = DenseVector(-k,1.0)    // a dot x = x1-k*x0
-    val ct2 = LinearConstraint("x1<=r+k*x0",dim,r,0.0,a)
-
-    val x = DenseVector(0.0,0.0)     // point where all the constraints are defined
-    val ineqs = ConstraintSet(dim,List(ct1,ct2),x)   // the inequality constraints
-
-    // add a feasible point
-    val x_feas = DenseVector(0.0,1.01)
-    val ineqsF = ineqs.addFeasiblePoint(x_feas)
-
-    val doSOIAnalysis = false
-
-    // None: no equality constraints
-    val problem = OptimizationProblem(id,objF,ineqsF,None,pars,logger,debugLevel)
-
-    // add the known solution
-    val x_opt = DenseVector(-1.0,1/e)    // minimizer
-    val minimizer = KnownMinimizer(x_opt,objF)
-    problem.addSolution(minimizer)
+    val B = DenseMatrix.tabulate[Double](2,2)((i,j)=>1.0); B(0,1)=0.0
+    val id2 = "Power problem A={{1,0},{1,1}}, alpha=(1,1), q=2"
+    val p2 = powerProblem( id2,B,alpha,q,pars,debugLevel)
+    List(p1,p2)
   }
 
-  /** Objective function f(x0,x1)=x0 subject to x1>=exp(x0) and x1=a+b*x0 with constant
-    * r=0.5*(e+1/e), k=0.5*(e-1/e) chosen so that the line x1=r+k*x0 intersects x1=exp(x0)
-    * at the points x0=1,-1. The minimum is thus attained at x0=-1, x1=r-k=1/e.
-    *
-    * The constraint set of the problem is allocated without feasible point.
-    *
-    * @param pars parameters controlling the solver behaviour (maxIter, backtracking line search
-    * parameters etc, see [SolverParams].
-    */
-  def minX1_no_FP(pars: SolverParams, debugLevel:Int):OptimizationProblem with KnownMinimizer = {
 
-    val id = "f(x0,x1)=x0 on x1>=exp(x0), x1 <= r+k*x0, no feasible point"
-    if(debugLevel>0) {
-      println("\n\nAllocating problem " + id)
-      Console.flush()
-    }
-    val logFilePath = "logs/"+id+"_log.txt"
-    val logger = Logger(logFilePath)
-
-    val dim = 2
-    // objective f(x0,x1)=x0
-    val objF = new ObjectiveFunction(dim){
-
-      def valueAt(x:DenseVector[Double]) = x(0)
-      def gradientAt(x:DenseVector[Double]) = DenseVector(1.0,0.0)
-      def hessianAt(x:DenseVector[Double]) = DenseMatrix.zeros[Double](dim,dim)
-    }
-
-    // set of inequality constraints
-
-    // constraint x1 >= exp(x0)
-    val ub = 0.0 // upper bound
-    val ct1 = new Constraint("x2>=exp(x1)",dim,ub){
-
-      def valueAt(x:DenseVector[Double]) = Math.exp(x(0))-x(1)
-      def gradientAt(x:DenseVector[Double]) = DenseVector(Math.exp(x(0)),-1.0)
-      def hessianAt(x:DenseVector[Double]) = DenseMatrix((Math.exp(x(0)),0.0),(0.0,0.0))
-    }
-    // linear inequality x1 <= r+k*x0
-    val e = Math.exp(1.0); val r = 0.5*(e+1/e); val k = 0.5*(e-1/e)
-    val a = DenseVector(-k,1.0)    // a dot x = x1-k*x0
-    val ct2 = LinearConstraint("x1<=r+k*x0",dim,r,0.0,a)
-
-    val x = DenseVector(0.0,0.0)     // point where all the constraints are defined
-    val ineqs = ConstraintSet(dim,List(ct1,ct2),x)   // the inequality constraints
-
-
-    val problem = OptimizationProblem(id,objF,ineqs,None,pars,logger,debugLevel)
-
-    // add the known solution
-    val x_opt = DenseVector(-1.0,1/e)    // minimizer
-    val minimizer = KnownMinimizer(x_opt,objF)
-    problem.addSolution(minimizer)
-  }
 
   /**********************************************************************************/
   /** Minimization of Kullback-Leibler distance from discrete uniform distribution **/
@@ -276,7 +159,7 @@ object OptimizationProblems {
 
     val id = "dist_KL problem 1"
     if(debugLevel>0) {
-      println("\n\nAllocating problem " + id)
+      println("Allocating problem " + id)
       Console.flush()
     }
     val logFilePath = "logs/"+id+"_log.txt"
@@ -334,17 +217,18 @@ object OptimizationProblems {
     *
     * @param n must be even and bigger than 9 (to ensure feasibility).
     */
-  def kl_2(n:Int, pars: SolverParams,debugLevel:Int):OptimizationProblem with KnownMinimizer = {
+  def kl_2(n:Int, pars: SolverParams, debugLevel:Int):OptimizationProblem with KnownMinimizer = {
 
     assert(n>9 && n%2==0, "\n\nn must be even and > 9, but n = "+n+"\n\n")
 
     val id = "dist_KL problem 2"
     if(debugLevel>0) {
-      println("\n\nAllocating problem " + id)
+      println("Allocating problem " + id)
       Console.flush()
     }
     val logFilePath = "logs/"+id+"_log.txt"
     val logger = Logger(logFilePath)
+
     val probEq:EqualityConstraint = Constraints.sumToOne(n)
 
     // indicator function 1_A
@@ -392,7 +276,7 @@ object OptimizationProblems {
 
     val id = "dist_KL problem 3 (infeasible)"
     if(debugLevel>0) {
-      println("\n\nAllocating problem " + id)
+      println("Allocating problem " + id)
       Console.flush()
     }
     val logFilePath = "logs/"+id+"_log.txt"
@@ -410,24 +294,6 @@ object OptimizationProblems {
     OptimizationProblem(id,objF,ineqs,Some(probEq),pars,logger,debugLevel)
   }
 
-  /** This is the problem
-    *      max a'x  subject to  |x_j|<=|a_j|.
-    * Obviously the maximum is assumed at x=a.
-    */
-  def maxDotProduct(a:DenseVector[Double],pars:SolverParams,debugLevel:Int):OptimizationProblem = {
 
-    val n = a.length
-    val ub = abs(a)
-    val cntList = Constraints.absoluteValuesBoundedBy(n,ub)
-    val x0 = DenseVector.zeros[Double](n)   // point where all constraints are defined
-    val ineqs = ConstraintSet(n,cntList,x0)
-
-    val id = "MaxDotProduct"
-    val logFilePath = "logs/"+id+"_log.txt"
-    val logger = Logger(logFilePath)
-
-    val objF = ObjectiveFunctions.dotProduct(a)
-    OptimizationProblem(id,objF,ineqs,None,pars,logger,debugLevel)
-  }
 
 }

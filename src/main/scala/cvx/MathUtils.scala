@@ -115,11 +115,11 @@ object MathUtils {
         val wj3 = wj2*wj
         val cj2 = c(j)*c(j)
         Q += cj2/wj
-        R += log(wj)                    // factor 1/r added later
+        R += log(wj)                     // factor 1/r added later
         dQ -= cj2/wj2
-        dR += 1.0/wj                    // factor 1/r added later
-        d2Q += cj2/wj3                  // factor 2 added later
-        d2R -= 1.0/wj2                  // factor 1/r added later
+        dR += 1.0/wj                     // factor 1/r added later
+        d2Q += cj2/wj3                   // factor 2 added later
+        d2R -= 1.0/wj2                   // factor 1/r added later
       }
       j+=1
     }
@@ -161,7 +161,7 @@ object MathUtils {
   def svdGLM3(t:Double,s:DenseVector[Double],c:DenseVector[Double],p:Int):
   (Double,Double,Double) = {
 
-    val all_QR = glmHelper(t,s,c,p)  // (Q(t),Q'(t),Q"(t),R(t),R'(t),R"(t))
+    val all_QR = glmHelper(t,s,c,p)   // (Q(t),Q'(t),Q"(t),R(t),R'(t),R"(t))
     val Q = all_QR._1; val dQ = all_QR._2; val d2Q = all_QR._2
     val R = all_QR._4; val dR = all_QR._5; val d2R = all_QR._6
 
@@ -181,7 +181,7 @@ object MathUtils {
   def min_svdGLM(t:Double,s:DenseVector[Double],c:DenseVector[Double],p:Int):Double = {
 
     val G = (t:Double) => {
-      val Gt = svdGLM3(t,s,c,p);  // (g(t),g'(t),g"(t))
+      val Gt = svdGLM3(t,s,c,p);   // (g(t),g'(t),g"(t))
       (Gt._2,Gt._3)
     }
     val tol = 1e-6

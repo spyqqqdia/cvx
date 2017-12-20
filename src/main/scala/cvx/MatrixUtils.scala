@@ -26,6 +26,8 @@ object MatrixUtils {
 
   /** An nxm matrix with uniformly random entries from the
     * intervall [a,b].
+    * Preferably use the version of this function with control over
+    * the condition number.
     */
   def randomMatrix(n:Int,m:Int,a:Double,b:Double):DenseMatrix[Double] =
     DenseMatrix.tabulate[Double](n,m)((i,j) => a+(b-a)*rng.nextDouble())
@@ -51,8 +53,20 @@ object MatrixUtils {
     val r = scala.util.Random
     val A = randomMatrix(n,n,-1,1)
     val Q = A*A.t
-    eigSym(Q).eigenvectors     // matrix with eigenvectors in columns
+    // we have a openblas numerical problem whereby Q is not symmetric
+    // to sufficient precision, so we must make it symmetric
+    eigSym(Q+Q.t).eigenvectors     // matrix with eigenvectors in columns
   }
+
+  /** A random symmetric, positive definite nxn matrix with given condition number.
+    */
+  def randomMatrix(n:Int,condNumber:Double):DenseMatrix[Double] = {
+
+    val U = randomOrthogonalMatrix(n)
+    val D = diagonalMatrix(n,condNumber,dimKernel=0)
+    (U*D)*U.t
+  }
+
 
   /** A matrix with m columns containing all combinations of signs +1, -1.
     * Note: this matrix has pow(2,m) rows!!
@@ -359,7 +373,9 @@ object MatrixUtils {
     assert(n==H.cols,"Matrix H not square: H.rows="+n+", H.cols="+H.cols)
     assert(m==n,"length(b) = "+m+" is not equal to H.rows="+H.rows)
 
-    val eqH = ruizEquilibrate(H); val d = eqH._1; val Q = eqH._2  // diag(d)*M*diag(d)
+    // Ruiz equilibration alters H
+    val M = H.copy
+    val eqM = ruizEquilibrate(M); val d = eqM._1; val Q = eqM._2  // diag(d)*M*diag(d)
 
     try {
 
@@ -495,7 +511,7 @@ object MatrixUtils {
 
       val msg = "\nsvdSolve: min_x||Mx-q||/f = "+minDist/f+" > tol = "+tol+
                 ", where f = sqrt(A.rows+A.cols) = "+f+".\n"
-      throw new UnsolvableSystemException(msg)
+      throw UnsolvableSystemException(msg)
     }
     // now minDist<=tol and the system is solvable to within tolerance at least theoretically
     // but we may have numeric problems

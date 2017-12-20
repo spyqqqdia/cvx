@@ -230,7 +230,47 @@ e.g. maximize  a dot x subject to |x_j|<=|a_j|.
 Might want to introduce a new method in Constraints to generate
 the list of these constraints.
 
-Status:
-Compiles and runs,
-Phase I SOI analysis fails on random feasible quadratic and linear constraints.
-Standard problems: optimization fails for random power problems.
+
+#----------------------------------------------------------------------------------------
+2017-12-11:|
+-------------
+
+Add the new problems
+OptimizationProblems.maxDotproduct,maxEigenVector
+to the list in MinimizationTests.runAll.
+
+
+#----------------------------------------------------------------------------------------
+2017-12-12:|
+-------------
+
+cvx-notes: add references:
+https://web.stanford.edu/~boyd/papers/graph_dcp.html
+http://cvxr.com/dcp/
+
+cvx-code: update all references to cvx-notes in the scala-doc.
+
+
+#----------------------------------------------------------------------------------------
+2017-12-13:|
+-------------
+
+Now that the natives load and we point to the openblas we have the
+numerical problem with symmetry of Q*Q.t again.
+Write a test to verify that the problem exists.
+
+
+#----------------------------------------------------------------------------------------
+2017-12-14:|
+-------------
+
+Write a function that constructs a list of constraints corresponding to
+a matrix inequality Gx<=h.
+
+SimpleOptimizationProblems.normSquaredWithFreeVariables and
+SimpleOptimizationProblems.joptP2
+fail in phase I analysis.
+
+Currently these are commented out from the list in
+   SimpleOptimizationProblems.standardProblems
+thus do not show up as failure in a run.

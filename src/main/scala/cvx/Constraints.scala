@@ -6,7 +6,7 @@ import breeze.numerics.pow
 import scala.collection.mutable.ListBuffer
 
 /**
-  * Created by oar on 10.10.17.
+  * Created by vagrant on 10.10.17.
   *
   * Some constraints we will use repeatedly.
   */
@@ -51,7 +51,7 @@ object Constraints {
     *
     * A moment constraint of the form EW^p=r is simply a special case of
     * this where the random variable W>0 is replaced with W^p, i.e the vector of
-    * values w is replaced with the vector pow(w,p).
+    * values w is replaced with the vector w^p.
     *
     * Likewise a probability constraint P[E]=r can be expressed as an expectation
     * constraint E[W]=r, where W is the indicator function W=1_E, i.e. the
@@ -85,7 +85,7 @@ object Constraints {
     *
     * A moment constraint of the form EW^p<r is simply a special case of
     * this where the random variable W>0 is replaced with W^p, i.e the vector of
-    * values w is replaced with the vector pow(w,p).
+    * values w is replaced with the vector w^p.
     *
     * Likewise a probability constraint P[E]<r can be expressed as an expectation
     * constraint E[W]=r, where W is the indicator function W=1_E, i.e. the
@@ -246,8 +246,20 @@ object Constraints {
     for(j <- 0 until n){
 
       val cnts_j = sumAbsoluteValuesBoundedBy(n,j,j+1,ub(j))   // |x_j| <= ub(j)
-      res0++cnts_j
+      res0++=cnts_j
     }
     res0.toList
+  }
+  /** This is the constraint 0.5*||x||²<=ub.
+    */
+  def oneHalfNorm2BoundedBy(n:Int,ub:Double):Constraint = {
+
+    val id = "x dot x <= "+ub
+    new Constraint(id,n,ub) {
+
+      def valueAt(x:DenseVector[Double]):Double = (x dot x)/2
+      def gradientAt(x:DenseVector[Double]):DenseVector[Double] = x
+      def hessianAt(x:DenseVector[Double]):DenseMatrix[Double] = DenseMatrix.eye[Double](x.length)
+    }
   }
 }

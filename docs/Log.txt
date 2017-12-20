@@ -239,10 +239,58 @@ MatrixUtils reorganized.
 Files affected:
 MatrixUtils, Constraints, MatrixUtilsTests, Runner
 
-Status:
-Compiles and runs,
-Phase I SOI analysis fails on random feasible quadratic and linear constraints.
-Standard problems: optimization fails for random power problems.
+
+#----------------------------------------------------------------------------------------
+2017-12-11:|
+-------------
+
+Added:
+Random matrix with control on condition number,
+more optimization problems, some renaming, print formatting.
+
+Files affected:
+MatrixUtils, MatrixUtilsTests,
+FeasibilityReport
+Constraints, ConstraintSet,
+ObjectiveFunctions, LinearObjectiveFunction (new), Type1Function,
+OptimizationProblem, OptimizationProblems, MinimizationTests
+
+Status: compiles, untested.
+
+
+#----------------------------------------------------------------------------------------
+2017-12-12:|
+-------------
+
+Cosmetic changes. Files affected as previous.
+
+Status: all minimization problems run successfully.
+Power problems fail only if condition number of A is too large!
+
+
+#----------------------------------------------------------------------------------------
+2017-12-14:|
+-------------
+
+Added some Optimization problems, expanded KnownMinimizer
+
+Files affected:
+KnownMinimizer
+MatrixUtils, MatrixUtilsTests,
+FeasibilityReport
+Constraints, ConstraintSet,
+ObjectiveFunctions, LinearObjectiveFunction (new), Type1Function,
+OptimizationProblem, OptimizationProblems, SimpleOptimizationProblems (new)
+MinimizationTests
+
+Status: compiles and runs but
+SimpleOptimizationProblems.normSquaredWithFreeVariables and
+SimpleOptimizationProblems.joptP2
+fail in phase I analysis.
+
+Currently these are commented out from the list in
+   SimpleOptimizationProblems.standardProblems
+thus do not show up as failure in a run.
 
 
 
