@@ -271,6 +271,37 @@ SimpleOptimizationProblems.normSquaredWithFreeVariables and
 SimpleOptimizationProblems.joptP2
 fail in phase I analysis.
 
-Currently these are commented out from the list in
-   SimpleOptimizationProblems.standardProblems
-thus do not show up as failure in a run.
+
+#----------------------------------------------------------------------------------------
+2017-12-20:|
+-------------
+
+The phase I analysis problem is not generally bounded below.
+E.g.: the SimpleOptimizationProblems.normSquaredWithFreeVariables
+Thus the phase I barrier solver needs to break off as soon as the
+objective s has been pushed below zero.
+
+For this it needs to know that it is a phase I barrier solver.
+We need to introduce a field into Barrier Solver which as this information.
+
+The same applies to the phase I SOI solver.
+Deal with this as follows:
+the function Solver.solve gets a new parameter
+  terminationCriterion: OptimizationState => Boolean
+
+The Double parameters of this function monitor the state of the computation
+(e.g.: current value of the objective function, duality gap, norm of gradient, etc)
+and break off the computation based on these.
+
+We need different termination criteria for different applications.
+For example a simple phase I analysis problem needs to break off as soon as the
+objective function is pushed below zero since then we have a strictly feasible
+point already.
+
+On the other hand when solving a usual minimization problem, we break off
+when the duality gap or the norm of the gradient is small enough.
+
+
+
+
+

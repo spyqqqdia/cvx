@@ -46,19 +46,20 @@ object MatrixUtils {
     diag(d)
   }
 
-  /** A random nxn orthogonal matrix.
+  /** A random nxn orthogonal matrix based on the QR-decomposition of a
+    * STN-random nxn matrix. This is uniform in the Haar measure on O(n).
     */
   def randomOrthogonalMatrix(n:Int):DenseMatrix[Double] = {
 
-    val r = scala.util.Random
-    val A = randomMatrix(n,n,-1,1)
-    val Q = A*A.t
-    // we have a openblas numerical problem whereby Q is not symmetric
-    // to sufficient precision, so we must make it symmetric
-    eigSym(Q+Q.t).eigenvectors     // matrix with eigenvectors in columns
+    val rng = scala.util.Random
+    val A = DenseMatrix.tabulate[Double](n,n)((i,j)=>rng.nextGaussian())
+    val qr.QR(q,r) = qr(A)     // complete QR factorization
+    q
   }
 
-  /** A random symmetric, positive definite nxn matrix with given condition number.
+  /** A random symmetric, positive definite nxn matrix A with given condition number.
+    * Constructed as A=UDU', where U is a random orthogonal matrix and D a diagonal
+    * matrix with exponentially declining values on the diagonal.
     */
   def randomMatrix(n:Int,condNumber:Double):DenseMatrix[Double] = {
 
@@ -218,6 +219,93 @@ object MatrixUtils {
 
 
   /************************************************************/
+  /***************** Matrix equilibration *********************/
+  /************************************************************/
+
+
+
+  /** Equilibrate (a form of preconditioning) the square matrix H with the ruiz algorithm
+    * in the l_2-norm until convergence, see docs/ruiz.pdf, p4 algorithm 1.
+    * Our algorithm assumes that H is symmetric.
+    *
+    * @param H a symmetric matrix.
+    * @return tuple (d,Q) where Q=DHD is the equilibrated version of H and D is a diagonal matrix
+    *         with diagonal d
+    */
+  def ruizEquilibrate(H:DenseMatrix[Double]):(DenseVector[Double],DenseMatrix[Double]) = {
+
+    val n = H.rows
+    assert(n==H.cols,"Matrix H not square: H.rows="+n+", H.cols="+H.cols)
+
+    val d = DenseVector.fill(n)(1.0)     // diagonal of equilibration matrix D
+    var rho = 1.0                        // convergence measure
+    val itermax = 20
+    var iter = 0
+
+    while(iter<itermax && rho>1e-6){
+
+      val Q = (d*d.t):*H
+      var i = 0
+      rho = 0.0                              // max_i|1-||row_i(Q)||_oo|
+      while(i<n){
+
+        //val u = sqrt(max(abs(Q(i,::))))
+        val u = sqrt(norm(Q(i,::).t))
+        val v = if(u>0) 1.0/u else 1.0
+        d(i)*=v
+        val r = abs(1-u)
+        if(r>rho) rho=r
+        i+=1
+      }
+      iter+=1
+    }
+    (d,(d*d.t):*H)
+  }
+
+
+  /** Equilibrate (a form of preconditioning) the square matrix H with the ruiz algorithm via
+    * one round of l_oo-norm equilibration followed by 5 rounds of l_2-norm equilibration.
+    *
+    * @param H square matrix without zero row.
+    * @return tuple (d,Q) where Q=DHD is the equilibrated version of H and D is a diagonal matrix
+    *         with diagonal d
+    */
+  def ruizEquilibrate0(H:DenseMatrix[Double]):(DenseVector[Double],DenseMatrix[Double]) = {
+
+    val n = H.rows
+    assert(n==H.cols,"Matrix H not square: H.rows="+n+", H.cols="+H.cols)
+
+    var Q = H.copy
+    var d=DenseVector.zeros[Double](n)     // diagonal of equilibration matrix D
+
+    // one round of l_oo-norm equilibration
+    var i=0
+    while(i<n){
+
+      var f_i = Math.sqrt(max(abs(Q(i,::).t)))
+      if(f_i==0) f_i=1.0
+      d(i)=1.0/f_i
+      i+=1
+    }
+    Q = (d*d.t):*H                         // outer(d,d) eltwise-* H
+
+    // five rounds of l_2-norm equilibration
+    var k=0
+    while(k<5){
+
+      i=0
+      while(i<n){ d(i)/=sqrt(norm(Q(i,::).t)); i+=1 }
+      Q = (d*d.t):*H
+      k+=1
+    }
+    (d,Q)
+  }
+
+
+
+
+
+  /************************************************************/
   /******************* Equation solving ***********************/
   /************************************************************/
 
@@ -318,43 +406,6 @@ object MatrixUtils {
     x
   }
 
-  /** Equilibrate (a form of preconditioning) the square matrix H with the ruiz algorithm via
-    * one round of l_oo-norm equilibration followed by 5 rounds of l_2-norm equilibration.
-    *
-    * @param H square matrix without zero row.
-    * @return tuple (d,Q) where Q=DHD is the equilibrated version of H and D is a diagonal matrix
-    *         with diagonal d
-    */
-  def ruizEquilibrate(H:DenseMatrix[Double]):(DenseVector[Double],DenseMatrix[Double]) = {
-
-    val n = H.rows
-    assert(n==H.cols,"Matrix H not square: H.rows="+n+", H.cols="+H.cols)
-
-    var Q = H.copy
-    var d=DenseVector.zeros[Double](n)     // diagonal of equilibration matrix D
-
-    // one round of l_oo-norm equilibration
-    var i=0
-    while(i<n){
-
-      var f_i = Math.sqrt(max(abs(Q(i,::).t)))
-      if(f_i==0) f_i=1.0
-      d(i)=1.0/f_i
-      i+=1
-    }
-    Q = (d*d.t):*H                         // outer(d,d) eltwise-* H
-
-    // five rounds of l_2-norm equilibration
-    var k=0
-    while(k<5){
-
-      i=0
-      while(i<n){ d(i)/=norm(Q(i,::).t); i+=1 }
-      Q = (d*d.t):*H
-      k+=1
-    }
-    (d,Q)
-  }
 
   /** Solve Hx=b, where H is positive semi-definite without zero row using Cholesky factorization.
     *
@@ -373,9 +424,10 @@ object MatrixUtils {
     assert(n==H.cols,"Matrix H not square: H.rows="+n+", H.cols="+H.cols)
     assert(m==n,"length(b) = "+m+" is not equal to H.rows="+H.rows)
 
-    // Ruiz equilibration alters H
+    // Ruiz equilibration changes H
     val M = H.copy
-    val eqM = ruizEquilibrate(M); val d = eqM._1; val Q = eqM._2  // diag(d)*M*diag(d)
+    val eqM = ruizEquilibrate(M);
+    val d = eqM._1; val Q = eqM._2  // diag(d)*M*diag(d)
 
     try {
 

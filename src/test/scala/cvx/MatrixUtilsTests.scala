@@ -8,6 +8,23 @@ import breeze.linalg.{DenseMatrix, DenseVector, _}
   */
 object MatrixUtilsTests {
 
+  /** Testing if Ruiz equlibration performs as expected if the matrix
+    * has zero rows
+    */
+  def testRuizEquilibration:Unit = {
+
+    val A = DenseMatrix((0.5,0.0,0.5),(0.0,0.0,0.0),(-0.5,0.0,-0.5))
+    val eqA = MatrixUtils.ruizEquilibrate(A)
+    print("\nA:\n")
+    MatrixUtils.print(A,digits=1)
+    val d = eqA._1; val Q = eqA._2
+    print("\nd: "+d)
+    print("\nQ:\n")
+    MatrixUtils.print(Q,digits=8)
+  }
+
+
+
 
   /** Testing the solution of a system HX=B using lapack through MatrixUtils.triangularSolve.
     * Here we do H of the form H=LL' with given lower triangular L
@@ -155,7 +172,7 @@ object MatrixUtilsTests {
 
     val errSol = norm(u-x)/norm(x)
     val errVal = norm(b-H*u)/norm(b)
-    var msg = "\n"+testID+": error in solution = "+errSol+",  error in value Hx = "+errVal
+    val msg = "\n"+testID+": error in solution = "+errSol+",  error in value Hx = "+errVal
     print(msg)
   }
 
@@ -263,7 +280,7 @@ object MatrixUtilsTests {
       } catch {
 
         case e:Exception =>
-          logger.println("\n"+e.getMessage()+"\n")
+          logger.println("\n"+e.getMessage+"\n")
           OK = false
       }
     }
@@ -327,36 +344,33 @@ object MatrixUtilsTests {
     testSvdSolve(nTests,dim,condNum,dimKernel,tolEqSolve,debugLevel)
   }
 
-  /** We allocate N nxn matrices with uniformly random entries from [-1,1]
-    * and compute the condition number before and after Ruiz equilibration.
-    * These condition numbers are collected and written to files
-    * condNum.txt and ruizCondNum.txt
+  /** We allocate N nxn random matrices A with condition number condNum.
+    * Then compute the condition number after Ruiz equilibration and write
+    * the ratios condNum(equilibrated(A))/condNum to the file logs/condNumRatio.txt
     *
-    * The purpose is to verify that random matrices have bad condition numbers.
+    * The purpose is to verify that Ruiz equilibration improves the condition
+    * nunmbers of ill conditioned matrices.
     */
-  def testRandomMatrixCondNum(N:Int,n:Int):Unit = {
+  def testRandomMatrixCondNum(N:Int,n:Int,condNum:Double):Unit = {
 
-    val condNums = DenseVector.zeros[Double](N)
-    val condNumsRuiz = DenseVector.zeros[Double](N)
+    val condNumRatio = DenseVector.zeros[Double](N)
     println("Computing condition numbers: ")
-    val d=N/20
+    val d = if(N>100) N/20 else 5
     for(k <- 0 until N ){
 
       if(k%d==0) print("*")
-      val A = MatrixUtils.randomMatrix(n,n,-1.0,1.0)
-      condNums(k)=MatrixUtils.conditionNumber(A)
+      val M = MatrixUtils.randomMatrix(n,condNum)
+      val A = M+M.t
       val rA = MatrixUtils.ruizEquilibrate(A)    // pair (d,Q) with Q=DAD with D=diag(d)
       val B = rA._2
-      condNumsRuiz(k)=MatrixUtils.conditionNumber(B)
+      condNumRatio(k) = MatrixUtils.conditionNumber(B)/condNum
     }
-    val logger = Logger("logs/condNums.txt")
-    MatrixUtils.print(condNums,logger,digits=1)
+    val logger = Logger("logs/condNumRatio.txt")
+    logger.println("Ratios condNum(equilibrated_A)/condNum(A):\n")
+    MatrixUtils.print(condNumRatio,logger,digits=1)
     logger.close()
-    val loggerRuiz = Logger("logs/condNumsRuiz.txt")
-    MatrixUtils.print(condNumsRuiz,loggerRuiz,digits=1)
-    loggerRuiz.close()
 
-    println("\nFinished, results in logs/condNums*.\n")
+    println("\nFinished, results in logs/condNumRatio.txt.\n")
   }
 }
 

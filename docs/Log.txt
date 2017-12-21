@@ -288,9 +288,35 @@ SimpleOptimizationProblems.normSquaredWithFreeVariables and
 SimpleOptimizationProblems.joptP2
 fail in phase I analysis.
 
-Currently these are commented out from the list in
-   SimpleOptimizationProblems.standardProblems
-thus do not show up as failure in a run.
+
+
+#----------------------------------------------------------------------------------------
+2017-12-20:|
+-------------
+
+Cosmetic improvements based on code analysis.
+Adhoc branch in Runner added.
+
+Files affected:
+Runner, MatrixUtils (Ruiz equilibration and solvers).
+
+
+
+#----------------------------------------------------------------------------------------
+2017-12-21:|
+-------------
+
+Rewrote MatrixUtils.ruizEquilibration (l2-norm until convergence) and the
+test MatrixUtilsTests.testRandomMatrixCondNum.
+
+Rewrote MatrixUtils.randomOrthogonalMatrix based on QR decomposition
+of random matrix with standard normal entries (this is then uniform in
+the Haar measure on O(n)).
+
+Files affected:
+Runner, MatrixUtils, MatrixUtilsTests, OptimizationState (new)
+
+
 
 
 

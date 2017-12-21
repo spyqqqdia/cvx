@@ -14,11 +14,13 @@ object Runner extends App {
 
     val debugLevel=2
 
-    val doTestMatrixUtils = false
+    val doAdHoc = false
+
+    val doTestMatrixUtils = true
     val doKktTests = false
 
     val doTestPowerProblems = false
-    val doTestStandardProblems = true
+    val doTestStandardProblems = false
     val doMinX1 = false
     val doTestKlProblems = false
     val doTestInfeasibleKlProblems = false
@@ -37,14 +39,26 @@ object Runner extends App {
     val tolSolution = 1e-2      // tolerance for solution identification
 
 
+    if(doAdHoc){
+
+      val dim = 2
+      val debugLevel=4
+      //val problem = SimpleOptimizationProblems.normSquaredWithFreeVariables(dim,pars,debugLevel)
+      //problem.solve(debugLevel)
+
+      MatrixUtilsTests.testRuizEquilibration
+    }
+
+
     if(doTestMatrixUtils){
 
       val dim = 100
       val reps= 10
       val tol = 1e-10
+      val condNum = 1e14
       //MatrixUtilsTests.runAll(dim,reps,tol)
       //MatrixUtilsTests.testSignCombinationMatrices
-      MatrixUtilsTests.testRandomMatrixCondNum(1000,100)
+      MatrixUtilsTests.testRandomMatrixCondNum(500,100,condNum)
     }
 
     if(doKktTests){
