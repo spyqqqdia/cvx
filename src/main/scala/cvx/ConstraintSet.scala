@@ -181,7 +181,11 @@ abstract class ConstraintSet(val dim:Int, val constraints:Seq[Constraint]) {
     // map the equalities to the dimension of the phase_I analysis:
     val phase_I_eqs:Option[EqualityConstraint] = eqs.map(eq => eq.phase_I_EqualityConstraint)
     val feasBS = phase_I_Solver(phase_I_eqs,pars)
-    val sol = feasBS.solve(debugLevel)
+
+    // terminate if objective function has been pushed below zero (then we are at a strictly
+    // feasible point already, or if the duality gap is small enough
+    val terminationCriterion = (os:OptimizationState) => os.objectiveFunctionValue < 0 || os.dualityGap < pars.tol
+    val sol = feasBS.solveSpecial(terminationCriterion,debugLevel)
 
     val w_feas = sol.x                  // w = c(x,s)
     val x_feas = w_feas(0 until dim)    // unclear how many constraints that satisfies, so we check

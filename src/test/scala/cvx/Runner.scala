@@ -14,9 +14,9 @@ object Runner extends App {
 
     val debugLevel=2
 
-    val doAdHoc = false
+    val doAdHoc = true
 
-    val doTestMatrixUtils = true
+    val doTestMatrixUtils = false
     val doKktTests = false
 
     val doTestPowerProblems = false
@@ -43,10 +43,10 @@ object Runner extends App {
 
       val dim = 2
       val debugLevel=4
-      //val problem = SimpleOptimizationProblems.normSquaredWithFreeVariables(dim,pars,debugLevel)
-      //problem.solve(debugLevel)
+      val problem = SimpleOptimizationProblems.normSquaredWithFreeVariables(dim,pars,debugLevel)
+      problem.solve(debugLevel)
 
-      MatrixUtilsTests.testRuizEquilibration
+      //MatrixUtilsTests.testRuizEquilibration
     }
 
 

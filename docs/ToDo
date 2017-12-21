@@ -302,6 +302,15 @@ On the other hand when solving a usual minimization problem, we break off
 when the duality gap or the norm of the gradient is small enough.
 
 
+#----------------------------------------------------------------------------------------
+2017-12-21A:|
+-------------
+
+SimpleOptimizationProblems.normSquaredWithFreeVariables
+does find a feasible point but then prints nothing in the subsequent optimization.
+Currently run a an adHoc problem in Runner.
+
+
 
 
 

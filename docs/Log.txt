@@ -317,6 +317,23 @@ Files affected:
 Runner, MatrixUtils, MatrixUtilsTests, OptimizationState (new)
 
 
+#----------------------------------------------------------------------------------------
+2017-12-21A:|
+--------------
+
+Added method solveSpecial to Solver and all the concrete solvers (allows to specify the
+termination criterion explicitly. See ToDo, 2017-12-20, why we need this.
+Changes to OptimizationState.
+
+Files affected:
+OptimizationState, Solver, UnconstrainedSolver, EqualityConstrainedSolver, BarrierSolver,
+ConstraintSet.
+
+Status: compiles and runs, does find a feasible point for the
+  SimpleOptimizationProblems.normSquaredWithFreeVariables
+problem but then prints nothing in the subsequent optimization.
+
+
 
 
 

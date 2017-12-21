@@ -20,6 +20,7 @@ import breeze.linalg.{DenseVector, _}
   */
 case class Solution(
   x:DenseVector[Double],
+  newtonDecrement:Double,
   dualityGap:Double,
   equalityGap:Double,
   normGrad:Double,

@@ -55,16 +55,28 @@ extends Solver {
   /** Find the location $x$ of the minimum of f=objF over C by the newton method
     * starting from the starting point x0 with no equality constraints.
     *
+    * @param terminationCriterion: depends on context (e.g. in a phase I analysis we terminate
+    *                            as soon as the objective function is pushed below zero).
     * @return Solution object: minimizer with additional info.
     */
-  def solveWithoutEQs(debugLevel:Int=0):Solution = {
+  def solveWithoutEQs(terminationCriterion:(OptimizationState)=>Boolean, debugLevel:Int=0):Solution = {
 
     val tol=pars.tol // tolerance for duality gap
     val mu = 10.0    // factor to increase parameter t in barrier method.
     var t = 1.0
     var x = startingPoint       // iterates x=x_k
+    var obfFcnValue = Double.MaxValue
+    var normGrad = Double.MaxValue
+    var dualityGap = Double.MaxValue
+    var newtonDecrement = Double.MaxValue
+    val equalityGap = 0.0
+    var optimizationState = OptimizationState(normGrad,newtonDecrement,dualityGap,equalityGap,obfFcnValue)
     var sol:Solution = null   // solutions at parameter t
-    while(numConstraints/t>=tol){
+
+    // insurance against nonterminating loop, normally terminates long before that
+    val maxIter = 300/mu
+    var iter = 0
+    while(!terminationCriterion(optimizationState) && iter<maxIter){
 
       if(debugLevel>2) logStep(t)
       // solver for barrier function at fixed parameter t
@@ -76,8 +88,16 @@ extends Solver {
       }
       val solver = new UnconstrainedSolver(objF_t,C,x,pars,logger)
       sol = solver.solve(debugLevel)
+
       x = sol.x
+      obfFcnValue = barrierFunction(t,x)
+      normGrad = sol.normGrad
+      newtonDecrement = sol.newtonDecrement
+      dualityGap = numConstraints/t
+      optimizationState = OptimizationState(normGrad,newtonDecrement,dualityGap,equalityGap,obfFcnValue)
+
       t = mu*t
+      iter+=1
     }
     sol
   }
@@ -87,14 +107,28 @@ extends Solver {
     *
     * @return Solution object: minimizer with additional info.
     */
-  def solveWithEQs(A:DenseMatrix[Double],b:DenseVector[Double],debugLevel:Int=0):Solution = {
+  def solveWithEQs(
+      terminationCriterion:(OptimizationState)=>Boolean,
+      A:DenseMatrix[Double],b:DenseVector[Double],debugLevel:Int=0
+  ):Solution = {
 
     val tol=pars.tol // tolerance for duality gap
     val mu = 10.0    // factor to increase parameter t in barrier method.
     var t = 1.0
     var x = startingPoint     // iterates x=x_k
+    var obfFcnValue = Double.MaxValue
+    var normGrad = Double.MaxValue
+    var dualityGap = Double.MaxValue
+    var newtonDecrement = Double.MaxValue
+    var equalityGap = Double.MaxValue
+    var optimizationState = OptimizationState(normGrad,newtonDecrement,dualityGap,equalityGap,obfFcnValue)
     var sol:Solution = null   // solutions at parameter t
-    while(numConstraints/t>=tol){
+
+
+    // insurance against nonterminating loop, normally terminates long before that
+    val maxIter = 300/mu
+    var iter = 0
+    while(!terminationCriterion(optimizationState) && iter<maxIter){
 
       if(debugLevel>2) logStep(t)
       // solver for barrier function at fixed parameter t
@@ -106,13 +140,31 @@ extends Solver {
       }
       val solver = EqualityConstrainedSolver(objF_t,C,x,A,b,pars,logger)
       sol = solver.solve(debugLevel)
+
       x = sol.x
+      obfFcnValue = barrierFunction(t,x)
+      normGrad = sol.normGrad
+      newtonDecrement = sol.newtonDecrement
+      dualityGap = numConstraints/t
+      equalityGap = sol.equalityGap
+      optimizationState = OptimizationState(normGrad,newtonDecrement,dualityGap,equalityGap,obfFcnValue)
+
       t = mu*t
+      iter+=1
     }
     sol
   }
-  def solve(debugLevel:Int=0):Solution =
-    if(eqs.isDefined) solveWithEQs(eqs.get.A,eqs.get.b,debugLevel) else solveWithoutEQs(debugLevel)
+  def solveSpecial(terminationCriterion:(OptimizationState)=>Boolean, debugLevel:Int=0):Solution =
+    if(eqs.isDefined) solveWithEQs(terminationCriterion,eqs.get.A,eqs.get.b,debugLevel)
+    else solveWithoutEQs(terminationCriterion,debugLevel)
+
+  /** Solution based on standard termination criterion: dualityGap < tol
+    */
+  def solve(debugLevel:Int=0):Solution = {
+
+     val terminationCriterion = (os:OptimizationState) => os.dualityGap < pars.tol
+     solveSpecial(terminationCriterion,debugLevel)
+  }
 }
 
 
@@ -203,11 +255,11 @@ object BarrierSolver {
       def hessianBarrierFunction(t:Double,u:DenseVector[Double]):DenseMatrix[Double] =
         (F.t*bs.hessianBarrierFunction(t,z0+F*u))*F
 
-      override def solve(debugLevel:Int):Solution = {
+      override def solveSpecial(terminationCriterion:(OptimizationState)=>Boolean,debugLevel:Int):Solution = {
 
         // 'super': with new X { ... } we automatically extend X
-        val sol = super.solve(debugLevel)
-        Solution(z0+F*sol.x,sol.dualityGap,0,sol.normGrad,sol.iter,sol.maxedOut)
+        val sol = super.solveSpecial(terminationCriterion,debugLevel)
+        Solution(z0+F*sol.x, sol.newtonDecrement, sol.dualityGap, 0, sol.normGrad, sol.iter, sol.maxedOut)
       }
     }
   }

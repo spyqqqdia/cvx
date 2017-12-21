@@ -93,9 +93,24 @@ class UnconstrainedSolver(
       }
       iter+=1
     }
-    Solution(x,newtonDecrement,0,normGrad,iter,iter==maxIter)
+    // no duality gap applies, no equality gap occurs:
+    Solution(x,newtonDecrement,dualityGap=Double.MaxValue,equalityGap=0,normGrad,iter,iter==maxIter)
   }
+
+  /** Same as [solve(Int)], the parameter terminationCriterion is ignored. We need that only in the
+    * outer loop of the barrier solver.
+    *
+    * @return Solution object: minimizer with additional info, tuple
+    *         (x,newtonDecrement,||Ax-b||,||grad f(x)||,iter,iter==maxIter).
+    */
+  def solveSpecial(terminationCriterion:(OptimizationState)=>Boolean, debugLevel:Int):Solution = solve(debugLevel)
 }
+
+
+
+
+
+
 object UnconstrainedSolver {
 
   def apply(
@@ -133,7 +148,7 @@ object UnconstrainedSolver {
 
         val sol = super.solve(debugLevel)
         val u = sol.x; val x = z0+F*u
-        Solution(x, sol.dualityGap, 0, sol.normGrad, sol.iter, sol.maxedOut)
+        Solution(x, sol.newtonDecrement, sol.dualityGap, 0, sol.normGrad, sol.iter, sol.maxedOut)
       }
     }
   }

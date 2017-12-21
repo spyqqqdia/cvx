@@ -7,10 +7,19 @@ import breeze.linalg.DenseVector
   *
   * Current state of the optimization computation.
   * Used as input to various termination criteria.
+  *
+  * This will be expanded as needed (for example for primal dual infeasible
+  * start solvers).
+  *
+  * @param equationResidual: ||Ax-b||
+  * @param dualityGap: upper bound for the duality gap (e.g. numInequalities/t
+  *                  at parameter t along the central path in the barrier solver)
+  *
   */
 case class OptimizationState(
-              gradient:DenseVector[Double],
+              normGradient:Double,
               newtonDecrement:Double,
               dualityGap:Double,
+              equationResidual:Double,
               objectiveFunctionValue:Double
 )

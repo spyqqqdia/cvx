@@ -1,5 +1,5 @@
 /**
-  * Created by oar on 09.10.17.
+  * Created by vagrant on 09.10.17.
   */
 package cvx
 
@@ -99,9 +99,22 @@ extends Solver {
       }
       iter+=1
     }
-    Solution(x,newtonDecrement,norm(eqDiff),normGrad,iter,iter==maxIter)
+    // duality gap does not apply here
+    Solution(x,newtonDecrement,dualityGap=Double.MaxValue,norm(eqDiff),normGrad,iter,iter==maxIter)
   }
+
+  /** Same as [solve(Int)], the parameter terminationCriterion is ignored. We need that only in the
+    * outer loop of the barrier solver.
+    *
+    * @return Solution object: minimizer with additional info, tuple
+    *         (x,newtonDecrement,||Ax-b||,||grad f(x)||,iter,iter==maxIter).
+    */
+  def solveSpecial(terminationCriterion:(OptimizationState)=>Boolean, debugLevel:Int):Solution = solve(debugLevel)
+
 }
+
+
+
 object EqualityConstrainedSolver{
 
   def apply(
