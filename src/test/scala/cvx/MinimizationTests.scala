@@ -23,26 +23,7 @@ object MinimizationTests {
     val sol = problem.solve(debugLevel)
     val x = sol.x                       // minimizer, solution found
     val y = problem.objectiveFunction.valueAt(x)     // value at solution found
-    val y_opt = problem.minimumValue
-
-    val newtonDecrement = sol.dualityGap      // Newton decrement at solution
-    val normGrad = sol.normGrad        // norm of gradient at solution
-    val iter = sol.iter
-    val maxedOut = sol.maxedOut
-    val isSolution = problem.isMinimizer(x,tol)
-    val knownSolution = problem.theMinimizer
-
-    var msg = "Iterations = "+iter+"; maxiter reached: "+maxedOut+"\n"
-    msg += "Newton decrement:  "+MathUtils.round(newtonDecrement,10)+"\n"
-    msg += "norm of gradient:  "+MathUtils.round(normGrad,10)+"\n"
-    msg += "value at solution y=f(x):  "+MathUtils.round(y,10)+"\n"
-    msg += "value of global min:  "+MathUtils.round(y_opt,10)+"\n"
-    msg += "known minimizer:\n"+knownSolution+"\n"
-    msg += "Computed solution x:\n"+x+"\n"
-    msg += "Is global solution at tolerance "+tol+": "+isSolution+"\n"
-    print(msg)
-    Console.flush()
-    problem.logger.close()
+    problem.reportWithKnownSolution(sol,y,tol,problem.logger)
 
   } catch {
 
@@ -68,21 +49,7 @@ object MinimizationTests {
     print("\n\n#-----Problem: "+problem.id+":\n\n")
 
     val sol = problem.solve(debugLevel)
-    val x = sol.x                       // minimizer, solution found
-    val y = problem.objectiveFunction.valueAt(x)     // value at solution found
-    val newtonDecrement = sol.dualityGap      // Newton decrement at solution
-    val normGrad = sol.normGrad        // norm of gradient at solution
-    val iter = sol.iter
-    val maxedOut = sol.maxedOut
-
-    var msg = "\n\nIterations = "+iter+"; maxiter reached: "+maxedOut+"\n"
-    msg += "Newton decrement:  "+MathUtils.round(newtonDecrement,10)+"\n"
-    msg += "norm of gradient:  "+MathUtils.round(normGrad,10)+"\n"
-    msg += "value at solution y=f(x):  "+MathUtils.round(y,10)+"\n"
-    msg += "Solution x:\n"+x+"\n\n"
-    print(msg)
-    Console.flush()
-    problem.logger.close()
+    problem.report(sol,tol)
 
   } catch {
 

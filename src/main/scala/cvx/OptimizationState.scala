@@ -11,7 +11,7 @@ import breeze.linalg.DenseVector
   * This will be expanded as needed (for example for primal dual infeasible
   * start solvers).
   *
-  * @param equationResidual: ||Ax-b||
+  * @param equalityGap: ||Ax-b||
   * @param dualityGap: upper bound for the duality gap (e.g. numInequalities/t
   *                  at parameter t along the central path in the barrier solver)
   *
@@ -20,6 +20,7 @@ case class OptimizationState(
               normGradient:Double,
               newtonDecrement:Double,
               dualityGap:Double,
-              equationResidual:Double,
+              equalityGap:Double,
               objectiveFunctionValue:Double
 )
+

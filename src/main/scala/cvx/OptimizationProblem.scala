@@ -35,11 +35,36 @@ class OptimizationProblem(
   def addSolutions(sols:List[DenseVector[Double]]): OptimizationProblem with KnownMinimizer  =
     new OptimizationProblem(id,objectiveFunction,solver,logger) with KnownMinimizer {
 
-      assert(!sols.isEmpty,"\naddSolutions: no solutions provided.\n")
+      assert(sols.nonEmpty,"\naddSolutions: no solutions provided.\n")
       override def theMinimizer: DenseVector[Double] = sols(0)
       def isMinimizer(x:DenseVector[Double],tol:Double) = min(sols.map(sol => norm(x-sol))) < tol
       def minimumValue = min(sols.map(sol => objectiveFunction.valueAt(sol)))
     }
+  /**
+    * @param sol the computed solution
+    * @param tol tolerated deviation from known solution (l2-norm)
+    */
+  def report(sol:Solution,tol:Double):Unit = {
+
+    val x = sol.x                       // minimizer, solution found
+    val y = objectiveFunction.valueAt(x)
+
+    val newtonDecrement = sol.dualityGap      // Newton decrement at solution
+    val normGrad = sol.normGrad        // norm of gradient at solution
+    val iter = sol.iter
+    val maxedOut = sol.maxedOut
+
+    var msg = "Iterations = "+iter+"; maxiter reached: "+maxedOut+"\n"
+    msg += "Newton decrement:  "+MathUtils.round(newtonDecrement,10)+"\n"
+    msg += "norm of gradient:  "+MathUtils.round(normGrad,10)+"\n"
+    msg += "value at solution y=f(x):  "+MathUtils.round(y,10)+"\n"
+    msg += "Computed solution x:\n"+x+"\n"
+
+    print(msg)
+    Console.flush()
+    logger.println(msg)
+    logger.close()
+  }
 }
 
 /** Factory functions to allocate problems and select the solver to use.

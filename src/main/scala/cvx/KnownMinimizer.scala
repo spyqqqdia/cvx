@@ -13,6 +13,38 @@ trait KnownMinimizer {
   def isMinimizer(x:DenseVector[Double],tol:Double):Boolean
   /** Minimum value of the objective function.*/
   def minimumValue:Double
+
+  /**
+    * @param sol the computed solution
+    * @param objFcnValue value of objective function at computed solution
+    * @param tol tolerated deviation from known solution (l2-norm)
+    * @param logger
+    */
+  def reportWithKnownSolution(sol:Solution,objFcnValue:Double,tol:Double,logger:Logger):Unit = {
+
+    val x = sol.x                       // minimizer, solution found
+    val y_opt = minimumValue
+
+    val newtonDecrement = sol.dualityGap      // Newton decrement at solution
+    val normGrad = sol.normGrad        // norm of gradient at solution
+    val iter = sol.iter
+    val maxedOut = sol.maxedOut
+    val isSolution = isMinimizer(x,tol)
+    val knownSolution = theMinimizer
+
+    var msg = "Iterations = "+iter+"; maxiter reached: "+maxedOut+"\n"
+    msg += "Newton decrement:  "+MathUtils.round(newtonDecrement,10)+"\n"
+    msg += "norm of gradient:  "+MathUtils.round(normGrad,10)+"\n"
+    msg += "value at computed solution y=f(x):  "+MathUtils.round(objFcnValue,10)+"\n"
+    msg += "value of global min:  "+MathUtils.round(y_opt,10)+"\n"
+    msg += "known minimizer:\n"+knownSolution+"\n"
+    msg += "Computed solution x:\n"+x+"\n"
+    msg += "Is global solution at tolerance "+tol+": "+isSolution+"\n"
+    print(msg)
+    Console.flush()
+    logger.println(msg)
+    logger.close()
+  }
 }
 object KnownMinimizer {
 

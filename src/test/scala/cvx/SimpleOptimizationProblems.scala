@@ -401,16 +401,16 @@ object SimpleOptimizationProblems {
     }
     val problem1 = minX1_no_FP(pars,debugLevel)
     val a = DenseVector.tabulate[Double](dim)(i => 1.0)
-    val problem2 = minDotProduct(a,pars,debugLevel)
+    //val problem2 = minDotProduct(a,pars,debugLevel)
     val problem3 = min_pNorm(dim,p=2.2,pars,debugLevel)
     val problem4 = min_pNorm(dim,p=4,pars,debugLevel)
     val problem5 = rankOneProblemSimplex(dim,pars,debugLevel)
     val problem6 = rankOneProblemSphere(dim,pars,debugLevel)
     val problem7 = joptP1(dim,pars,debugLevel)
-    //val problem8 = joptP2(pars,debugLevel)
-    //val problem9 = normSquaredWithFreeVariables(dim,pars,debugLevel)
-    problem1 :: problem2 :: problem3 :: problem4 ::
-      problem5 :: problem6 :: problem7 :: theList
+    val problem8 = joptP2(pars,debugLevel)
+    val problem9 = normSquaredWithFreeVariables(dim,pars,debugLevel)
+    problem1 :: problem3 :: problem4 ::
+      problem5 :: problem6 :: problem7 :: problem8 :: problem9 :: theList
   }
 
 

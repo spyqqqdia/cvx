@@ -335,6 +335,23 @@ problem but then prints nothing in the subsequent optimization.
 
 
 
+#----------------------------------------------------------------------------------------
+2017-12-22:|
+--------------
+
+Fixed reporting of optimization results: moved to the problems from the function
+running a list of problems.
+
+Status:
+problem f(x)=a'x subject to |x_j|<=|a_j|
+phase I analysis fails, claims problem infeasible within tolerance.
+Same for  problem Min f(x)=||x||_p subject to ||x||_1=1
+and probably many others.
+Seems like we are breaking off the phase I analysis too early (as soon as objective function
+below zero)
+
+
+
 
 
 
