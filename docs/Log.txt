@@ -350,15 +350,106 @@ and probably many others.
 Seems like we are breaking off the phase I analysis too early (as soon as objective function
 below zero)
 
+Files affected:
+
+BarrierSolver
+ConstraintSet
+EqualityConstrainedSolver
+KnownSolution
+OptimizationProblem
+OptimizationState
+Solution
+Solver
+SolverParams
+UnconstrainedSolver
+
+Runner
+MinimizationTests
 
 
 
 
+#----------------------------------------------------------------------------------------
+2017-12-27:|
+-------------
+
+Cosmetic fixes,
+Fixed BarrierSolver: get the objective function as a field, needed to monitor
+the OptimizationState.
+MatrixUtils.solveXXX: better error criterion based on relative error ||Ax-b||/||b||
+MatrixUtils.svdsolve: regularization is now tried only until the error is below
+the tolerance.
+
+Files affected:
+BarrierSolver
+FeasibilityReport
+MatrixUtils
+OptimizationProblems
+OptimizationState
+SimpleOptimizationProblems
+UnconstrainedSolver
+
+Runner
+
+
+Status: all problem run successfully _except_:
+
+SimpleOptimizationProblems.jop2 and
+SimpleOptimizationProblems.normSquaredWithFreeVariables
+
+
+#----------------------------------------------------------------------------------------
+2017-12-28:|
+-------------
+
+Rewrote phase_I_analysis in the presence of equality constraints whereby we search
+for a feasible point x which minimizes ||Ax-b||²+delta*||x||² to start off the
+phase_I_analysis. The delta term regularizes this mostly singular problem.
+
+Rewrote the solvers so that we regularize positive semidefinite H via H -> H+delta*I
+with delta a field in SolverParams.
+
+svdSolve is useless in any case. For positive definite systems svdSolve is vastly
+inferior to the Cholesky factor approach.
+Reason: if A is ill conditioned the small singular values (which dominate the solutions
+for hard to solve systems) cannot be computed accurately.
+Should be noted in cvx_notes.
+
+Files affected:
+
+ConstraintSet
+EqualityConstrainedSolver
+KKTSystem
+MatrixUtils
+ObjectiveFunctions
+OptimizationState
+UnconstrainedSolver
+
+FeasibilityTests
+KktTest
+MinmizationTests
+OptimizationProblems
+SimpleOptimizationProblems
+Runner
+
+
+Status runs to completion on all problems but idiotic results in first step of phase_I_analysis
+of the probability simplex.
 
 
 
+#----------------------------------------------------------------------------------------
+2017-12-29:|
+-------------
+
+Rewrote MatrixUtils.svdSolve now based on MatrixUtils.diagonalizationSolve (new) and added
+MatrixUtils.symSolve (using the symmetric eigenvalue decomposition).
+
+Files affected:
+MatrixUtils
 
 
+MatrixUtilsTests
 
 
 

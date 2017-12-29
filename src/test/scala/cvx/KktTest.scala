@@ -50,7 +50,7 @@ object KktTest {
     * KKT system.
     */
   def testKktSystemReduction(
-     nTests:Int,nullIndices:Vector[Int],logger:Logger,tolEqSolve:Double,debugLevel:Int):Unit =
+     nTests:Int,nullIndices:Vector[Int],logger:Logger,pars:SolverParams,debugLevel:Int):Unit =
   for(tt <- 1 to nTests) {
 
     // check if the indices in nullIndices are strictly increasing
@@ -89,7 +89,7 @@ object KktTest {
     val rr = reducedKktData.r
     val reducedKktSystem = KKTSystem(rH,rA,rg,rr)
 
-    val (rdx,nu) = reducedKktSystem.solve(logger,tolEqSolve,debugLevel)
+    val (rdx,nu) = reducedKktSystem.solve(pars.delta,logger,pars.tolEqSolve,debugLevel)
     // pad the solution back to original size, nu is unaffected
     val dx = KKTData.paddVector(rdx,nullIndices)
     // the solution of the original system is now (dx,nu),
@@ -191,22 +191,21 @@ object KktTest {
     *      Ax = b
     * where H is nxn and A is pxn.
     *
-    * @param tolEqSolve tolerance (L2-norm) in forward and backward error
     * @return true if both forward and backward error (relative, L2-norm) are less than tol, else false.
     */
   def testPositiveDefinite(
-                            H:DenseMatrix[Double], A:DenseMatrix[Double],
-                            x:DenseVector[Double], w:DenseVector[Double],
-                            tolEqSolve:Double, logger:Logger, debugLevel:Int
-                          ):Boolean = {
+     H:DenseMatrix[Double], A:DenseMatrix[Double],
+     x:DenseVector[Double], w:DenseVector[Double],
+     pars:SolverParams, logger:Logger, debugLevel:Int
+  ):Boolean = {
 
     val q = -(H*x+A.t*w)
     val b = A*x
     val condH = MatrixUtils.conditionNumber(H)
     println("Condition number of H: "+MathUtils.round(condH,1))
 
-    val kktType = 0
-    val (x1,w1) = KKTSystem(H,A,q,b,kktType).solve(logger,tolEqSolve,debugLevel)
+    val tolEqSolve = pars.tolEqSolve
+    val (x1,w1) = KKTSystem(H,A,q,b).solve(pars.delta,logger,tolEqSolve,debugLevel)
 
     val q1 = -(H*x1+A.t*w1)
     val b1 = A*x1
@@ -223,7 +222,7 @@ object KktTest {
       "Backward error (absolute): "+MathUtils.round(backwardErrorAbs,2)+
         ",\t\tbackward error (relative): "+MathUtils.round(backwardErrorRel,4)
     )
-    forwardErrorRel<tolEqSolve && backwardErrorRel<tolEqSolve
+    forwardErrorRel < tolEqSolve  &&  backwardErrorRel < tolEqSolve
   }
 
   /** Test the solution of random system
@@ -231,10 +230,11 @@ object KktTest {
     *      Ax = b
     * where H is nxn and A is pxn.
     *
-    * @param tolEqSolve tolerance (L2-norm) in forward and backward error
     * @return true if both forward and backward error (L2-norm) are less than tol, else false.
     */
-  def testPositiveDefinite(n:Int,p:Int,tolEqSolve:Double, logger:Logger, debugLevel:Int):Boolean = {
+  def testPositiveDefinite(
+    n:Int,p:Int,pars:SolverParams,logger:Logger,debugLevel:Int
+  ):Boolean = {
 
     println("\n\nSolving random KKT system in dimensions n="+n+", p="+p)
     // uniform in (-1,1)
@@ -253,7 +253,7 @@ object KktTest {
     val x = DenseVector.tabulate(n)(i => -1+2*Math.random())     // uniform in (-1,1)
     val w = DenseVector.tabulate(p)(i => -2+4*Math.random())     // uniform in (-2,2)
 
-    testPositiveDefinite(H,A,x,w,tolEqSolve,logger,debugLevel)
+    testPositiveDefinite(H,A,x,w,pars,logger,debugLevel)
   }
 
 
@@ -262,9 +262,11 @@ object KktTest {
     *      Ax = b
     * where H is nxn and A is pxn.
     */
-  def testPositiveDefinite(m:Int,n:Int,p:Int,tolEqSolve:Double,logger:Logger,debugLevel:Int):Boolean = {
+  def testPositiveDefinite(
+    m:Int,n:Int,p:Int,pars:SolverParams,logger:Logger,debugLevel:Int
+  ):Boolean = {
 
-    val results = (0 until m).map(i => testPositiveDefinite(n,p,tolEqSolve,logger,debugLevel))
+    val results = (0 until m).map(i => testPositiveDefinite(n,p,pars,logger,debugLevel))
     results.forall(p => p)
   }
 }

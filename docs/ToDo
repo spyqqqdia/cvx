@@ -324,3 +324,68 @@ Seems like we are breaking off the phase I analysis too early (as soon as object
 below zero)
 
 
+#----------------------------------------------------------------------------------------
+2017-12-27:|
+-------------
+
+The BarrierSolver needs to start from a _strictly_ feasible point since we use
+the logarithmic barrier function.
+This needs to be worked into the FeasibilityReport (report on strict feasibility).
+
+SimpleOptimizationProblems.jop2 and
+SimpleOptimizationProblems.normSquaredWithFreeVariables
+do not run to completion.
+
+SimpleOptimizationProblems.joptP2:
+fails in phase I analysis
+the equalityGap is not shrinking in the outer loop
+of the barrier solver so this outer loop iterates to values of t for which the system is
+too ill conditioned to be solved.
+The solution of the KKTsystem does not yield a descent direction even when this system is
+still well conditioned. The inner newton loop then breaks of and the outer loop moves to
+the next parameter value t and the system becomes more and more ill conditioned until
+the solution fails completely.
+
+
+SimpleOptimizationProblems.normSquaredWithFreeVariables
+fails in large dimension:
+works in dimension 24 but fails in dimensions >= 25 in phase I analysis.
+Note (debug in dim=2): in phase I analysis we get a singular KKT system
+with zero rows and cols (why are these not eliminated?) of the form
+
+x1-x3 = 1
+0x1+0x3 = 0
+-x1+x3 = 0
+
+which is indeed unsolvable to any tolerance < 1.
+
+
+#----------------------------------------------------------------------------------------
+2017-12-28:|
+-------------
+
+Phase I analysis with equality constraints:
+the first step minimizing ||Ax-b||^2 subject to the inequality constraints
+breaks off too soon with completely ridiculous results making the norm huge instead of
+small in the case where the constraintSet is the probability simplex.
+
+Incidentally this problem is ill conditioned, the matrix A has rank one (only one equality)
+and A'A is the matrix with all entries equal to one.
+
+The problem then becomes the following:
+
+Minimize (x1+x2+...+xn - 1)^2 subject to xj>=0.
+
+Clearly the set of minimizers is the entire probability simplex.
+In this simple problem we can study the effects of ill conditioning and regularization.
+
+
+KKTSystem:
+we should implement a check if the iterative solution of the linearized KKTSystem
+solves the original nonlinear KKTSystem accurately and throw an exception if it does not.
+
+openblas:
+we still have the problem that A.t*A is not symmetric enough to pass the LAPACK test for
+symmetry. This is a problem with the prepackaged openblas.
+openblas needs to be compiled from source on this machine.
+

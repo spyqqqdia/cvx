@@ -1,7 +1,7 @@
 package cvx
 
 import breeze.linalg.{DenseMatrix, DenseVector, norm, sum}
-import breeze.numerics.{abs, pow}
+import breeze.numerics.{abs, pow, sqrt}
 
 /** Examples of objective functions (test cases).*/
 object ObjectiveFunctions {
@@ -42,6 +42,25 @@ object ObjectiveFunctions {
     val R = DenseMatrix.tabulate[Double](dim,dim)((i,j) => -1+2*rng.nextDouble())
     quadraticObjectiveFunction(x0,R)
   }
+
+  /** The objective function f(x)=0.5*(||Ax-b||²+delta*||x||²), where delta = 1e-7*norm(A)
+    * @param A an nxm matrix
+    * @param b a vector of length n
+    */
+  def regularizedEquationResidual(
+    A:DenseMatrix[Double],b:DenseVector[Double], delta:Double
+  ):ObjectiveFunction = {
+
+    val dim = A.cols
+    val norm_A = sqrt(sum(A:*A))
+    val I = DenseMatrix.eye[Double](dim)
+    val P = A.t*A + I*(delta*norm_A)
+    val a = -A.t*b
+    val r = 0.0
+    QuadraticObjectiveFunction(dim,r,a,P)
+  }
+
+
 
   /** The L_p norm f(x)=||x||_p raised to power p, i.e.
     * $f(x)=\sum|x_j|^^p$.

@@ -232,7 +232,8 @@ object MatrixUtilsTests {
 
 
   /** We construct randomly some ill conditioned systems symmetric,
-    * positive definite systems Ax=b and solve them via SVD.
+    * positive definite systems Ax=b and solve them via SVD and symmetric
+    * eigendecomposition.
     *
     * Let A = UDV' denote the singular value decomposition of A,
     * with D=diag(s_j) the diagonal matrix with the singular values s_j of A.
@@ -257,13 +258,13 @@ object MatrixUtilsTests {
     * In that case we go into the regularization loop to try to get
     * within accepted tolerance.
     */
-  def testSvdSolve(
+  def testDiagonalizationSolve(
     nTests:Int, dim:Int, condNum:Double, dimKernel:Int, tolEqSolve:Double, debugLevel:Int
   ):Unit = {
 
     val  startMsg = "\n\n\nDoing MatrixUtilsTests.testSvdSolve in dimension "+dim+":\n"
     println(startMsg); Console.flush()
-    val logger = Logger("logs/testSVDSolve.txt")
+    val logger = Logger("logs/testDiagonalizationSolve.txt")
     logger.println(startMsg)
     var OK = true
     for(nT <- 1 to nTests){
@@ -272,15 +273,27 @@ object MatrixUtilsTests {
       val U = MatrixUtils.randomOrthogonalMatrix(dim)
       val D = MatrixUtils.diagonalMatrix(dim,condNum,dimKernel)
       val d = diag(D)
-      val A = (U.t*D)*U          // SVD of symmetric, positive definite matrix A
+      val Q = (U*D)*U.t          // SVD of symmetric, positive definite matrix A
+      // make this exactly symmetric (openblas problem)
+      val A = (Q+Q.t)*0.5
       val b = MatrixUtils.nastyRHS(d,U)
 
       try{
+        logger.println("Solution via svdSolve")
         val  x = MatrixUtils.svdSolve(A,b,logger,tolEqSolve,debugLevel)
       } catch {
 
         case e:Exception =>
-          logger.println("\n"+e.getMessage+"\n")
+          logger.println("\nsvdSolve:\n"+e.getMessage+"\n")
+          OK = false
+      }
+      try{
+        logger.println("Solution via symSolve")
+        val  x = MatrixUtils.symSolve(A,b,logger,tolEqSolve,debugLevel)
+      } catch {
+
+        case e:Exception =>
+          logger.println("\nsymSolve:\n"+e.getMessage+"\n")
           OK = false
       }
     }
@@ -341,7 +354,7 @@ object MatrixUtilsTests {
     testTriangularSolve(dim,10,reps,tol)
     val nTests = 3; val condNum = 1e12; val debugLevel = 3; val tolEqSolve=1e-4
     val dimKernel =  0
-    testSvdSolve(nTests,dim,condNum,dimKernel,tolEqSolve,debugLevel)
+    testDiagonalizationSolve(nTests,dim,condNum,dimKernel,tolEqSolve,debugLevel)
   }
 
   /** We allocate N nxn random matrices A with condition number condNum.

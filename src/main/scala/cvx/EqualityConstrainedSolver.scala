@@ -1,5 +1,5 @@
 /**
-  * Created by vagrant on 09.10.17.
+  * Created by oar on 09.10.17.
   */
 package cvx
 
@@ -16,8 +16,8 @@ import breeze.linalg.{DenseMatrix, DenseVector, _}
   * @param pars parameters to control solver behaviour.
   */
 class EqualityConstrainedSolver(
-   val objF:ObjectiveFunction, val C:ConvexSet, val startingPoint:DenseVector[Double],
-   val A:DenseMatrix[Double], val b:DenseVector[Double], val pars:SolverParams, val logger:Logger
+  val objF:ObjectiveFunction, val C:ConvexSet, val startingPoint:DenseVector[Double],
+  val A:DenseMatrix[Double], val b:DenseVector[Double], val pars:SolverParams, val logger:Logger
 )
 extends Solver {
 
@@ -55,11 +55,11 @@ extends Solver {
 
       // FIX ME: the solution step
       val KKTS = KKTSystem(H,A,y,eqDiff)
-      val d:DenseVector[Double] = KKTS.solve(logger,tolEqSolve,debugLevel)._1
+      val d:DenseVector[Double] = KKTS.solve(pars.delta,logger,tolEqSolve,debugLevel)._1
 
       val q = d dot y
       newtonDecrement = -q/2
-      if(q>0){
+      if(q>0){ // loop will terminate on newtonDecrement < tol
 
         var msg = "\n\nEqualityConstrainedSolver, Iteration "+iter+":\n"
         msg += "Newton step d is not a descent direction: (d dot gradF(x)) = "+q
@@ -71,7 +71,6 @@ extends Solver {
           MatrixUtils.print(H,logger,3)
           logger.println("\n")
         }
-        iter = maxIter      // break off
       }
       //continue only if newtonDecrement > tol
       if(newtonDecrement > tol){
@@ -118,13 +117,13 @@ extends Solver {
 object EqualityConstrainedSolver{
 
   def apply(
-    objF:ObjectiveFunction,
-    C:ConvexSet,
-    startingPoint:DenseVector[Double],
-    A:DenseMatrix[Double],
-    b:DenseVector[Double],
-    pars:SolverParams,
-    logger:Logger
+             objF:ObjectiveFunction,
+             C:ConvexSet,
+             startingPoint:DenseVector[Double],
+             A:DenseMatrix[Double],
+             b:DenseVector[Double],
+             pars:SolverParams,
+             logger:Logger
   ):EqualityConstrainedSolver = new EqualityConstrainedSolver(objF,C,startingPoint,A,b,pars,logger)
 
 

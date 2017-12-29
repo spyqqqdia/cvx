@@ -19,9 +19,9 @@ import breeze.linalg.{DenseMatrix, DenseVector, NotConvergedException, _}
   * @param pars see [SolverParams].
   */
 class UnconstrainedSolver(
-   val objF:ObjectiveFunction, val C:ConvexSet, val startingPoint:DenseVector[Double],
-   val pars:SolverParams, val logger:Logger
-) extends Solver {
+                           val objF:ObjectiveFunction, val C:ConvexSet, val startingPoint:DenseVector[Double],
+                           val pars:SolverParams, val logger:Logger
+                         ) extends Solver {
 
   /** Find the location $x$ of the minimum of f=objF over C by the newton method
     * starting from the starting point x0.
@@ -41,6 +41,7 @@ class UnconstrainedSolver(
     var x = startingPoint
     var y = objF.gradientAt(x)
     var normGrad = norm(y)
+
     while (iter < maxIter && newtonDecrement > tol && normGrad > tol) {
 
       val f = objF.valueAt(x)
@@ -52,12 +53,19 @@ class UnconstrainedSolver(
         MatrixUtils.solveWithPreconditioning(H, -y, tolEqSolve, debugLevel)
       } catch {
 
-        case e: Exception => MatrixUtils.svdSolve(H,-y,logger,tolEqSolve,debugLevel)
-      }
+        case e: Exception => try {
 
+          val M = H + DenseMatrix.eye[Double](H.rows)*1e-9
+          MatrixUtils.solveWithPreconditioning(M, -y, tolEqSolve, debugLevel)
+
+        } catch {
+
+          case e: Exception => MatrixUtils.svdSolve(H, -y, logger, tolEqSolve, debugLevel)
+        }
+      }
       val q = d dot y
       newtonDecrement = -q/2
-      if(q>0){
+      if(q>0){     // loop will terminate on newtonDecrement < tol
 
         if(debugLevel>2){
 
@@ -66,7 +74,6 @@ class UnconstrainedSolver(
           msg+="\nx:\n"+x+"\ngradF(x):\n"+y+"\nhessF(x):\n"+H+"\nNewton step d:\n"+d+"\n\n"
           logger.print(msg)
         }
-        iter = maxIter   // break off
       }
       //continue only if newtonDecrement > eps
       if(newtonDecrement > tol){
@@ -94,7 +101,7 @@ class UnconstrainedSolver(
       iter+=1
     }
     // no duality gap applies, no equality gap occurs:
-    Solution(x,newtonDecrement,dualityGap=Double.MaxValue,equalityGap=0,normGrad,iter,iter==maxIter)
+    Solution(x,newtonDecrement,dualityGap=Double.MaxValue,equalityGap=0,normGrad,iter,iter>=maxIter)
   }
 
   /** Same as [solve(Int)], the parameter terminationCriterion is ignored. We need that only in the
@@ -119,7 +126,7 @@ object UnconstrainedSolver {
              startingPoint:DenseVector[Double],
              pars:SolverParams,
              logger:Logger
-  ): UnconstrainedSolver = new UnconstrainedSolver(objF,C,startingPoint,pars,logger)
+           ): UnconstrainedSolver = new UnconstrainedSolver(objF,C,startingPoint,pars,logger)
 
   /** Unconstrained solver in the variable u with C being the whole space in dimension dim(u), where
     * the solutions to the equality constraints Ax=b are parametrized as x=z0+Fu, see [SolutionSpace].
@@ -129,12 +136,12 @@ object UnconstrainedSolver {
     * @return
     */
   def apply(
-              objF:ObjectiveFunction,
-              A:DenseMatrix[Double],
-              b:DenseVector[Double],
-              pars:SolverParams,
-              logger:Logger
-  ): UnconstrainedSolver = {
+             objF:ObjectiveFunction,
+             A:DenseMatrix[Double],
+             b:DenseVector[Double],
+             pars:SolverParams,
+             logger:Logger
+           ): UnconstrainedSolver = {
 
     val solSpace = SolutionSpace(A,b)
     val z0 = solSpace.z0

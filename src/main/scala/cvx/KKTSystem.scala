@@ -20,23 +20,16 @@ import breeze.numerics._
   * H and the solution proceeds directly using this factor L. In this case the
   * parameter kktType must be set to 1.
   *
-  * @param M if kktType=0, M is interpreted to be the matrix H and solution proceeds
-  *          as described above. If kktType=1, M is interpreted to be the factor M=L
-  *          in the Cholesky factorization H=LL' and solution uses ths factor L.
-  * @param kktType flag to indicate how the matrix M is to be interpreted.
-  *
-  * The idea is that you will not call the constructor directly but rather
-  * use the apply factory functions in the companion object.
+  * @param H the matrix H as described above.
   */
 class KKTSystem(
-                 val M:DenseMatrix[Double], val A:DenseMatrix[Double],
-                 val q:DenseVector[Double], val b:DenseVector[Double],
-                 val kktType:Int=0
-               ) {
+  val H:DenseMatrix[Double], val A:DenseMatrix[Double],
+  val q:DenseVector[Double], val b:DenseVector[Double]
+) {
 
-  val n=M.cols
-  assert(M.rows==n,"Matrix M not square, n=M.cols="+n+", M.rows="+M.rows)
-  assert(A.cols==n,"A.cols="+A.cols+" not equal to n=M.rows="+M.rows)
+  val n=H.cols
+  assert(H.rows==n,"Matrix M not square, n=M.cols="+n+", M.rows="+H.rows)
+  assert(A.cols==n,"A.cols="+A.cols+" not equal to n=M.rows="+H.rows)
   val p=A.rows   // number of equalities
 
 
@@ -44,54 +37,47 @@ class KKTSystem(
     *
     * @param debugLevel if set to a value > 2 the condition number of the matrix H
     *              before and after equilibration is printed.
+    * @param delta: regularization pos semidef H -> H+delta*||H||*I
     * @return pair of solutions (x,w)
     */
-  private def solveType0(logger:Logger,tol:Double,debugLevel:Int):(DenseVector[Double],DenseVector[Double]) =
-  try {
+  def solve(
+    delta:Double,logger:Logger,tol:Double,debugLevel:Int
+  ):(DenseVector[Double],DenseVector[Double]) = {
 
     // move to non singular system (positive definite K) immediately
-    val K = M + A.t * A
+    val K = H + A.t * A
     val z = q - A.t * b
-    KKTSystem.solvePD(K, A, z, b, logger, tol, debugLevel)
+    try {
 
-  } catch {
+      KKTSystem.solvePD(K,A,z,b,logger,tol,debugLevel)
 
-    case e:LinSolveException => KKTSystem.kktSolveSVD(M,A,q,b,logger,tol,debugLevel)
+    } catch {
 
+      case e: Exception => try {
+
+        val M = K + DenseMatrix.eye[Double](K.rows)*delta
+        KKTSystem.solvePD(M,A,z,b,logger,tol,debugLevel)
+
+      } catch {
+
+        case e: Exception => KKTSystem.kktSolveSVD(H,A,q,b,logger,tol,debugLevel)
+      }
+    }
   }
-  /** Solution in case of kktType=1, i.e. M=L, where H=LL' is positive definite
-    * and L is lower triangular. No equilibration of H performed.
-    *
-    * @return pair of solutions (x,w)
-    */
-  private def solveType1(logger:Logger,tol:Double,debugLevel:Int):(DenseVector[Double],DenseVector[Double]) =
-  KKTSystem.solveWithCholFactor(M,A,q,b,logger,tol,debugLevel)
-
-  /** Solution of the system in the following form:
-    *
-    * @return pair of solutions (x,w)
-    */
-  def solve(logger:Logger,tol:Double,debugLevel:Int):(DenseVector[Double],DenseVector[Double]) =
-  if(kktType==1) solveType1(logger,tol,debugLevel) else solveType0(logger,tol,debugLevel)
 }
 object KKTSystem {
 
   /** System of equations
-    * Hx+A'w = -q   and   Ax = b,
+    *                 Hx+A'w = -q   and   Ax = b,
     * see docs/KKT.pdf.
     *
-    * @param M       if kktType=0, M is interpreted to be the matrix H and solution proceeds
-    *                by Cholesky factorization M=H=LL', if H is positive definite, or H+AA'=LL'
-    *                if M=H is only positive semi definite.
-    *                If kktType=1, M is interpreted to be the factor M=L
-    *                in the Cholesky factorization H=LL' and solution uses this factor L.
-    * @param kktType flag to indicate how the matrix M is to be interpreted.
+    * @param H matrix H as above.
     *
     * */
   def apply(
-             M: DenseMatrix[Double], A: DenseMatrix[Double],
-             q: DenseVector[Double], b: DenseVector[Double], kktType: Int = 0
-           ): KKTSystem = new KKTSystem(M, A, q, b, kktType)
+             H: DenseMatrix[Double], A: DenseMatrix[Double],
+             q: DenseVector[Double], b: DenseVector[Double]
+           ): KKTSystem = new KKTSystem(H,A,q,b)
 
   /** Solution of
     * Hx+A'w = -q  and  Ax = b
@@ -111,10 +97,10 @@ object KKTSystem {
     * @return pair of solutions (x,w)
     */
   def solveWithCholFactor(
-                           L: DenseMatrix[Double], A: DenseMatrix[Double],
-                           q: DenseVector[Double], b: DenseVector[Double],
-                           logger:Logger, tol:Double, debugLevel:Int
-                         ): (DenseVector[Double], DenseVector[Double]) = {
+    L: DenseMatrix[Double], A: DenseMatrix[Double],
+    q: DenseVector[Double], b: DenseVector[Double],
+    logger:Logger, tol:Double, debugLevel:Int
+  ): (DenseVector[Double], DenseVector[Double]) = {
 
     val n = L.cols
     assert(L.rows == n, "Matrix M not square, n=M.cols=" + n + ", M.rows=" + L.rows)
@@ -191,7 +177,7 @@ object KKTSystem {
                   H: DenseMatrix[Double], A: DenseMatrix[Double],
                   q: DenseVector[Double], b: DenseVector[Double],
                   logger: Logger, tol:Double, debugLevel: Int
-                ): (DenseVector[Double], DenseVector[Double]) = {
+  ): (DenseVector[Double], DenseVector[Double]) = {
 
     val n = H.cols
     assert(H.rows == n, "Matrix M not square, n=M.cols=" + n + ", M.rows=" + H.rows)
@@ -230,7 +216,7 @@ object KKTSystem {
                        H: DenseMatrix[Double], A: DenseMatrix[Double],
                        q: DenseVector[Double], b: DenseVector[Double],
                        logger: Logger, tol:Double, debugLevel: Int
-                     ): (DenseVector[Double], DenseVector[Double]) = {
+  ): (DenseVector[Double], DenseVector[Double]) = {
 
     val n = H.cols
     assert(H.rows == n, "Matrix M not square, n=M.cols=" + n + ", M.rows=" + H.rows)

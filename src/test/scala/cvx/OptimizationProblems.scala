@@ -19,7 +19,7 @@ object OptimizationProblems {
 
     val id = "f(x) = 0.5*||x||^2  in dimension "+dim
     if(debugLevel>0) {
-      println("Allocating problem " + id)
+      println("\nAllocating problem " + id)
       Console.flush()
     }
     val logFilePath = "logs/"+id+"_log.txt"
@@ -65,7 +65,7 @@ object OptimizationProblems {
 
     assert(q>=1,"\nExponent q needs to be at least 1 but q="+q+"\n")
     if(debugLevel>0){
-      println("Allocating problem "+id)
+      println("\nAllocating problem "+id)
       Console.flush()
     }
     val n=A.cols; val m=A.rows
@@ -159,7 +159,7 @@ object OptimizationProblems {
 
     val id = "dist_KL problem 1"
     if(debugLevel>0) {
-      println("Allocating problem " + id)
+      println("\nAllocating problem " + id)
       Console.flush()
     }
     val logFilePath = "logs/"+id+"_log.txt"
@@ -223,7 +223,7 @@ object OptimizationProblems {
 
     val id = "dist_KL problem 2"
     if(debugLevel>0) {
-      println("Allocating problem " + id)
+      println("\nAllocating problem " + id)
       Console.flush()
     }
     val logFilePath = "logs/"+id+"_log.txt"
@@ -276,7 +276,7 @@ object OptimizationProblems {
 
     val id = "dist_KL problem 3 (infeasible)"
     if(debugLevel>0) {
-      println("Allocating problem " + id)
+      println("\nAllocating problem " + id)
       Console.flush()
     }
     val logFilePath = "logs/"+id+"_log.txt"

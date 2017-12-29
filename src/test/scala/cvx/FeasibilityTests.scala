@@ -16,7 +16,7 @@ object FeasibilityTests {
     cts:ConstraintSet,eqs:Option[EqualityConstraint], pars:SolverParams, debugLevel:Int
   ):Unit = {
 
-    print("\nDoing simple feasibility analysis with tolerance tol = "+pars.tolFeas)
+    print("\nDoing simple feasibility analysis with tolerance tol = "+pars.tolFeas+"\n")
     try {
 
       val fR:FeasibilityReport = cts.phase_I_Analysis(eqs,pars,debugLevel)
@@ -36,6 +36,27 @@ object FeasibilityTests {
 
       case e:InfeasibleProblemException => print("\nInfeasible constraints:\n"+e.getMessage)
     }
+  }
+
+  /** Feasibility analysis of probability simplex x_j>=0, sum(x_j)=1.
+    *
+    * @param n
+    * @param pars
+    * @param debugLevel
+    */
+  def checkFeasibilityProbabilitySimplex(
+    n:Int, pars:SolverParams, debugLevel:Int
+  ):Unit = {
+
+    // set up the constraints
+    val cnts:List[Constraint] = Constraints.allCoordinatesPositive(n)
+
+    // point where all constraints are defined.
+    val x = DenseVector.tabulate[Double](n)(j=>1.0/n)
+    val cts = ConstraintSet(n,cnts,x)
+    val probCt = Constraints.sumToOne(n)
+
+    checkFeasibility(cts,Some(probCt),pars,debugLevel)
   }
 
   /** Perform a feasibility analysis (first simple, then SOI) on the

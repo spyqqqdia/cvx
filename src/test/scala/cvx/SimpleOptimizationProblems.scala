@@ -22,7 +22,7 @@ object SimpleOptimizationProblems {
 
     val id = "f(x0,x1)=x0 on x1>=exp(x0), x1 <= r+k*x0, with feasible point."
     if(debugLevel>0) {
-      println("Allocating problem " + id)
+      println("\nAllocating problem " + id)
       Console.flush()
     }
     val logFilePath = "logs/"+id+"_log.txt"
@@ -83,7 +83,7 @@ object SimpleOptimizationProblems {
 
     val id = "f(x0,x1)=x0 on x1>=exp(x0), x1 <= r+k*x0, no feasible point"
     if(debugLevel>0) {
-      println("Allocating problem " + id)
+      println("\nAllocating problem " + id)
       Console.flush()
     }
     val logFilePath = "logs/"+id+"_log.txt"
@@ -137,7 +137,7 @@ object SimpleOptimizationProblems {
     val logger = Logger(logFilePath)
 
     if(debugLevel>0) {
-      println("Allocating problem " + id)
+      println("\nAllocating problem " + id)
       Console.flush()
     }
 
@@ -165,12 +165,12 @@ object SimpleOptimizationProblems {
 
     assert(p>=2,"\np-norm not twice differentiable unless p>=2 but p="+p+"\n")
 
-    val id = "Min f(x)=||x||_p subject to ||x||_1=1"
+    val id = "Min f(x)=||x||_"+p+" subject to ||x||_1=1, x_j>=0"
     val logFilePath = "logs/"+id+"_log.txt"
     val logger = Logger(logFilePath)
 
     if(debugLevel>0) {
-      println("Allocating problem " + id)
+      println("\nAllocating problem " + id)
       Console.flush()
     }
 
@@ -203,7 +203,7 @@ object SimpleOptimizationProblems {
 
     val id = "Simplicial rankOneProblem"
     if(debugLevel>0) {
-      println("Allocating problem " + id)
+      println("\nAllocating problem " + id)
       Console.flush()
     }
     val logFilePath = "logs/"+id+"_log.txt"
@@ -243,7 +243,7 @@ object SimpleOptimizationProblems {
 
     val id = "Spherical rankOneProblem"
     if(debugLevel>0) {
-      println("Allocating problem " + id)
+      println("\nAllocating problem " + id)
       Console.flush()
     }
     val logFilePath = "logs/"+id+"_log.txt"
@@ -280,7 +280,7 @@ object SimpleOptimizationProblems {
 
     val id = "normSquaredWithFreeVariables"
     if(debugLevel>0) {
-      println("Allocating problem " + id)
+      println("\nAllocating problem " + id)
       Console.flush()
     }
     val logFilePath = "logs/"+id+"_log.txt"
@@ -292,7 +292,7 @@ object SimpleOptimizationProblems {
     val cnt = LinearConstraint("x_1<=-1",dim,-1.0,0.0,a)
 
     // point where all constraints are defined
-    val x = DenseVector.fill[Double](dim)(-10.0)
+    val x = DenseVector.fill[Double](dim)(1.0)    // infeasible point
     val ineqs = ConstraintSet(dim,List(cnt),x)
 
     val problem = OptimizationProblem(id,objF,ineqs,None,pars,logger,debugLevel)
@@ -314,7 +314,7 @@ object SimpleOptimizationProblems {
 
     val id = "f(x)=sum(x) with ||x||²<=1"
     if(debugLevel>0) {
-      println("Allocating problem " + id)
+      println("\nAllocating problem " + id)
       Console.flush()
     }
     val logFilePath = "logs/"+id+"_log.txt"
@@ -344,7 +344,7 @@ object SimpleOptimizationProblems {
 
     val id = "example_1.5"
     if(debugLevel>0) {
-      println("Allocating problem " + id)
+      println("\nAllocating problem " + id)
       Console.flush()
     }
     val logFilePath = "logs/"+id+"_log.txt"
@@ -356,10 +356,10 @@ object SimpleOptimizationProblems {
     val objF = QuadraticObjectiveFunction(dim,0.0,a,P)
 
     val probEq:EqualityConstraint = Constraints.sumToOne(dim)
-    val cnt = Constraints.allCoordinatesPositive(dim)
+    val cnts = Constraints.allCoordinatesPositive(dim)
     // point where all constraints are defined
     val x = DenseVector.fill[Double](dim)(2.0)    // infeasible
-    val ineqs = ConstraintSet(dim,cnt,x)
+    val ineqs = ConstraintSet(dim,cnts,x)
 
     val problem = OptimizationProblem(id,objF,ineqs,Some(probEq),pars,logger,debugLevel)
 
@@ -392,25 +392,23 @@ object SimpleOptimizationProblems {
 
     var theList:List[OptimizationProblem with KnownMinimizer]
       = List(normSquared(dim,debugLevel))
-    for(j <- 1 to 3){
 
-      val q = 2.0+rand()   // needs to be >= 2 for differentiability
-      val id = "Random power problem in dimension "+dim+" with m="+dim+" and exponent "+q
-      val p = randomPowerProblem(id,dim,dimKernel=0,condNumber,q,pars,debugLevel)
-      theList = theList :+ p
-    }
+    val q = 2.0+rand()   // needs to be >= 2 for differentiability
+    val id = "Random power problem in dimension "+dim+" with m="+dim+" and exponent "+q
+    val problem0 = randomPowerProblem(id,dim,dimKernel=0,condNumber,q,pars,debugLevel)
+
     val problem1 = minX1_no_FP(pars,debugLevel)
     val a = DenseVector.tabulate[Double](dim)(i => 1.0)
-    //val problem2 = minDotProduct(a,pars,debugLevel)
+    val problem2 = minDotProduct(a,pars,debugLevel)
     val problem3 = min_pNorm(dim,p=2.2,pars,debugLevel)
     val problem4 = min_pNorm(dim,p=4,pars,debugLevel)
     val problem5 = rankOneProblemSimplex(dim,pars,debugLevel)
     val problem6 = rankOneProblemSphere(dim,pars,debugLevel)
     val problem7 = joptP1(dim,pars,debugLevel)
-    val problem8 = joptP2(pars,debugLevel)
+    //val problem8 = joptP2(pars,debugLevel)
     val problem9 = normSquaredWithFreeVariables(dim,pars,debugLevel)
-    problem1 :: problem3 :: problem4 ::
-      problem5 :: problem6 :: problem7 :: problem8 :: problem9 :: theList
+    problem0 :: problem1 :: problem2 :: problem3 :: problem4 ::
+      problem5 :: problem6 :: problem7 :: problem9 :: theList
   }
 
 

@@ -426,7 +426,7 @@ object MatrixUtils {
 
     // Ruiz equilibration changes H
     val M = H.copy
-    val eqM = ruizEquilibrate(M);
+    val eqM = ruizEquilibrate(M)
     val d = eqM._1; val Q = eqM._2  // diag(d)*M*diag(d)
 
     try {
@@ -440,11 +440,11 @@ object MatrixUtils {
 
       // throw LinSolveException if the solution is not accurate to tolerance,
       val err = norm(H * x - b)
-      val f = Math.sqrt(H.rows + H.cols) // scaling the tolerated error
+      val f = 1e-10+norm(b)
       if (err > tol * f) {
 
-        val src = "\nMatrixUtils.solveWithPreconditioning: error exceeds tolerance:\n"
-        val problem = "With f = sqrt(H.rows+H.cols) = " + f + " we have ||Hx-b||/f = " + err / f + ".\n"
+        val src = "MatrixUtils.solveWithPreconditioning: error exceeds tolerance: "
+        val problem = "||Hx-b||/||b|| = " + MathUtils.round(err/f,d=2)
         val msg = src + problem
         if (debugLevel > 1) {
           println(msg); Console.flush()
@@ -524,102 +524,164 @@ object MatrixUtils {
       U*w
     }
 
-
-  /** Computes the vector x0 of minimal norm minimizing the distance ||Mx-q|| and throws an
+  /** Computes the vector x0 of minimal norm minimizing the distance ||Ax-b|| and throws an
     * UnsolvableSystemException if this distance exceeds the tolerance tol*f, where the factor
     * f = sqrt(M.rows+M.cols) scales the acceptable error with the matrix size.
     *
     * If the system Mx=q has a solution then x0 will be the solution of minimal norm.
-    * Uses the SVD of A. First the norm ||Mx0-q|| is computed
-    * (for this we do not need x0, see docs/svdSolve.pdf, eq(3)) and
-    * we check if this is less than the tolerance tol.
-    * If ||Mx0-q||>=tol an UnsolvableSystemException is thrown.
-    * Otherwise we first try the straightforward
-    * solution (docs/svdSolve.pdf, eq(2)) using all positive singular values.
+    * Uses the decomposition of A as A=UDV' where D=diag(d_j) is a diagonal matrix and U and V are
+    * orthogonal matrices. In practice this is either the symmetric eigenvalue decomposition
+    * or the SVD of A.
+    * For symmetric matrices the symmetric eigenvalue decomposition (where V=U) is preferred.
+    *
+    * First the distance of q from the range of A is computed and
+    * we check if this is less than the tolerance tol. If not an UnsolvableSystemException is thrown.
+    * Otherwise we first try the straightforward solution (docs/svdSolve.pdf, eq(2)) using all nonzero
+    * diagonal elements d_j.
     * If this fails to solve the system within tolerance tol, we proceed to regularization
     * along the lines of docs/cvx_notes.pdf, section ???. If this also fails, an
     * UnsolvableSystemException is thrown.
     *
-    * @param tol tolerated size of ||Mx0-q|| is tol*f, where f=sqrt(M.rows+M.cols).
+    * @param tol tolerated relative error||Ax0-b||/||b||.
     * @return solution x0
     */
-  def svdSolve(
-    M: DenseMatrix[Double], q: DenseVector[Double],
+  def diagonalizationSolve(
+    A:DenseMatrix[Double], U:DenseMatrix[Double], d:DenseVector[Double], V: DenseMatrix[Double],
+    b: DenseVector[Double],
     logger:Logger, tol:Double, debugLevel:Int
-  ) = {
+  ):DenseVector[Double] = {
 
-    val n = M.rows; val m = M.cols; val f = Math.sqrt(n+m)
-    assert(q.length==n,
-      "\nminimumNormSolution: incompatible dimensions in Mx=q, M.rows = "+n+", q.length = "+q.length+"\n"
+    assert(U.cols==d.length && d.length==V.rows && U.rows==b.length,
+      {
+        val prefix = "\ndiagonalizationSolve: incompatible dimensions in UDV'x=q:"
+        val postfix = "\nbut: U is "+U.rows+"x"+U.cols+", D is "+d.length+"x"+d.length+
+                    ", V' is "+V.cols+"x"+V.rows+" and q.length="+b.length
+        prefix+postfix
+      }
     )
-
-    val svd.SVD(u, s, v) = svd(M)
-    // compute min_x||Mx-q||=||q-proj_q||, where proj_q is
-    // the projection of q onto range of M, docs/svdSolve.pdf, eq(3)
-    val a = DenseVector.tabulate[Double](n)(j => if (s(j) > 0) u(::, j) dot q  else 0.0)
-    val proj_q = u*a
-    val minDist = norm(q-proj_q)    // min_x||Mx-q||
+    val n=U.rows
+    val a = DenseVector.tabulate[Double](n)(j => if (abs(d(j)) > 0) U(::, j) dot b  else 0.0)
+    val b0 = U*a                // projection of b onto Im(A)
+    val minDist = norm(b-b0)    // min_x||Mx-q||
+    val f = 1e-10+norm(b)
     if(minDist>tol*f) {
 
-      val msg = "\nsvdSolve: min_x||Mx-q||/f = "+minDist/f+" > tol = "+tol+
-                ", where f = sqrt(A.rows+A.cols) = "+f+".\n"
+      val r = MathUtils.round(minDist/f,d=2)
+      val msg = "\nMatrixUtils.diagonalizationSolve: min_x||Mx-q||/||q|| = "+r+" > tol = "+tol+".\n"
       throw UnsolvableSystemException(msg)
     }
+
     // now minDist<=tol and the system is solvable to within tolerance at least theoretically
     // but we may have numeric problems
     // first the straightforward solution in the form docs/svdSolve.pdf, eq(1)
-    val z = DenseVector.tabulate[Double](n)(j => if (s(j) > 0) ((u(::, j) dot q) / s(j)) else 0.0)
-    val w = v*z // the solution
-    var error = norm(M * w - q)
+    val z = DenseVector.tabulate[Double](n)(j => if (abs(d(j)) > 0) ((U(::, j) dot b) / d(j)) else 0.0)
+    val w = V*z // the solution
+    var relError = norm(A * w - b)/f
     var optSol = w
-    var minError = error
+
+    if(debugLevel>0 && relError <= tol){
+
+      val report = "MatrixUtils.diagonalizationSolve: solution successful:"+
+                   "error ||Ax-b||/||b|| = " + MathUtils.round(relError,d=2)
+      println(report); Console.flush()
+      logger.println(report)
+    }
+
     // if this error is too large we need to regularize the system
-    if (error > tol * f) {
+    if (relError > tol) {
 
       if (debugLevel > 0) {
 
-        val problem = "\nmatrixUtils.svdSolve: error ||Mw-q||/f = " + error / f +
-                      " > tol, where f = sqrt(M.rows+M.cols) = "+f+".\n"
+        val problem =
+          "\nMatrixUtils.diagonalizationSolve: error ||Ax-b||/||b|| = " + MathUtils.round(relError,d=2) + " > tol.\n"
         val next = "Trying regularization.\n"
         val msg = problem + next
         println(msg)
         Console.flush()
         logger.println(msg)
       }
-      // try a couple of regularizations similar to docs/cvx_notes.pdf ??? with p=1
-      val deltas = Vector[Double](1e-14, 1e-12, 1e-10, 1e-8, 1e-6, 1e-4, 1e-2, 1e-1, 1.0, 10.0, 100, 1000)
-      for (delta <- deltas) {
+      // try regularizations similar to docs/cvx_notes.pdf ??? with p=1
+      val maxTries = 18
+      var curTry = 0
+      var delta = 1e-14
+      var minRelError = relError
+      while(curTry < maxTries && relError > tol) {
 
         val z = DenseVector.tabulate[Double](n)(j => {
 
-          val sj=s(j); val sj_num = sj*sj*sj; val sj_denom = sj_num*sj
-          if (abs(s(j)) > 0) sj_num*(u(::, j) dot q) / (sj_denom+delta*delta) else 0.0
+          // the dj which are zero won't matter, if dj==0 we will set z(j)=0
+          val dj=d(j)
+          val alpha = if(abs(dj)>0) delta/(dj*dj) else 1.0
+          val rho = 1.0/(dj+alpha*alpha)
+          if (abs(d(j)) > 0) rho*(U(::, j) dot b) else 0.0
         })
-        val w = v*z // the solution
-
-        error = norm(M * w - q)
-        if (error < minError) {
-          minError = error
-          optSol = w
-        }
+        val w = V*z // the solution
+        relError = norm(A * w - b) / f
+        if(relError < minRelError){ minRelError = relError; optSol=w }
 
         // log what's going on
         if (debugLevel > 1) {
 
-          val msg = "delta = " + delta + ",\t\terror ||Mw-q||/f = " + MathUtils.round(error/f,2) +
-                    ",\t\twhere f = sqrt(M.rows+M.cols) = "+MathUtils.round(f,2)+"."
+          val msg = "delta = " + delta + ",\t\terror ||Ax-b||/||b|| = " + MathUtils.round(relError,d=2)
           println(msg)
           Console.flush()
           logger.println(msg)
         }
-      }
-      if (minError > tol * M.rows) {
 
-        val problem = "\nsolveSVD: system not solvable within tolerance tol = "+tol+":\n"
-        val size = "error ||Mw-q||/f = " + minError / f + ", where f = sqrt(M.rows+M.cols) = "+f+".\n"
+        curTry+=1
+        delta*=10.0
+      } // end while
+      if (relError > tol) {
+
+        val problem = "\nMatrixUtils.diagonalizationSolve: system not solvable within tolerance tol = "+tol+":\n"
+        val size = "error ||Ax-b||/||b|| = " + MathUtils.round(minRelError,d=2) + ".\n"
         throw UnsolvableSystemException(problem + size)
       }
     }
     optSol
+  }
+
+
+  /** [diagonalizationSolve] using the SVD of A.
+    */
+  def svdSolve(
+    A: DenseMatrix[Double], b: DenseVector[Double],
+    logger:Logger, tol:Double, debugLevel:Int
+  ) = {
+
+    if(debugLevel>0){
+
+      println("\nMatrixUtils.svdSolve:"); Console.flush()
+      logger.println("\nMatrixUtils.svdSolve:")
+    }
+    val n = A.rows; val m = A.cols
+    assert(b.length==n,
+      "\nMatrixUtils.svdSolve: incompatible dimensions in Mx=q, M.rows = "+n+", q.length = "+b.length+"\n"
+    )
+
+    val svd.SVD(u, s, v) = svd(A)
+    diagonalizationSolve(A,u,s,v,b,logger,tol,debugLevel)
+  }
+
+  /** [diagonalizationSolve] using the symmetric eigenvalue decomposition of A.
+    * @param A must be a symmetric matrix.
+    */
+  def symSolve(
+    A: DenseMatrix[Double], b: DenseVector[Double],
+    logger:Logger, tol:Double, debugLevel:Int
+  ) = {
+
+    if(debugLevel>0){
+
+      println("\nMatrixUtils.symSolve:"); Console.flush()
+      logger.println("\nMatrixUtils.symSolve:")
+    }
+    val n = A.rows;
+    assert(b.length==n,
+      "\nMatrixUtils.symSolve: incompatible dimensions in Mx=q, M.rows = "+n+", q.length = "+b.length+"\n"
+    )
+    checkSymmetric(A,1e-13)
+    val EigSym(lambda,evs) = eigSym(A)
+    diagonalizationSolve(A,evs,lambda,evs,b,logger,tol,debugLevel)
   }
 }

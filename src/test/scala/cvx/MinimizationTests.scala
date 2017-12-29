@@ -14,8 +14,8 @@ object MinimizationTests {
     * solution found by the solver, see [OptimizationSolution].
     */
   def runProblemsWithKnownMinimizer(
-    optProblems:List[OptimizationProblem with KnownMinimizer], tol:Double, debugLevel:Int
-  ):Unit = for(problem <- optProblems) try {
+                                     optProblems:List[OptimizationProblem with KnownMinimizer], tol:Double, debugLevel:Int
+                                   ):Unit = for(problem <- optProblems) try {
 
     print("\n\n#-----Problem: "+problem.id+":\n\n")
     Console.flush()
@@ -44,7 +44,7 @@ object MinimizationTests {
     */
   def runProblems(
                    optProblems:List[OptimizationProblem], tol:Double, debugLevel:Int
-  ):Unit = for(problem <- optProblems) try {
+                 ):Unit = for(problem <- optProblems) try {
 
     print("\n\n#-----Problem: "+problem.id+":\n\n")
 
@@ -80,8 +80,8 @@ object MinimizationTests {
     * @param tol tolerance for deviation from the known solution.
     */
   def testStandardProblems(
-    dim:Int,condNumber:Double,pars:SolverParams,tol:Double,debugLevel:Int
-  ):Unit = {
+                            dim:Int,condNumber:Double,pars:SolverParams,tol:Double,debugLevel:Int
+                          ):Unit = {
 
     val problems = SimpleOptimizationProblems.standardProblems(dim,condNumber,pars,debugLevel)
     runProblemsWithKnownMinimizer(problems,tol,debugLevel)
@@ -99,12 +99,11 @@ object MinimizationTests {
   }
 
   /** Test the KL-problems (geometric centering) with known solutions.*/
-  def test_KL_problems(pars:SolverParams,tol:Double,debugLevel:Int):Unit = {
-
+  def test_KL_problems(dim:Int,pars:SolverParams,tol:Double,debugLevel:Int):Unit = {
 
     val problems = List(
-      OptimizationProblems.kl_1(12,pars,debugLevel),
-      OptimizationProblems.kl_2(20,pars,debugLevel)
+      OptimizationProblems.kl_1(dim,pars,debugLevel),
+      OptimizationProblems.kl_2(dim,pars,debugLevel)
     )
     runProblemsWithKnownMinimizer(problems,tol,debugLevel)
   }
@@ -120,6 +119,3 @@ object MinimizationTests {
 
 
 }
-
-
-

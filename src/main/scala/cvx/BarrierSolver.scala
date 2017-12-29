@@ -14,16 +14,24 @@ import breeze.linalg.{DenseMatrix, DenseVector, _}
   * C.samplePoint will be used as the starting point of the optimization.
   *
   * @param C domain of definition of the barrier function.
+  * @param objF: objective function of the optimization problem (needed to
+  *            monitor the optimization state)
   * @param eqs Optional equality constraint(s) of the form Ax=b
   * @param pars see [SolverParams]
   */
 abstract class BarrierSolver(
-  val C:ConvexSet, val startingPoint:DenseVector[Double],
+  val C:ConvexSet, val startingPoint:DenseVector[Double], val objF:ObjectiveFunction,
   val eqs:Option[EqualityConstraint], val pars:SolverParams, val logger:Logger
 )
 extends Solver {
 
   //  check if the pieces fit together
+  assert(C.dim==startingPoint.length,
+    "\nDimension mismatch C.dim="+C.dim+", startingPoint.length="+startingPoint.length+"\n"
+  )
+  assert(objF.dim==startingPoint.length,
+    "\nDimension mismatch objF.dim="+objF.dim+", startingPoint.length="+startingPoint.length+"\n"
+  )
   assert(C.isInSet(startingPoint),"Starting point x not in set C, x:\n"+startingPoint+"\n")
   eqs.map(eqCnt => {
 
@@ -48,7 +56,7 @@ extends Solver {
     val border = "\n****************************************************************\n"
     val content =    "**           BarrierSolver: step t = "+t+"                  **"
     val msg = "\n"+border+content+border+"\n"
-    println(msg)
+    println(msg); Console.flush()
     logger.println(msg)
   }
 
@@ -90,12 +98,16 @@ extends Solver {
       sol = solver.solve(debugLevel)
 
       x = sol.x
-      obfFcnValue = barrierFunction(t,x)
+      obfFcnValue = objF.valueAt(x)
       normGrad = sol.normGrad
       newtonDecrement = sol.newtonDecrement
       dualityGap = numConstraints/t
       optimizationState = OptimizationState(normGrad,newtonDecrement,dualityGap,equalityGap,obfFcnValue)
 
+      if(debugLevel>3){
+        print("\nOptimization state:"+optimizationState)
+        Console.flush()
+      }
       t = mu*t
       iter+=1
     }
@@ -108,9 +120,9 @@ extends Solver {
     * @return Solution object: minimizer with additional info.
     */
   def solveWithEQs(
-      terminationCriterion:(OptimizationState)=>Boolean,
-      A:DenseMatrix[Double],b:DenseVector[Double],debugLevel:Int=0
-  ):Solution = {
+                    terminationCriterion:(OptimizationState)=>Boolean,
+                    A:DenseMatrix[Double],b:DenseVector[Double],debugLevel:Int=0
+                  ):Solution = {
 
     val tol=pars.tol // tolerance for duality gap
     val mu = 10.0    // factor to increase parameter t in barrier method.
@@ -142,13 +154,17 @@ extends Solver {
       sol = solver.solve(debugLevel)
 
       x = sol.x
-      obfFcnValue = barrierFunction(t,x)
+      obfFcnValue = objF.valueAt(x)
       normGrad = sol.normGrad
       newtonDecrement = sol.newtonDecrement
       dualityGap = numConstraints/t
       equalityGap = sol.equalityGap
       optimizationState = OptimizationState(normGrad,newtonDecrement,dualityGap,equalityGap,obfFcnValue)
 
+      if(debugLevel>3) {
+        print("\nOptimization state:" + optimizationState)
+        Console.flush()
+      }
       t = mu*t
       iter+=1
     }
@@ -162,8 +178,8 @@ extends Solver {
     */
   def solve(debugLevel:Int=0):Solution = {
 
-     val terminationCriterion = (os:OptimizationState) => os.dualityGap < pars.tol
-     solveSpecial(terminationCriterion,debugLevel)
+    val terminationCriterion = (os:OptimizationState) => os.dualityGap < pars.tol
+    solveSpecial(terminationCriterion,debugLevel)
   }
 }
 
@@ -177,13 +193,13 @@ object BarrierSolver {
     * @param pars see [SolverParams].
     */
   def apply(
-    objF: ObjectiveFunction, cnts: ConstraintSet with FeasiblePoint,
-    eqs: Option[EqualityConstraint], pars: SolverParams, logger:Logger
-  ): BarrierSolver = {
+             objF: ObjectiveFunction, cnts: ConstraintSet with FeasiblePoint,
+             eqs: Option[EqualityConstraint], pars: SolverParams, logger:Logger
+           ): BarrierSolver = {
 
     val Feas = cnts.strictlyFeasibleSet
     val C = ConvexSet.addSamplePoint(Feas, cnts.feasiblePoint)
-    new BarrierSolver(C, cnts.feasiblePoint, eqs, pars, logger) {
+    new BarrierSolver(C, cnts.feasiblePoint, objF, eqs, pars, logger) {
 
       def numConstraints:Int = cnts.constraints.length
 
@@ -246,7 +262,7 @@ object BarrierSolver {
       def samplePoint = Some(u0)
     }
 
-    new BarrierSolver(D,u0,None,bs.pars,logger){
+    new BarrierSolver(D,u0,bs.objF,None,bs.pars,logger){
 
       def numConstraints:Int = bs.numConstraints
       def barrierFunction(t:Double,u:DenseVector[Double]):Double = bs.barrierFunction(t,z0+F*u)

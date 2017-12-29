@@ -66,13 +66,14 @@ abstract class ConstraintSet(val dim:Int, val constraints:Seq[Constraint]) {
     }
   }
 
-  /** Set of these constraints for basic phase I analysis, [boyd], 11.4.1, p579.
-    * Recall: one new variable s and each constraint g_j(x) <= ub_j replaced with g_j(x)-s <= ub_j.
+  /** Set of these constraints for basic phase I analysis when no equalities are present,
+    * [boyd], 11.4.1, p579.
     *
+    * Recall: one new variable s and each constraint g_j(x) <= ub_j replaced with g_j(x)-s <= ub_j.
     * For these we can always find a point at which all these constraints are satisfied.
     * (member function [feasiblePoint]).
     */
-  def phase_I_Constraints:ConstraintSet with FeasiblePoint = {
+  def phase_I_Constraints_noEqs:ConstraintSet with FeasiblePoint = {
 
     val n = dim
     new ConstraintSet(1+n,constraints.map(cnt => Constraint.phase_I(cnt))) with FeasiblePoint {
@@ -84,6 +85,54 @@ abstract class ConstraintSet(val dim:Int, val constraints:Seq[Constraint]) {
       def feasiblePoint = DenseVector.tabulate[Double](1+n)(j => if (j<n) x0(j) else 1+y0 )
       def pointWhereDefined = feasiblePoint
     }
+  }
+
+  /** Set of these constraints for basic phase I analysis when equalities are present,
+    * [boyd], 11.4.1, p579.
+    *
+    * Recall: one new variable s and each constraint g_j(x) <= ub_j replaced with g_j(x)-s <= ub_j.
+    * For these we can always find a point at which all these constraints are satisfied
+    * but the feasible point should also satisfy the equalities Ax=b.
+    * We try to find such a point by minimizing 0.5*||Ax-b||² subject to the inequality
+    * constraints.
+    */
+  def phase_I_Constraints_withEqs(
+    eqs:EqualityConstraint, pars:SolverParams, logger:Logger, debugLevel:Int
+  ):ConstraintSet with FeasiblePoint = {
+
+    val delta = 1e-9  // PD regularization H -> H+delta*||H||*I
+    val objF = ObjectiveFunctions.regularizedEquationResidual(eqs.A,eqs.b,delta)
+    val id = "phase_I_Constraints_withEqs::feasibilityProblem"
+    val feasibilityProblem = OptimizationProblem(id,objF,this,None,pars,logger,debugLevel)
+    val sol:Solution = feasibilityProblem.solve(debugLevel)
+
+    val n = dim
+    new ConstraintSet(1+n,constraints.map(cnt => Constraint.phase_I(cnt))) with FeasiblePoint {
+
+      val x0 = sol.x  // may not be strictly feasible for the inequalities
+      // recall inequality constraints have the form g_j(x) <= ub_j and are replaced with
+      // g_j(x)-s <= ub_j. This can be satisfied with any s > g_j(x)-ub_j
+      val y0:Double = self.constraints.map(cnt => cnt.valueAt(x0)-cnt.ub).max // max_j g_j(x0)
+      def feasiblePoint = DenseVector.tabulate[Double](1+n)(j => if (j<n) x0(j) else 1+y0 )
+      def pointWhereDefined = feasiblePoint
+    }
+  }
+
+  /** Set of these constraints for basic phase I analysis when equalities are present,
+    * [boyd], 11.4.1, p579.
+    *
+    * Recall: one new variable s and each constraint g_j(x) <= ub_j replaced with g_j(x)-s <= ub_j.
+    * For these we can always find a point at which all these constraints are satisfied
+    * but the feasible point should also satisfy the equalities Ax=b.
+    * We try to find such a point by minimizing 0.5*||Ax-b||² subject to the inequality
+    * constraints.
+    */
+  def phase_I_Constraints(
+    eqs:Option[EqualityConstraint], pars:SolverParams, logger:Logger, debugLevel:Int
+  ):ConstraintSet with FeasiblePoint = {
+
+    if(eqs.isEmpty) phase_I_Constraints_noEqs
+    else phase_I_Constraints_withEqs(eqs.get,pars,logger,debugLevel)
   }
 
 
@@ -156,13 +205,16 @@ abstract class ConstraintSet(val dim:Int, val constraints:Seq[Constraint]) {
     * @param pars solver parameters, see [SolverParams].
     */
   private def phase_I_Solver(
-    eqs: Option[EqualityConstraint], pars:SolverParams
+    eqs: Option[EqualityConstraint], pars:SolverParams, debugLevel:Int
   ):BarrierSolver = {
 
-    val feasObjF = phase_I_ObjectiveFunction
-    val feasCnts = phase_I_Constraints
     val logFilePath = "logs/ConstraintSet_phase_I_log.txt"
-    BarrierSolver(feasObjF,feasCnts,eqs,pars,Logger(logFilePath))
+    val logger = Logger(logFilePath)
+    val feasObjF = phase_I_ObjectiveFunction
+    val feasCnts = phase_I_Constraints(eqs,pars,logger,debugLevel)
+    // map the equalities to the dimension of the phase_I analysis:
+    val phase_I_eqs:Option[EqualityConstraint] = eqs.map(eq => eq.phase_I_EqualityConstraint)
+    BarrierSolver(feasObjF,feasCnts,phase_I_eqs,pars,logger)
   }
 
 
@@ -173,18 +225,26 @@ abstract class ConstraintSet(val dim:Int, val constraints:Seq[Constraint]) {
     * @param pars solver parameters, see [SolverParams].
     */
   def phase_I_Analysis(
-      eqs: Option[EqualityConstraint], pars:SolverParams, debugLevel:Int
+    eqs: Option[EqualityConstraint], pars:SolverParams, debugLevel:Int
   ): FeasibilityReport = {
 
-    if(debugLevel>0) println("ConstraintSet: doing phase_I_Analysis:")
+    val logFilePath = "logs/ConstraintSet_phase_I_log.txt"
+    val logger = Logger(logFilePath)
+
+    if(debugLevel>0){
+
+      val prefix = "ConstraintSet: doing phase_I_Analysis "
+      val msg = if(eqs.isEmpty) prefix + "without equalities:" else prefix + "with equalities:"
+      println(msg); Console.flush()
+      logger.println(msg)
+    }
     Console.flush()
-    // map the equalities to the dimension of the phase_I analysis:
-    val phase_I_eqs:Option[EqualityConstraint] = eqs.map(eq => eq.phase_I_EqualityConstraint)
-    val feasBS = phase_I_Solver(phase_I_eqs,pars)
+    val feasBS = phase_I_Solver(eqs,pars,debugLevel)
 
     // terminate if objective function has been pushed below zero (then we are at a strictly
     // feasible point already, or if the duality gap is small enough
-    val terminationCriterion = (os:OptimizationState) => os.objectiveFunctionValue < 0 || os.dualityGap < pars.tol
+    val terminationCriterion = (os:OptimizationState) =>
+      (os.objectiveFunctionValue < 0 || os.dualityGap < pars.tol) && os.equalityGap < pars.tol
     val sol = feasBS.solveSpecial(terminationCriterion,debugLevel)
 
     val w_feas = sol.x                  // w = c(x,s)
@@ -202,8 +262,6 @@ abstract class ConstraintSet(val dim:Int, val constraints:Seq[Constraint]) {
     val report = FeasibilityReport(x_feas,s,isStrictlySatisfied,this,eqError)
 
     if(debugLevel>1){
-      val logFilePath = "logs/ConstraintSet_phase_I_log.txt"
-      val logger = Logger(logFilePath)
       val msg = report.toString(pars.tol)
       logger.println(msg)
       println(msg); Console.flush()
@@ -221,7 +279,8 @@ abstract class ConstraintSet(val dim:Int, val constraints:Seq[Constraint]) {
     * @param pars solver parameters, see [SolverParams].
     */
   def phase_I_Analysis_by_reduction(
-    eqs:EqualityConstraint, pars:SolverParams,debugLevel:Int): FeasibilityReport = {
+    eqs:EqualityConstraint, pars:SolverParams,debugLevel:Int
+  ): FeasibilityReport = {
 
     if(debugLevel>0) println("\nConstraintSet: doing phase_I_Analysis by reduction.")
     Console.flush()
@@ -234,7 +293,7 @@ abstract class ConstraintSet(val dim:Int, val constraints:Seq[Constraint]) {
 
     val k=F.cols     // dimension of variable u in x=z0+Fu
 
-    val solverNoEqs = phase_I_Solver(Some(eqs),pars)
+    val solverNoEqs = phase_I_Solver(Some(eqs),pars,debugLevel)
     // change variables x = z0+Fu
     val logFilePath = "logs/ConstraintSet_phase_I_by_dimension_reduction_log.txt"
     val solver = BarrierSolver.reducedSolver(solverNoEqs,solEqs,Logger(logFilePath))
@@ -299,8 +358,8 @@ abstract class ConstraintSet(val dim:Int, val constraints:Seq[Constraint]) {
     * @param pars solver parameters, see [SolverParams].
     */
   def phase_I_Analysis_SOI(
-    eqs:Option[EqualityConstraint], pars:SolverParams, debugLevel:Int
-  ): FeasibilityReport = {
+                            eqs:Option[EqualityConstraint], pars:SolverParams, debugLevel:Int
+                          ): FeasibilityReport = {
 
     if(debugLevel>0) println("ConstraintSet: doing phase_I_SOI_Analysis:")
     Console.flush()
@@ -348,17 +407,18 @@ abstract class ConstraintSet(val dim:Int, val constraints:Seq[Constraint]) {
 
     type ConstraintType = ConstraintSet with FeasiblePoint
     if(this.isInstanceOf[ConstraintType]) this.asInstanceOf[ConstraintType] else {
-        // perform a feasibility analysis and add a feasible point
+      // perform a feasibility analysis and add a feasible point
 
-        val tol = pars.tol
-        val feasibilityReport: FeasibilityReport = phase_I_Analysis(eqs,pars,debugLevel)
-        val x0 = feasibilityReport.x0
-        val s = feasibilityReport.s
-        val violatedConstraints = feasibilityReport.violatedConstraints(tol)
-        val eqResidual = eqs.map(eqCnt => norm(eqCnt.A*x0-eqCnt.b))
+      val tol = pars.tol
+      val feasibilityReport: FeasibilityReport = phase_I_Analysis(eqs,pars,debugLevel)
+      val x0 = feasibilityReport.x0
+      val s = feasibilityReport.s
+      val violatedConstraints = feasibilityReport.violatedConstraints(tol)
+      val eqResidual = eqs.map(eqCnt => norm(eqCnt.A*x0-eqCnt.b))
 
-        if (!feasibilityReport.isFeasible(tol)) throw new InfeasibleProblemException(feasibilityReport,tol)
-        addFeasiblePoint(x0)
+      if (!feasibilityReport.isFeasible(tol))
+        throw new InfeasibleProblemException(feasibilityReport,tol)
+      addFeasiblePoint(x0)
     }
   }
 }
@@ -374,7 +434,7 @@ object ConstraintSet {
     * @return the ConstraintSet with constraints in theConstraints
     */
   def apply(dim:Int, theConstraints:Seq[Constraint],x0:DenseVector[Double]) =
-  new ConstraintSet(dim,theConstraints){ def pointWhereDefined = x0 }
+    new ConstraintSet(dim,theConstraints){ def pointWhereDefined = x0 }
 
 
 }
