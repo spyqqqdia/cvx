@@ -50,17 +50,17 @@ class UnconstrainedSolver(
 
       // newton  step
       val d = try {
-        MatrixUtils.solveWithPreconditioning(H, -y, tolEqSolve, debugLevel)
+        MatrixUtils.solveWithPreconditioning(H, -y, logger, tolEqSolve, debugLevel)
       } catch {
 
         case e: Exception => try {
 
           val M = H + DenseMatrix.eye[Double](H.rows)*1e-9
-          MatrixUtils.solveWithPreconditioning(M, -y, tolEqSolve, debugLevel)
+          MatrixUtils.solveWithPreconditioning(M, -y, logger, tolEqSolve, debugLevel)
 
         } catch {
 
-          case e: Exception => MatrixUtils.svdSolve(H, -y, logger, tolEqSolve, debugLevel)
+          case e: Exception => MatrixUtils.symSolve(H, -y, logger, tolEqSolve, debugLevel)
         }
       }
       val q = d dot y

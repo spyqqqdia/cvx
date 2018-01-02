@@ -45,22 +45,22 @@ class KKTSystem(
   ):(DenseVector[Double],DenseVector[Double]) = {
 
     // move to non singular system (positive definite K) immediately
-    val K = H + A.t * A
-    val z = q - A.t * b
+
     try {
 
-      KKTSystem.solvePD(K,A,z,b,logger,tol,debugLevel)
+      KKTSystem.solvePD(H,A,q,b,logger,tol,debugLevel)
 
     } catch {
 
       case e: Exception => try {
 
-        val M = K + DenseMatrix.eye[Double](K.rows)*delta
-        KKTSystem.solvePD(M,A,z,b,logger,tol,debugLevel)
+        val K = H + A.t * A
+        val z = q - A.t * b
+        KKTSystem.solvePD(K,A,z,b,logger,tol,debugLevel)
 
       } catch {
 
-        case e: Exception => KKTSystem.kktSolveSVD(H,A,q,b,logger,tol,debugLevel)
+        case e: Exception => KKTSystem.kktSymSolve(H,A,q,b,logger,tol,debugLevel)
       }
     }
   }
@@ -106,8 +106,13 @@ object KKTSystem {
     assert(L.rows == n, "Matrix M not square, n=M.cols=" + n + ", M.rows=" + L.rows)
     assert(A.cols == n, "A.cols=" + A.cols + " not equal to n=M.rows=" + L.rows)
 
-    val p = A.rows // number of equalities
+    if(debugLevel>1){
 
+       val msg = "\nKKTSystem.solveWithCholFactor: "
+       Console.print(msg); Console.flush()
+      logger.print(msg)
+    }
+    val p = A.rows // number of equalities
     val B = DenseMatrix.zeros[Double](n, p + 1)
     B(::, 0 until p) := A.t
     B(::, p) := q
@@ -123,13 +128,12 @@ object KKTSystem {
       val symmErr = Math.sqrt(sum((R - R.t) :* (R - R.t)))
       if (symmErr > 1e-14*R.rows){
 
-        val src = "\nKKTSystem.solveWithCholFactor:\n"
         val problem = "unexpectedly large deviation from symmetry in R = A*inv(H)*A':\n"
         val size = "size per row: ||R-R'||/rows = "+symmErr/R.rows+"\n"
         val fix = "Could be a problem with openblas, recompile from source!\n"
-        val msg = src+problem+size+fix
-        logger.println(msg)
-        println(msg); Console.flush()
+        val msg = problem+size+fix
+        Console.print(msg); Console.flush()
+        logger.print(msg)
       }
     }
     val S = (R + R.t) * 0.5 // make exactly symmetric
@@ -141,23 +145,21 @@ object KKTSystem {
     val x = -(Hinv_q + Hinv_At * w)
 
     // check for accuracy, recall Hx=LL'x
-    val f = Math.sqrt(L.rows+L.cols)
     val Ltx = L.t*x; val Hx = L*Ltx
-    val err1 = norm(Hx+A.t*w+q)/f
+    val residual_1 = Hx+A.t*w+q
+    val err1 = MatrixUtils.relativeSize(residual_1,-q,tol)
 
-    val g = Math.sqrt(A.rows+A.cols)
-    val err2 = norm(A*x-b)/g
+    val residual_2 = A*x-b
+    val err2 = MatrixUtils.relativeSize(residual_2,b,tol)
     if(err1 > tol || err2 > tol){
 
-      if(debugLevel>0){
-        val src = "\nKKTSystem.solveWithCholFactor: "
-        val problem = "Error in solution exceeds tolerance:\n"+
-                      "With f = sqrt(H.rows+H.cols) = "+f+" and g = sqrt(A.rows+A.cols) = "+g+"\n"
-        val size = "we have\t\t ||Hx+A.t*w+q||/f = "+err1+", and\t\t||Ax-b||/g = "+err2+".\n"
-        val fix = "Throwing exception to hand off to remediation attempts.\n"
-        val msg = src+problem+size+fix
-        logger.println(msg)
-        println(msg); Console.flush()
+      if(debugLevel>1){
+        val problem = "Error in solution exceeds tolerance:\n"
+        val size = "\t\t ||Hx+A.t*w+q|| / ||q|| = "+err1+", and\t\t||Ax-b|| / ||b|| = "+err2
+        val fix = "\nThrowing exception (will hand off to symSolve).\n"
+        val msg = problem+size+fix
+        Console.print(msg); Console.flush()
+        logger.print(msg)
       }
       throw LinSolveException(null, null, null,"Error in solution exceeds tolerance.")
     }
@@ -180,28 +182,11 @@ object KKTSystem {
   ): (DenseVector[Double], DenseVector[Double]) = {
 
     val n = H.cols
-    assert(H.rows == n, "Matrix M not square, n=M.cols=" + n + ", M.rows=" + H.rows)
-    assert(A.cols == n, "A.cols=" + A.cols + " not equal to n=M.rows=" + H.rows)
+    assert(H.rows == n, "Matrix H not square, n=M.cols=" + n + ", H.rows=" + H.rows)
+    assert(A.cols == n, "A.cols=" + A.cols + " not equal to n=H.rows=" + H.rows)
 
-    try {
-      val L = cholesky(H) // M=H
-      solveWithCholFactor(L, A, q, b, logger, tol, debugLevel)
-
-    } catch {
-
-      case e: NotConvergedException => {
-
-        val msg = "\nKKTSystem.blockSolve: problem with Cholesky factor. Will switch to SVD."
-        if(debugLevel > 0){ print(msg); Console.flush() }
-        if (debugLevel > 2) {
-
-          logger.print("\n\nKKTSystem::blocksolve: singular KKT system, matrix H:\n")
-          MatrixUtils.print(H, logger, 3)
-          logger.println("\n")
-        }
-        throw LinSolveException(H, null, null, msg)
-      }
-    }
+    val L = MatrixUtils.regularizedCholesky(H)
+    solveWithCholFactor(L, A, q, b, logger, tol, debugLevel)
   }
 
   /** Solution of
@@ -295,7 +280,7 @@ object KKTSystem {
     * @return pair (u,nu). Here the interpretation of u=dx is the Newton step
     *         and nu the lagrange multiplier associated with the equality constraints.
     */
-  def kktSolveSVD(
+  def kktSymSolve(
                    H: DenseMatrix[Double], A: DenseMatrix[Double],
                    g: DenseVector[Double], r: DenseVector[Double],
                    logger: Logger, tol: Double, debugLevel:Int
@@ -309,7 +294,7 @@ object KKTSystem {
     try {
 
       val n = H.rows
-      val w = MatrixUtils.svdSolve(M, q, logger, tol, debugLevel)
+      val w = MatrixUtils.symSolve(M, q, logger, tol, debugLevel)
       (w(0 until n), w(n until n + A.rows))
 
     } catch {

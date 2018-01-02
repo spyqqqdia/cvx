@@ -417,25 +417,20 @@ Should be noted in cvx_notes.
 
 Files affected:
 
-ConstraintSet
+
 EqualityConstrainedSolver
 KKTSystem
+KktTest
 MatrixUtils
 ObjectiveFunctions
-OptimizationState
 UnconstrainedSolver
 
 FeasibilityTests
-KktTest
-MinmizationTests
-OptimizationProblems
-SimpleOptimizationProblems
 Runner
 
 
-Status runs to completion on all problems but idiotic results in first step of phase_I_analysis
+Status: runs to completion on all problems but idiotic results in first step of phase_I_analysis
 of the probability simplex.
-
 
 
 #----------------------------------------------------------------------------------------
@@ -448,8 +443,61 @@ MatrixUtils.symSolve (using the symmetric eigenvalue decomposition).
 Files affected:
 MatrixUtils
 
-
 MatrixUtilsTests
+
+
+#----------------------------------------------------------------------------------------
+2018-01-02:|
+-------------
+
+Rewrote the equation solvers in MatrixUtils and KKTSystem.
+Expanded the test of these solvers in MatrixUtilsTests
+
+
+Files Affected:
+
+ConstraintSet
+KKTSystem
+MatrixUtils
+UnconstrainedSolver
+
+KkktTest
+MatrixUtilsTests
+MinimizationTests
+SimpleOptimizationProblems
+
+
+
+Allocated the problem which occurs in the first step of a phase I analysis
+of the probability simplex in SimpleOptimizationProblems. Runs without difficulties.
+
+_ConstraintSet_:
+Cleanly separated phase I analysis with equalities from
+phase I analysis without equalities.
+
+
+Status:
+
+MatrixUtilsTests.testEquationSolve:
+svdSolve fails badly on ill conditioned, symmetric, positive definite systems
+where symSolve and solveWithPreconditioning (Cholesky factorization) have no problems.
+Do we have a problem with the SVD in breeze?
+
+MinimizationTests:
+
+All SimpleOptimizationProblems.standardProblems and the distKL problems run to
+completion.
+
+
+
+
+
+
+
+
+
+
+
 
 
 

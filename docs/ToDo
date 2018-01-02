@@ -365,7 +365,7 @@ which is indeed unsolvable to any tolerance < 1.
 -------------
 
 Phase I analysis with equality constraints:
-the first step minimizing ||Ax-b||^2 subject to the inequality constraints
+the first step minimizing ||Ax-b||² subject to the inequality constraints
 breaks off too soon with completely ridiculous results making the norm huge instead of
 small in the case where the constraintSet is the probability simplex.
 
@@ -374,10 +374,15 @@ and A'A is the matrix with all entries equal to one.
 
 The problem then becomes the following:
 
-Minimize (x1+x2+...+xn - 1)^2 subject to xj>=0.
+Minimize (x1+x2+...+xn - 1)² subject to xj>=0.
 
 Clearly the set of minimizers is the entire probability simplex.
 In this simple problem we can study the effects of ill conditioning and regularization.
+
+
+KKTSystem:
+we should implement a check if the iterative solution of the linearized KKTSystem
+solves the original nonlinear KKTSystem accurately and throw an exception if it does not.
 
 
 KKTSystem:
@@ -388,4 +393,32 @@ openblas:
 we still have the problem that A.t*A is not symmetric enough to pass the LAPACK test for
 symmetry. This is a problem with the prepackaged openblas.
 openblas needs to be compiled from source on this machine.
+
+
+#----------------------------------------------------------------------------------------
+2017-12-29:|
+-------------
+
+:_ConstraintSet_:
+Phase I analysis is not correct as implemented, since the termination criterion in case
+there are no equality constraints does not fit if we run into this case from a phase I
+analysis with equalities.
+
+Therefore these two cases must be separated cleanly in phase I analysis.
+There is no reason to move from one case to the other since both minimizations
+will produce strictly feasible points.
+Note that phase I analysis with equalities Ax=b minimizes ||Ax-b||^^2 subject to the
+inequalities and thus conducts a phase I analysis on these inequalities without
+equalities producing a strictly feasible point for these, if one exists.
+
+Done!
+
+
+#----------------------------------------------------------------------------------------
+2018-01-02:|
+-------------
+
+Debug an optimization problem on the probability simplex to see if phase I analysis
+still produces these idiotic feasible points for the inequalities x_j>=0 in the very first step.
+
 

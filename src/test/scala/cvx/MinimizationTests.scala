@@ -14,8 +14,8 @@ object MinimizationTests {
     * solution found by the solver, see [OptimizationSolution].
     */
   def runProblemsWithKnownMinimizer(
-                                     optProblems:List[OptimizationProblem with KnownMinimizer], tol:Double, debugLevel:Int
-                                   ):Unit = for(problem <- optProblems) try {
+    optProblems:List[OptimizationProblem with KnownMinimizer], tol:Double, debugLevel:Int
+  ):Unit = for(problem <- optProblems) try {
 
     print("\n\n#-----Problem: "+problem.id+":\n\n")
     Console.flush()
@@ -36,6 +36,9 @@ object MinimizationTests {
       problem.logger.close()
     }
   }
+  def runProblemWithKnownMinimizer(
+    optProblem:OptimizationProblem with KnownMinimizer, tol:Double, debugLevel:Int
+  ):Unit = runProblemsWithKnownMinimizer(List(optProblem),tol,debugLevel)
 
   /** Solve a list of Optimization problems where the solution may not be known
     * or is known to be infeasible.
@@ -43,8 +46,8 @@ object MinimizationTests {
     * @param tol tolerance for all sorts of things.
     */
   def runProblems(
-                   optProblems:List[OptimizationProblem], tol:Double, debugLevel:Int
-                 ):Unit = for(problem <- optProblems) try {
+    optProblems:List[OptimizationProblem], tol:Double, debugLevel:Int
+  ):Unit = for(problem <- optProblems) try {
 
     print("\n\n#-----Problem: "+problem.id+":\n\n")
 
@@ -62,6 +65,9 @@ object MinimizationTests {
       problem.logger.close()
     }
   }
+  def runProblem(
+    optProblem:OptimizationProblem, tol:Double, debugLevel:Int
+  ):Unit = runProblems(List(optProblem),tol,debugLevel)
 
   /** Run the two simple power problems [OptimizationProblems.powerProblems].
     */
@@ -80,8 +86,8 @@ object MinimizationTests {
     * @param tol tolerance for deviation from the known solution.
     */
   def testStandardProblems(
-                            dim:Int,condNumber:Double,pars:SolverParams,tol:Double,debugLevel:Int
-                          ):Unit = {
+    dim:Int,condNumber:Double,pars:SolverParams,tol:Double,debugLevel:Int
+  ):Unit = {
 
     val problems = SimpleOptimizationProblems.standardProblems(dim,condNumber,pars,debugLevel)
     runProblemsWithKnownMinimizer(problems,tol,debugLevel)

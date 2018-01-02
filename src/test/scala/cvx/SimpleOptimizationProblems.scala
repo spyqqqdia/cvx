@@ -369,8 +369,42 @@ object SimpleOptimizationProblems {
     problem.addSolution(minimizer)
   }
 
+  /** This is the problem of minimizing f(x)=(x_1+x_2+...+x_n - 1)^^2 over
+    * the positive orthant x_j>=0.
+    * This problem comes up in the phase I analysis of the probability simplex.
+    * We use it for debugging this very analysis.
+    * The minimizer is obviously not uniquely determined and the set of minimizers
+    * is exactly the probability simplex.
+    */
+  def probabilitySimplexProblem(n:Int, pars: SolverParams, debugLevel:Int):
+  OptimizationProblem with KnownMinimizer = {
 
+    val id = "Probability_simplex_problem"
+    if(debugLevel>0) {
+      println("\nAllocating problem " + id)
+      Console.flush()
+    }
+    val logFilePath = "logs/"+id+"_log.txt"
+    val logger = Logger(logFilePath)
 
+    val a = DenseVector.fill[Double](n)(1.0)
+    val P:DenseMatrix[Double] = a*a.t
+    // a'x = x_1+x_2+...+x_n, x'Px = (x_1+x_2+...+x_n)^^2
+    // f(x) = 0.5 - a'x + x'Px = 0.5*(x_1+x_2+...+x_n -1)^^2
+    val objF = QuadraticObjectiveFunction(n,0.5,-a,P)
+
+    val cnts = Constraints.allCoordinatesPositive(n)
+    // point where all constraints are defined
+    val x = DenseVector.fill[Double](n)(2.0)    // infeasible
+    val ineqs = ConstraintSet(n,cnts,x)
+
+    val problem = OptimizationProblem(id,objF,ineqs,None,pars,logger,debugLevel)
+
+    // the known optimal solution
+    val x_opt = DenseVector.fill[Double](n)(1.0/n)
+    val minimizer = KnownMinimizer(x_opt,objF)
+    problem.addSolution(minimizer)
+  }
 
 
 
@@ -405,10 +439,10 @@ object SimpleOptimizationProblems {
     val problem5 = rankOneProblemSimplex(dim,pars,debugLevel)
     val problem6 = rankOneProblemSphere(dim,pars,debugLevel)
     val problem7 = joptP1(dim,pars,debugLevel)
-    //val problem8 = joptP2(pars,debugLevel)
+    val problem8 = joptP2(pars,debugLevel)
     val problem9 = normSquaredWithFreeVariables(dim,pars,debugLevel)
     problem0 :: problem1 :: problem2 :: problem3 :: problem4 ::
-      problem5 :: problem6 :: problem7 :: problem9 :: theList
+      problem5 :: problem6 :: problem7 :: problem8 :: problem9 :: theList
   }
 
 

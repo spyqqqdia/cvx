@@ -168,7 +168,8 @@ object MatrixUtilsTests {
     val delta = 1e-15
     val debugLevel = 3
     val tolEqSolve = 1e-8
-    val u = MatrixUtils.solveWithPreconditioning(H,b,tolEqSolve,debugLevel)
+    val logger = Logger("logs/testSolveWithPreconditioning.txt")
+    val u = MatrixUtils.solveWithPreconditioning(H,b,logger,tolEqSolve,debugLevel)
 
     val errSol = norm(u-x)/norm(x)
     val errVal = norm(b-H*u)/norm(b)
@@ -232,19 +233,19 @@ object MatrixUtilsTests {
 
 
   /** We construct randomly some ill conditioned systems symmetric,
-    * positive definite systems Ax=b and solve them via SVD and symmetric
-    * eigendecomposition.
+    * positive definite systems Ax=b and solve them via SVD, symmetric
+    * eigendecomposition and Cholesky factorization.
     *
-    * Let A = UDV' denote the singular value decomposition of A,
-    * with D=diag(s_j) the diagonal matrix with the singular values s_j of A.
-    * The singular values of A are declining exponentially from 1.0 to 1/condNum.
-    * If dimKernel>0, the last (smallest) dimKernel singular values are set to zero.
+    * A is constructed as A = UDU' with D=diag(d_j) a diagonal matrix and U a matrix
+    * with orthogonal columns.
+    * The diagonal elements are declining exponentially from 1.0 to 1/condNum.
+    * If dimKernel>0, the last (smallest) dimKernel d_j are set to zero.
     *
     * Let u_j = col_j(U). Then a right hand side b with large components
     *           u_j'b = rand_unif(10,100)
     * in directions of the u_j corresponding to small (but nonzero)
-    * singular values s_j is constructed which has zero components in
-    * direction u_j if s_j=0.
+    * diagonal elements is constructed which has zero components in
+    * direction u_j if d_j=0.
     * This guarantees that the system Ax=b has an exact solution but is
     * very ill conditioned with right hand side for which this ill conditioning
     * is a problem.
@@ -258,18 +259,23 @@ object MatrixUtilsTests {
     * In that case we go into the regularization loop to try to get
     * within accepted tolerance.
     */
-  def testDiagonalizationSolve(
+  def testEquationSolve(
     nTests:Int, dim:Int, condNum:Double, dimKernel:Int, tolEqSolve:Double, debugLevel:Int
   ):Unit = {
 
-    val  startMsg = "\n\n\nDoing MatrixUtilsTests.testSvdSolve in dimension "+dim+":\n"
+    val logger = Logger("logs/testEquationSolve.txt")
+    val  startMsg = "\nDoing MatrixUtilsTests.testEquationSolve in dimension "+dim+
+       "\non symmetric, positive semidefinite system Ax=b with condition number "+condNum+":\n\n"
     println(startMsg); Console.flush()
-    val logger = Logger("logs/testDiagonalizationSolve.txt")
     logger.println(startMsg)
     var OK = true
     for(nT <- 1 to nTests){
 
-      logger.println("\n\nTest "+nT+":\n")
+      val header = "\n\n#-------------------- Test "+nT+" --------------------#\n"
+      if (debugLevel>0){
+        println(header); Console.flush()
+        logger.println(header)
+      }
       val U = MatrixUtils.randomOrthogonalMatrix(dim)
       val D = MatrixUtils.diagonalMatrix(dim,condNum,dimKernel)
       val d = diag(D)
@@ -288,8 +294,17 @@ object MatrixUtilsTests {
           OK = false
       }
       try{
-        logger.println("Solution via symSolve")
+        logger.println("\nSolution via symSolve")
         val  x = MatrixUtils.symSolve(A,b,logger,tolEqSolve,debugLevel)
+      } catch {
+
+        case e:Exception =>
+          logger.println("\nsymSolve:\n"+e.getMessage+"\n")
+          OK = false
+      }
+      try{
+        logger.println("\nSolution via Cholesky factorization")
+        val  x = MatrixUtils.solveWithPreconditioning(A,b,logger,tolEqSolve,debugLevel)
       } catch {
 
         case e:Exception =>
@@ -298,7 +313,7 @@ object MatrixUtilsTests {
       }
     }
     if(OK) println("Finished, all tests passed within tolerance.")
-    else println("Finished, some tests failed, see logs/logs/testSVDSolve.txt")
+    else println("Finished, some tests failed, see logs/logs/testEquationSolve.txt")
     Console.flush()
   }
 
@@ -354,7 +369,7 @@ object MatrixUtilsTests {
     testTriangularSolve(dim,10,reps,tol)
     val nTests = 3; val condNum = 1e12; val debugLevel = 3; val tolEqSolve=1e-4
     val dimKernel =  0
-    testDiagonalizationSolve(nTests,dim,condNum,dimKernel,tolEqSolve,debugLevel)
+    testEquationSolve(nTests,dim,condNum,dimKernel,tolEqSolve,debugLevel)
   }
 
   /** We allocate N nxn random matrices A with condition number condNum.
@@ -362,7 +377,7 @@ object MatrixUtilsTests {
     * the ratios condNum(equilibrated(A))/condNum to the file logs/condNumRatio.txt
     *
     * The purpose is to verify that Ruiz equilibration improves the condition
-    * nunmbers of ill conditioned matrices.
+    * numbers of ill conditioned matrices.
     */
   def testRandomMatrixCondNum(N:Int,n:Int,condNum:Double):Unit = {
 
@@ -386,4 +401,3 @@ object MatrixUtilsTests {
     println("\nFinished, results in logs/condNumRatio.txt.\n")
   }
 }
-

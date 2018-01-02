@@ -204,17 +204,117 @@ abstract class ConstraintSet(val dim:Int, val constraints:Seq[Constraint]) {
     * @param eqs optional equality constraint(s) in the form Ax=b.
     * @param pars solver parameters, see [SolverParams].
     */
-  private def phase_I_Solver(
-    eqs: Option[EqualityConstraint], pars:SolverParams, debugLevel:Int
+  private def phase_I_Solver_withEqs(
+    eqs: EqualityConstraint, pars:SolverParams, logger:Logger, debugLevel:Int
   ):BarrierSolver = {
 
-    val logFilePath = "logs/ConstraintSet_phase_I_log.txt"
-    val logger = Logger(logFilePath)
     val feasObjF = phase_I_ObjectiveFunction
-    val feasCnts = phase_I_Constraints(eqs,pars,logger,debugLevel)
+    val feasCnts = phase_I_Constraints(Some(eqs),pars,logger,debugLevel)
     // map the equalities to the dimension of the phase_I analysis:
-    val phase_I_eqs:Option[EqualityConstraint] = eqs.map(eq => eq.phase_I_EqualityConstraint)
-    BarrierSolver(feasObjF,feasCnts,phase_I_eqs,pars,logger)
+    val phase_I_eqs = eqs.phase_I_EqualityConstraint
+    BarrierSolver(feasObjF,feasCnts,Some(phase_I_eqs),pars,logger)
+  }
+
+  /** Barrier solver for phase I feasibility analysis according to basic algorithm,
+    *  [boyd], 11.4.1, p579.
+    *
+    * @param pars solver parameters, see [SolverParams].
+    */
+  private def phase_I_Solver_withoutEqs(
+    pars:SolverParams, logger:Logger, debugLevel:Int
+  ):BarrierSolver = {
+
+    val feasObjF = phase_I_ObjectiveFunction
+    val feasCnts = phase_I_Constraints(None,pars,logger,debugLevel)
+    BarrierSolver(feasObjF,feasCnts,None,pars,logger)
+  }
+
+
+  /** Minimizes ||Ax-b||^^2 subject to the inequality constraints, then
+    * investigates if the solution x0 satisfies Ax0=b.
+    *
+    * @param eqs optional equality constraint(s) in the form Ax=b.
+    * @param pars solver parameters, see [SolverParams].
+    */
+  def phase_I_Analysis_withEqs(
+    eqs: EqualityConstraint, pars:SolverParams, logger:Logger, debugLevel:Int
+  ): FeasibilityReport = {
+
+    if(debugLevel>0){
+
+      val msg = "ConstraintSet: doing phase_I_Analysis with equalities:"
+      println(msg); Console.flush()
+      logger.println(msg)
+    }
+    Console.flush()
+    val feasBS = phase_I_Solver_withEqs(eqs,pars,logger,debugLevel)
+    val sol = feasBS.solve(debugLevel)
+
+    val w_feas = sol.x                  // w = c(x,s)
+    val x_feas = w_feas(0 until dim)    // unclear how many constraints that satisfies, so we check
+    val s_feas = w_feas(dim)            // if s_feas < 0, all constraints are strictly satisfied.
+
+    // for the equality constraints use the stricter pars.tol not pars.tolEqSolve which is for
+    // the ill conditioned KKT systems
+    val eqError = eqs.errorAt(x_feas)
+    val isStrictlySatisfied = s_feas < 0.0 && eqError < pars.tol
+    val violatedCnts = constraints.filter(!_.isSatisfiedStrictly(x_feas))
+
+    val s = DenseVector[Double](1)
+    s(0)=s_feas
+    val report = FeasibilityReport(x_feas,s,isStrictlySatisfied,this,Some(eqError))
+
+    if(debugLevel>1){
+      val msg = report.toString(pars.tol)
+      logger.println(msg)
+      println(msg); Console.flush()
+    }
+    report
+  }
+
+
+  /** Phase I feasibility analysis according to basic algorithm, [boyd], 11.4.1, p579
+    *  using a BarrierSolver on the feasibility problem.
+    *
+    * @param pars solver parameters, see [SolverParams].
+    */
+  def phase_I_Analysis_withoutEqs(
+    pars:SolverParams, logger:Logger, debugLevel:Int
+  ): FeasibilityReport = {
+
+    if(debugLevel>0){
+
+      val msg = "ConstraintSet: doing phase_I_Analysis without equalities:"
+      println(msg); Console.flush()
+      logger.println(msg)
+    }
+    Console.flush()
+    val feasBS = phase_I_Solver_withoutEqs(pars,logger,debugLevel)
+
+    // terminate if objective function has been pushed below zero (then we are at a strictly
+    // feasible point already, or if the duality gap is small enough
+    val terminationCriterion = (os:OptimizationState) =>
+      (os.objectiveFunctionValue < 0 || os.dualityGap < pars.tol) && os.equalityGap < pars.tol
+    val sol = feasBS.solveSpecial(terminationCriterion,debugLevel)
+
+    val w_feas = sol.x                  // w = c(x,s)
+    val x_feas = w_feas(0 until dim)    // unclear how many constraints that satisfies, so we check
+    val s_feas = w_feas(dim)            // if s_feas < 0, all constraints are strictly satisfied.
+
+    val isStrictlySatisfied = s_feas < 0.0
+    val violatedCnts = constraints.filter(!_.isSatisfiedStrictly(x_feas))
+
+    val s = DenseVector[Double](1)
+    s(0)=s_feas
+    val eqError = 0.0
+    val report = FeasibilityReport(x_feas,s,isStrictlySatisfied,this,Some(eqError))
+
+    if(debugLevel>1){
+      val msg = report.toString(pars.tol)
+      logger.println(msg)
+      println(msg); Console.flush()
+    }
+    report
   }
 
 
@@ -231,42 +331,8 @@ abstract class ConstraintSet(val dim:Int, val constraints:Seq[Constraint]) {
     val logFilePath = "logs/ConstraintSet_phase_I_log.txt"
     val logger = Logger(logFilePath)
 
-    if(debugLevel>0){
-
-      val prefix = "ConstraintSet: doing phase_I_Analysis "
-      val msg = if(eqs.isEmpty) prefix + "without equalities:" else prefix + "with equalities:"
-      println(msg); Console.flush()
-      logger.println(msg)
-    }
-    Console.flush()
-    val feasBS = phase_I_Solver(eqs,pars,debugLevel)
-
-    // terminate if objective function has been pushed below zero (then we are at a strictly
-    // feasible point already, or if the duality gap is small enough
-    val terminationCriterion = (os:OptimizationState) =>
-      (os.objectiveFunctionValue < 0 || os.dualityGap < pars.tol) && os.equalityGap < pars.tol
-    val sol = feasBS.solveSpecial(terminationCriterion,debugLevel)
-
-    val w_feas = sol.x                  // w = c(x,s)
-    val x_feas = w_feas(0 until dim)    // unclear how many constraints that satisfies, so we check
-    val s_feas = w_feas(dim)            // if s_feas < 0, all constraints are strictly satisfied.
-
-    // for the equality constraints use the stricter pars.tol not pars.tolEqSolve which is for
-    // the ill conditioned KKT systems
-    val eqError = eqs.map(eqs => eqs.errorAt(x_feas))
-    val isStrictlySatisfied = s_feas < 0.0 && eqError.getOrElse(0.0) < pars.tol
-    val violatedCnts = constraints.filter(!_.isSatisfiedStrictly(x_feas))
-
-    val s = DenseVector[Double](1)
-    s(0)=s_feas
-    val report = FeasibilityReport(x_feas,s,isStrictlySatisfied,this,eqError)
-
-    if(debugLevel>1){
-      val msg = report.toString(pars.tol)
-      logger.println(msg)
-      println(msg); Console.flush()
-    }
-    report
+    if(eqs.isEmpty) phase_I_Analysis_withoutEqs(pars,logger,debugLevel)
+    else phase_I_Analysis_withEqs(eqs.get,pars,logger,debugLevel)
   }
 
 
@@ -279,11 +345,18 @@ abstract class ConstraintSet(val dim:Int, val constraints:Seq[Constraint]) {
     * @param pars solver parameters, see [SolverParams].
     */
   def phase_I_Analysis_by_reduction(
-    eqs:EqualityConstraint, pars:SolverParams,debugLevel:Int
+    eqs:EqualityConstraint, pars:SolverParams, debugLevel:Int
   ): FeasibilityReport = {
 
-    if(debugLevel>0) println("\nConstraintSet: doing phase_I_Analysis by reduction.")
-    Console.flush()
+    val logFilePath = "logs/ConstraintSet_phase_I_by_dimension_reduction_log.txt"
+    val logger = Logger(logFilePath)
+
+    if(debugLevel>0) {
+
+      val msg = "\nConstraintSet: doing phase_I_Analysis by reduction."
+      println(msg); Console.flush()
+      logger.println(msg)
+    }
 
     val n = dim
     val solEqs = eqs.solutionSpace
@@ -293,9 +366,8 @@ abstract class ConstraintSet(val dim:Int, val constraints:Seq[Constraint]) {
 
     val k=F.cols     // dimension of variable u in x=z0+Fu
 
-    val solverNoEqs = phase_I_Solver(Some(eqs),pars,debugLevel)
+    val solverNoEqs = phase_I_Solver_withoutEqs(pars,logger,debugLevel)
     // change variables x = z0+Fu
-    val logFilePath = "logs/ConstraintSet_phase_I_by_dimension_reduction_log.txt"
     val solver = BarrierSolver.reducedSolver(solverNoEqs,solEqs,Logger(logFilePath))
     val sol = solver.solve(debugLevel)
 

@@ -12,17 +12,17 @@ object Runner extends App {
 
     println("Doing test problems."); Console.flush()
 
-    val debugLevel=2
+    val debugLevel=1
 
-    val doAdHoc = false
+    val doAdHoc = true
 
-    val doTestMatrixUtils = true
+    val doTestMatrixUtils = false
     val doKktTests = false
 
     val doTestPowerProblems = false
-    val doTestStandardProblems = false
+    val doTestStandardProblems = true
     val doMinX1 = false
-    val doTestKlProblems = false
+    val doTestKlProblems = true
     val doTestInfeasibleKlProblems = false
     val doFeasibilityTests = false
 
@@ -33,7 +33,7 @@ object Runner extends App {
     val tolSolver = 1e-5        // tolerance for norm of gradient, duality gap
     val tolEqSolve = 1e-2       // tolerance in the solution of the KKT system
     val tolFeas = 1e-9          // tolerance in inequality and equality constraints
-    val delta = 1e-3            // regularization A -> A+delta*I if ill conditioned
+    val delta = 1e-7            // regularization A -> A+delta*I if ill conditioned
     val pars = SolverParams(maxIter,alpha,beta,tolSolver,tolEqSolve,tolFeas,delta)
 
     val tolSolution = 1e-2      // tolerance for solution identification
@@ -41,21 +41,17 @@ object Runner extends App {
 
     if(doAdHoc){
 
-      val dim = 24
-      val debugLevel=4
+      val dim = 200
+      val debugLevel=1
       //val problem = SimpleOptimizationProblems.normSquaredWithFreeVariables(dim,pars,debugLevel)
       val problem = SimpleOptimizationProblems.joptP2(pars,debugLevel)
+      //val problem = SimpleOptimizationProblems.probabilitySimplexProblem(dim,pars,debugLevel)
 
       if(false) {
         val a = DenseVector.fill[Double](dim)(1.0)
         val problem = SimpleOptimizationProblems.minDotProduct(a, pars, debugLevel)
       }
-
-      val sol = problem.solve(debugLevel)
-      val x = sol.x
-      val objFcnValue = problem.objectiveFunction.valueAt(x)
-      val tol = 1e-6
-      problem.reportWithKnownSolution(sol, objFcnValue, tol, problem.logger)
+      MinimizationTests.runProblemWithKnownMinimizer(problem,tolSolution,debugLevel)
 
       //MatrixUtilsTests.testRuizEquilibration
     }
@@ -64,14 +60,14 @@ object Runner extends App {
     if(doTestMatrixUtils){
 
       val dim = 100
-      val reps= 10
+      val dimKernel=0
+      val nTests= 10
       val tol = 1e-10
-      val condNum = 1e14
-      val debugLevel=4
-      //MatrixUtilsTests.runAll(dim,reps,tol)
+      val condNum = 1e12
+      //MatrixUtilsTests.runAll(dim,nTests,tol)
       //MatrixUtilsTests.testSignCombinationMatrices
       //MatrixUtilsTests.testRandomMatrixCondNum(500,100,condNum)
-      MatrixUtilsTests.testDiagonalizationSolve(nTests=5,dim,condNum,dimKernel=0,tol,debugLevel)
+      MatrixUtilsTests.testEquationSolve(nTests,dim,condNum,dimKernel,tolEqSolve,debugLevel)
     }
 
     if(doKktTests){

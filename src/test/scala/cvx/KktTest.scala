@@ -194,9 +194,9 @@ object KktTest {
     * @return true if both forward and backward error (relative, L2-norm) are less than tol, else false.
     */
   def testPositiveDefinite(
-     H:DenseMatrix[Double], A:DenseMatrix[Double],
-     x:DenseVector[Double], w:DenseVector[Double],
-     pars:SolverParams, logger:Logger, debugLevel:Int
+    H:DenseMatrix[Double], A:DenseMatrix[Double],
+    x:DenseVector[Double], w:DenseVector[Double],
+    pars:SolverParams, logger:Logger, debugLevel:Int
   ):Boolean = {
 
     val q = -(H*x+A.t*w)

@@ -406,6 +406,36 @@ object MatrixUtils {
     x
   }
 
+  /** Relative size ||a|| / ||b|| with provisions for the case b=0.
+    * Intended application: the relative error ||Ax-b|| / ||b|| when solving
+    * a system Ax=b.
+    * Here tol is the error tolerance.
+    */
+  def relativeSize(a:DenseVector[Double],b:DenseVector[Double],tol:Double):Double = {
+
+    val norm_b = norm(b)
+    val f = if(norm_b<tol) tol else tol+norm_b
+    norm(a)/f
+  }
+
+  /** Lower triangular Cholesky factor L in Q=LL' regularized as follows:
+    *   (a) if the Cholesky factorization of Q fails (since Q is singular) or
+    *   (b) if the smallest diagonal elements L_ii are less than 1e-7
+    * then Q is replaced with Q+delta*I, where delta=1e-10.
+    *
+    * @param Q: symmetric, positive semidefinite matrix
+    * @return Cholesky factor L in Q=LL'.
+    */
+  def regularizedCholesky(Q:DenseMatrix[Double]):DenseMatrix[Double] = {
+
+    val Qd = Q+DenseMatrix.eye[Double](Q.rows)*1e-10
+    // first stab at the Cholesky factor
+    val C = try { cholesky(Q) } catch { case e:Exception => cholesky(Qd) }
+
+    // if some of the diagonal elements are too small we regularize
+    val minD = min(diag(C))
+    if(minD>1e-7) C else cholesky(Qd)
+  }
 
   /** Solve Hx=b, where H is positive semi-definite without zero row using Cholesky factorization.
     *
@@ -416,7 +446,7 @@ object MatrixUtils {
     * @return solution vector x
     */
   def solveWithPreconditioning(
-      H:DenseMatrix[Double], b:DenseVector[Double], tol:Double, debugLevel:Int
+    H:DenseMatrix[Double], b:DenseVector[Double], logger:Logger, tol:Double, debugLevel:Int
   ): DenseVector[Double] = {
 
     val m = b.length
@@ -424,41 +454,47 @@ object MatrixUtils {
     assert(n==H.cols,"Matrix H not square: H.rows="+n+", H.cols="+H.cols)
     assert(m==n,"length(b) = "+m+" is not equal to H.rows="+H.rows)
 
+    if(debugLevel>1){
+
+      Console.print("\nMatrixUtils.solveWithPreconditioning: "); Console.flush()
+      logger.print("\nMatrixUtils.solveWithPreconditioning: ")
+    }
+
     // Ruiz equilibration changes H
     val M = H.copy
     val eqM = ruizEquilibrate(M)
     val d = eqM._1; val Q = eqM._2  // diag(d)*M*diag(d)
 
-    try {
+    val L = regularizedCholesky(Q)
 
-      val L = cholesky(Q)
-      // Set D=diag(d), rewrite Hx=b as HDu=b with x=Du, then multiply with D to obtain Qu=DHDu=Db,
-      // i.e. LL'u=Db, solve as Lw=Db, w=L'u. Finally get x=Du
-      val w = MatrixUtils.forwardSolve(L, d :* b)
-      val u = MatrixUtils.backSolve(L.t, w)
-      val x = d :* u // the solution
+    // Set D=diag(d), rewrite Hx=b as HDu=b with x=Du, then multiply with D to obtain Qu=DHDu=Db,
+    // i.e. LL'u=Db, solve as Lw=Db, w=L'u. Finally get x=Du
+    val w = MatrixUtils.forwardSolve(L, d :* b)
+    val u = MatrixUtils.backSolve(L.t, w)
+    val x = d :* u // the solution
 
-      // throw LinSolveException if the solution is not accurate to tolerance,
-      val err = norm(H * x - b)
-      val f = 1e-10+norm(b)
-      if (err > tol * f) {
+    // throw LinSolveException if the solution is not accurate to tolerance,
+    val relErr = relativeSize(H*x-b,b,tol)
+    val relErrRnd = MathUtils.round(relErr,d=5)
+    if (relErr > tol) {
 
-        val src = "MatrixUtils.solveWithPreconditioning: error exceeds tolerance: "
-        val problem = "||Hx-b||/||b|| = " + MathUtils.round(err/f,d=2)
-        val msg = src + problem
-        if (debugLevel > 1) {
-          println(msg); Console.flush()
-        }
-        throw LinSolveException(H, b, L, msg)
+      val src = "\nMatrixUtils.solveWithPreconditioning: "
+      val msg = "error exceeds tolerance: ||Hx-b||/||b|| = " + relErrRnd+"\n"
+      if (debugLevel > 1){
+
+        Console.print(msg); Console.flush()
+        logger.print(msg)
       }
-      x
+      throw LinSolveException(H, b, L, src+msg)
 
-    } catch {
+    } else if (debugLevel > 1) {
 
-        case e:Exception =>
-          val msg = "MatrixUtils.solveWithPreconditioning: Cholesky factorization of H failed.\n"
-          throw LinSolveException(H,b,null,msg)
-      }
+      val msg = "MatrixUtils.solveWithPreconditioning: solution successful: "+
+         "error ||Ax-b||/||b|| = " + relErrRnd + ".\n"
+      println(msg); Console.flush()
+      logger.println(msg)
+    }
+    x
   }
 
   /** Solves underdetermined systen Ax=b where A is an mxn matrix with m < n and full rank m,
@@ -500,29 +536,30 @@ object MatrixUtils {
   /** Returns a bad right hand side b for a symmetric,
     * positive definite system Ax=b.
     *
-    * Let A = UDV' denote the singular value decomposition of A,
-    * with D=diag(s_j) the diagonal matrix with the singular values s_j of A
-    * and  u_j = col_j(U).
+    * Let A = UDV' denote the diagonalization of A,
+    * with D=diag(d_j) a diagonal matrix and U,V matrices with orthognal columns
+    * u_j = col_j(U) and v_j=col_j(V).
+    * The d_j are usually the singular values (then d_j>=0) or eigenvalues of A.
     *
     * b will be constructed with large components
     *           u_j'b = rand_unif(10,100)
     * in directions of all the u_j corresponding to nonzero
-    * singular values s_j and zero components in direction of u_j if s_j=0.
+    * diagonal values d_j and zero components in direction of u_j if d_j=0.
     * This guarantees that the system Ax=b has an exact solution but
     * the right hand side b makes the solution challenging if the system is
     * ill conditioned.
     *
-    * @param s: vector of singular values of A.
+    * @param d: diagonal of D in the factorization A=UDU'.
     * @param U: vector of left singular vectors of A.
     */
-    def nastyRHS(s:DenseVector[Double],U:DenseMatrix[Double]):DenseVector[Double] = {
+  def nastyRHS(d:DenseVector[Double],U:DenseMatrix[Double]):DenseVector[Double] = {
 
-      val n = s.length
-      assert(U.rows == n && U.cols==n,"\nU.rows = "+U.rows+", U.cols = "+U.cols+" should both = "+n+"\n")
-      val  r = scala.util.Random
-      val w = DenseVector.tabulate[Double](U.rows)(j => if(s(j)>0) 1+2*r.nextDouble() else 0.0)
-      U*w
-    }
+    val n = d.length
+    assert(U.rows == n && U.cols==n,"\nU.rows = "+U.rows+", U.cols = "+U.cols+" should both = "+n+"\n")
+    val  r = scala.util.Random
+    val w = DenseVector.tabulate[Double](U.rows)(j => if(abs(d(j))>0) 1+2*r.nextDouble() else 0.0)
+    U*w
+  }
 
   /** Computes the vector x0 of minimal norm minimizing the distance ||Ax-b|| and throws an
     * UnsolvableSystemException if this distance exceeds the tolerance tol*f, where the factor
@@ -555,50 +592,51 @@ object MatrixUtils {
       {
         val prefix = "\ndiagonalizationSolve: incompatible dimensions in UDV'x=q:"
         val postfix = "\nbut: U is "+U.rows+"x"+U.cols+", D is "+d.length+"x"+d.length+
-                    ", V' is "+V.cols+"x"+V.rows+" and q.length="+b.length
+          ", V' is "+V.cols+"x"+V.rows+" and q.length="+b.length
         prefix+postfix
       }
     )
+    if(debugLevel>1){
+
+      val msg = "MatrixUtils.diagonalizationSolve: "
+      println(msg); Console.flush()
+      logger.print(msg)
+    }
     val n=U.rows
     val a = DenseVector.tabulate[Double](n)(j => if (abs(d(j)) > 0) U(::, j) dot b  else 0.0)
-    val b0 = U*a                // projection of b onto Im(A)
-    val minDist = norm(b-b0)    // min_x||Mx-q||
-    val f = 1e-10+norm(b)
-    if(minDist>tol*f) {
+    val b0 = U*a                // projection of b onto Im(A
+    val relDist = relativeSize(b-b0,b,tol)  // smallest possible relative error in Ax=b
+    if(relDist>tol) {
 
-      val r = MathUtils.round(minDist/f,d=2)
-      val msg = "\nMatrixUtils.diagonalizationSolve: min_x||Mx-q||/||q|| = "+r+" > tol = "+tol+".\n"
+      val r = MathUtils.round(relDist,d=5)
+      val msg = "\nMatrixUtils.diagonalizationSolve: min_x||Ax-b||/||b|| = "+r+" > tol = "+tol+".\n"
       throw UnsolvableSystemException(msg)
     }
-
     // now minDist<=tol and the system is solvable to within tolerance at least theoretically
     // but we may have numeric problems
     // first the straightforward solution in the form docs/svdSolve.pdf, eq(1)
     val z = DenseVector.tabulate[Double](n)(j => if (abs(d(j)) > 0) ((U(::, j) dot b) / d(j)) else 0.0)
     val w = V*z // the solution
-    var relError = norm(A * w - b)/f
+    val relError = relativeSize(A*w-b,b,tol)
     var optSol = w
 
-    if(debugLevel>0 && relError <= tol){
+    if(debugLevel>1 && relError <= tol){
 
-      val report = "MatrixUtils.diagonalizationSolve: solution successful:"+
-                   "error ||Ax-b||/||b|| = " + MathUtils.round(relError,d=2)
-      println(report); Console.flush()
-      logger.println(report)
+      val report = "solution successful: "+"error ||Ax-b||/||b|| = " + MathUtils.round(relError,d=5)
+      Console.print(report); Console.flush()
+      logger.print(report)
     }
 
     // if this error is too large we need to regularize the system
     if (relError > tol) {
 
-      if (debugLevel > 0) {
+      if (debugLevel > 1) {
 
-        val problem =
-          "\nMatrixUtils.diagonalizationSolve: error ||Ax-b||/||b|| = " + MathUtils.round(relError,d=2) + " > tol.\n"
-        val next = "Trying regularization.\n"
-        val msg = problem + next
-        println(msg)
-        Console.flush()
-        logger.println(msg)
+        val msg = "solution failed within tolerance "+tol+
+          ", error ||Ax-b||/||b|| = " + MathUtils.round(relError,d=2) + " > tol."+
+          "\nTrying regularization."
+        Console.print(msg); Console.flush()
+        logger.print(msg)
       }
       // try regularizations similar to docs/cvx_notes.pdf ??? with p=1
       val maxTries = 18
@@ -616,26 +654,36 @@ object MatrixUtils {
           if (abs(d(j)) > 0) rho*(U(::, j) dot b) else 0.0
         })
         val w = V*z // the solution
-        relError = norm(A * w - b) / f
+        val relError = relativeSize(A*w-b,b,tol)
         if(relError < minRelError){ minRelError = relError; optSol=w }
 
         // log what's going on
         if (debugLevel > 1) {
 
-          val msg = "delta = " + delta + ",\t\terror ||Ax-b||/||b|| = " + MathUtils.round(relError,d=2)
-          println(msg)
-          Console.flush()
+          val msg = "delta = " + delta + ",\t\terror ||Ax-b||/||b|| = " + MathUtils.round(relError,d=5)
           logger.println(msg)
         }
 
         curTry+=1
         delta*=10.0
       } // end while
+      val err = MathUtils.round(minRelError,d=5)
       if (relError > tol) {
 
-        val problem = "\nMatrixUtils.diagonalizationSolve: system not solvable within tolerance tol = "+tol+":\n"
-        val size = "error ||Ax-b||/||b|| = " + MathUtils.round(minRelError,d=2) + ".\n"
-        throw UnsolvableSystemException(problem + size)
+        val msg = "MatrixUtils.diagonalizationSolve: system not solvable within tolerance tol = "+tol+
+            ", error ||Ax-b||/||b|| = " + err + ".\n"
+
+        if (debugLevel > 1) {
+
+          println(msg); Console.flush()
+          logger.println(msg)
+        }
+        throw UnsolvableSystemException(msg)
+      }
+      if (debugLevel > 1) {
+
+        val msg = "MatrixUtils.diagonalizationSolve: error ||Ax-b||/||b|| = " + err + ".\n"
+        logger.println(msg)
       }
     }
     optSol
@@ -649,7 +697,7 @@ object MatrixUtils {
     logger:Logger, tol:Double, debugLevel:Int
   ) = {
 
-    if(debugLevel>0){
+    if(debugLevel>1){
 
       println("\nMatrixUtils.svdSolve:"); Console.flush()
       logger.println("\nMatrixUtils.svdSolve:")
@@ -671,7 +719,7 @@ object MatrixUtils {
     logger:Logger, tol:Double, debugLevel:Int
   ) = {
 
-    if(debugLevel>0){
+    if(debugLevel>1){
 
       println("\nMatrixUtils.symSolve:"); Console.flush()
       logger.println("\nMatrixUtils.symSolve:")
