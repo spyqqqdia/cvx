@@ -365,7 +365,7 @@ which is indeed unsolvable to any tolerance < 1.
 -------------
 
 Phase I analysis with equality constraints:
-the first step minimizing ||Ax-b||² subject to the inequality constraints
+the first step minimizing ||Ax-b||? subject to the inequality constraints
 breaks off too soon with completely ridiculous results making the norm huge instead of
 small in the case where the constraintSet is the probability simplex.
 
@@ -374,7 +374,7 @@ and A'A is the matrix with all entries equal to one.
 
 The problem then becomes the following:
 
-Minimize (x1+x2+...+xn - 1)² subject to xj>=0.
+Minimize (x1+x2+...+xn - 1)? subject to xj>=0.
 
 Clearly the set of minimizers is the entire probability simplex.
 In this simple problem we can study the effects of ill conditioning and regularization.
@@ -435,3 +435,8 @@ to push the relative error ||Ax-b||/||b|| below pars.toleqSolve.
 In OptimizationProblems implement a static method to apply an affine transform to a list
 of problems and rewrite known solutions into the new variable. We can then efficiently
 test affine transforms and the effect of ill conditioning on all our test problems.
+
+SimpleOptimizationProblems.distanceFromOrigin1
+does not reach the required accuracy in the value of the optimum (suboptimality greater than the duality gap).
+Do we need to check the accuracy of the solution of the linearized KKT equations in the original,
+nonlinear KKT equations (would have to be done in KKTSystem)?

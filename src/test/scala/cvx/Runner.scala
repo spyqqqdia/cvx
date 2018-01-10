@@ -27,9 +27,9 @@ object Runner extends App {
     val doFeasibilityTests = false
 
     // solver parameters
-    val maxIter = 200           // max number of Newton steps computed
-    val alpha = 0.05            // line search descent factor
-    val beta = 0.75             // line search backtrack factor
+    val maxIter = 500           // max number of Newton steps computed
+    val alpha = 0.07            // line search descent factor
+    val beta = 0.6              // line search backtrack factor
     val tolSolver = 1e-8        // tolerance for norm of gradient, duality gap
     val tolEqSolve = 1e-2       // tolerance in the solution of the KKT system
     val tolFeas = 1e-9          // tolerance in inequality and equality constraints
