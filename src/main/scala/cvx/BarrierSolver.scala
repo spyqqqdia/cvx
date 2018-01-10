@@ -23,7 +23,7 @@ abstract class BarrierSolver(
   val C:ConvexSet, val startingPoint:DenseVector[Double], val objF:ObjectiveFunction,
   val eqs:Option[EqualityConstraint], val pars:SolverParams, val logger:Logger
 )
-extends Solver {
+extends Solver { self =>
 
   //  check if the pieces fit together
   assert(C.dim==startingPoint.length,
@@ -181,6 +181,75 @@ extends Solver {
     val terminationCriterion = (os:OptimizationState) => os.dualityGap < pars.tol
     solveSpecial(terminationCriterion,debugLevel)
   }
+  /** Version of _this_ solver which operates on the variable u related to
+    * the original variable as x = z0+Fu.
+    * This solves the minimization problem under the additional constraint that
+    * x is of the form z0+Fu and operates on the variable u. Results are reported using
+    * the variable u not x.
+    *
+    * The intended application is to problems with equality constraints Ax=b, where the solution
+    * space of the equality constraints is parametrized as x=z0+Fu, u unconstrained.
+    *
+    * REMARK: affine transformation can induce catastrophic overhead via large numbers of
+    * big matrix multiplications if not handled correctly. In our approach this does not
+    * happen, since we transform the completed barrier function instead of transforming
+    * all summands in the barrier function and then summing up the transformed parts.
+    * Note for example that we do not need a method affineTransformed for the class
+    * ConstraintSet.
+    *
+    * @param u0 a vector satisfying x0 = z0+F*u0, where x0 is the startingPoint of _this_
+    *           solver.
+    *
+    */
+  def affineTransformed(
+    z0:DenseVector[Double], F:DenseMatrix[Double], u0:DenseVector[Double]
+  ): BarrierSolver = {
+
+    // pull the domain bs.C back to the u variable
+    val dim_u = F.cols
+    val x0 = startingPoint
+    assert(
+      norm(x0-(z0+F*u0))<pars.tolEqSolve,
+      "\nu0 does not map to x0 under the variable transform.\n"
+    )
+    val D = C.affineTransformed(z0,F,u0)
+    val transformedObjF = objF.affineTransformed(z0,F)
+    val transformedEqs = eqs.map(_.affineTransformed(z0,F))
+
+    new BarrierSolver(D,u0,transformedObjF,transformedEqs,pars,logger){
+
+      def numConstraints:Int = self.numConstraints
+      def barrierFunction(t:Double,u:DenseVector[Double]):Double = self.barrierFunction(t,z0+F*u)
+      def gradientBarrierFunction(t:Double,u:DenseVector[Double]):DenseVector[Double] =
+        F.t*self.gradientBarrierFunction(t,z0+F*u)
+      def hessianBarrierFunction(t:Double,u:DenseVector[Double]):DenseMatrix[Double] =
+        (F.t*self.hessianBarrierFunction(t,z0+F*u))*F
+    }
+  }
+  /** As [[affineTransformed(z0:DenseVector[Double],F:DenseMatrix[Double], u0:DenseVector[Double])]]
+    * with u0 computed as the solution of Fu=x0-z0 using the SVD of F.
+    */
+  def affineTransformed(z0:DenseVector[Double],F:DenseMatrix[Double]): BarrierSolver = {
+
+    val x0 = startingPoint
+    val debugLevel = 0
+    val u0 = MatrixUtils.svdSolve(F,x0-z0,logger,pars.tolEqSolve,debugLevel)
+    affineTransformed(z0,F,u0)
+  }
+
+  /** As As [[affineTransformed(z0:DenseVector[Double],F:DenseMatrix[Double], u0:DenseVector[Double])]]
+    * with z0,F,u0 computed by the solution space sol. This usually implies a dimension reduction
+    * in the independent variable ( x -> u ).
+    */
+  def reduced(sol:SolutionSpace): BarrierSolver = {
+
+    val z0 = sol.z0
+    val F  = sol.F
+    val x0 = startingPoint
+    val u0 = sol.parameter(x0)     // more efficient than MatrixUtils.svdSolve above.
+    affineTransformed(z0,F,u0)
+  }
+
 }
 
 
@@ -234,49 +303,6 @@ object BarrierSolver {
           val GGt = G * G.t
           sum + GGt / (d * d) + H / d
         })
-    }
-  }
-  /** Version of solver bs which operates on the dimension reduced variable u related to
-    * the original variable as x = z0+Fu.
-    * This solves the minimization problem of bs under the additional constraint that
-    * x is of the form z0+Fu and operates on the variable u. Results are reported using the variable x.
-    *
-    * The intended application is to problems with equality constraints Ax=b, where the solution
-    * spoace of the equality constraints is parametrized as x=z0+Fu, u unconstrained.
-    *
-    * @param sol solution space of Ax=b (then z0=sol.z0, F=sol.F).
-    */
-  def reducedSolver(bs:BarrierSolver, sol:SolutionSpace, logger:Logger): BarrierSolver = {
-
-    // pull the domain bs.C back to the u variable
-    val C = bs.C
-    val z0 = sol.z0
-    val F = sol.F
-    val dim_u = F.cols
-    val x0 = bs.startingPoint
-    val u0 = sol.parameter(x0)      // u0 with x0 = z0+F*u0
-
-    val D = new ConvexSet(dim_u) {
-
-      def isInSet(u:DenseVector[Double]):Boolean = C.isInSet(z0+F*u)
-      def samplePoint = Some(u0)
-    }
-
-    new BarrierSolver(D,u0,bs.objF,None,bs.pars,logger){
-
-      def numConstraints:Int = bs.numConstraints
-      def barrierFunction(t:Double,u:DenseVector[Double]):Double = bs.barrierFunction(t,z0+F*u)
-      def gradientBarrierFunction(t:Double,u:DenseVector[Double]):DenseVector[Double] =
-        F.t*bs.gradientBarrierFunction(t,z0+F*u)
-      def hessianBarrierFunction(t:Double,u:DenseVector[Double]):DenseMatrix[Double] =
-        (F.t*bs.hessianBarrierFunction(t,z0+F*u))*F
-
-      override def solveSpecial(terminationCriterion:(OptimizationState)=>Boolean,debugLevel:Int):Solution = {
-
-        // 'super': with new X { ... } we automatically extend X
-        val sol = super.solveSpecial(terminationCriterion,debugLevel)
-        Solution(z0+F*sol.x, sol.newtonDecrement, sol.dualityGap, 0, sol.normGrad, sol.iter, sol.maxedOut)
-      }
     }
   }
 }

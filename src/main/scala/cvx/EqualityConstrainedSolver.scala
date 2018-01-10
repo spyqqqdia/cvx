@@ -110,6 +110,30 @@ extends Solver {
     */
   def solveSpecial(terminationCriterion:(OptimizationState)=>Boolean, debugLevel:Int):Solution = solve(debugLevel)
 
+  /** The solver operating on the variable u related to the original variable x via the
+    * affine transform x = z0+Fu. This means that the underlying problem has been similarly
+    * transformed (objective function and constraints).
+    *
+    * This can be viewed as introducing and additional constraint that the solution x0 must
+    * be of the form x0 = z0+F*u0.
+    * Solution will be reported in the variable u not in x.
+    *
+    * @param u0 a vector satisfying this.startingPoint = z0 + F*u0.
+    */
+  override def affineTransformed(
+    z0: DenseVector[Double], F: DenseMatrix[Double], u0: DenseVector[Double]
+  ): EqualityConstrainedSolver = {
+
+    val x0 = startingPoint
+    assert(
+      norm(x0-(z0+F*u0))<pars.tolEqSolve,
+      "\nu0 does not map to starting point x0 under transform.\n"
+    )
+    val transformedObjF = objF.affineTransformed(z0,F)
+    val D = C.affineTransformed(z0,F,u0)
+    // rewrite the equality constraints Ax=b as A(z0+Fu)=b, i.e AFu=b-Az0
+    new EqualityConstrainedSolver(transformedObjF,D,u0,A*F,b-A*z0,pars,logger)
+  }
 }
 
 

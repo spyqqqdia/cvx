@@ -368,7 +368,7 @@ abstract class ConstraintSet(val dim:Int, val constraints:Seq[Constraint]) {
 
     val solverNoEqs = phase_I_Solver_withoutEqs(pars,logger,debugLevel)
     // change variables x = z0+Fu
-    val solver = BarrierSolver.reducedSolver(solverNoEqs,solEqs,Logger(logFilePath))
+    val solver = solverNoEqs.reduced(solEqs)
     val sol = solver.solve(debugLevel)
 
     val w_feas = sol.x             // w = c(u,s), dim(u)=m, s scalar

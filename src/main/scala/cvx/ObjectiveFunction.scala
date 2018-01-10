@@ -16,28 +16,21 @@ abstract class ObjectiveFunction(val dim:Int){
   def checkDim(x:DenseVector[Double]):Unit =
     assert(x.length==dim,"Dimension mismatch: x.length = "+x.length+", dim="+dim)
 
-  /** This objective function restricted to values of the original variable x of the form x=z+Fu
-    * now viewed as a constraint on the variable u in dimension dim-p, where p is the rank
-    * of F.
-    * F is assumed to be of full rank and this condition is not checked.
-    * The intended application is the case where the x=z+Fu are the solutions of
-    * equality constraints Ax=b.
+  /** The objective function h(u) = f(z+Fu), where f=f(x) is _this_ objective
+    * function. In short _this_ objective function under change of variables
+    * x = z + Fu.
     *
-    * In general this reduction will induce significant matrix multiplication overhead.
-    * Elimination of equality constraints Ax=b by reduction will only be used in special
-    * cases where this overhead can be avoided.
-    *
-    * @param z a vector of dimension dim-p (intended: special solution of Ax=b)
-    * @param F a nxp matrix (intended: p = number of equality constraints)
+    * @param F a nxp matrix
+    * @param z a vector of dimension F.rows
     */
-  def reduced(z:DenseVector[Double],F:DenseMatrix[Double]):ObjectiveFunction = {
+  def affineTransformed(z:DenseVector[Double],F:DenseMatrix[Double]):ObjectiveFunction = {
 
     val  rDim = dim-F.cols
     new ObjectiveFunction(rDim){
 
-      override def valueAt(u:DenseVector[Double]):Double = self.valueAt(z+F*u)
-      override def gradientAt(u:DenseVector[Double]):DenseVector[Double] = F.t*self.gradientAt(z+F*u)
-      override def hessianAt(u:DenseVector[Double]):DenseMatrix[Double] = (F.t*self.hessianAt(z+F*u))*F
+      override def valueAt(u:DenseVector[Double]) = self.valueAt(z+F*u)
+      override def gradientAt(u:DenseVector[Double]) = F.t*self.gradientAt(z+F*u)
+      override def hessianAt(u:DenseVector[Double]) = (F.t*self.hessianAt(z+F*u))*F
     }
   }
 }

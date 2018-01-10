@@ -415,10 +415,23 @@ Done!
 
 
 #----------------------------------------------------------------------------------------
-2018-01-02:|
+2018-01-08:|
 -------------
 
-Debug an optimization problem on the probability simplex to see if phase I analysis
-still produces these idiotic feasible points for the inequalities x_j>=0 in the very first step.
+Add a method to linearly distort a problem (linear change of coordinates).
+We can then experiment with ill conditioned distortion matrices.
+Method should live in Optimization problem.
+
+Done with affine transform!
 
 
+#----------------------------------------------------------------------------------------
+2018-01-09:|
+-------------
+
+Throw an exception if the ConstraintSet.phase_I_Analysis with equalities is not able
+to push the relative error ||Ax-b||/||b|| below pars.toleqSolve.
+
+In OptimizationProblems implement a static method to apply an affine transform to a list
+of problems and rewrite known solutions into the new variable. We can then efficiently
+test affine transforms and the effect of ill conditioning on all our test problems.

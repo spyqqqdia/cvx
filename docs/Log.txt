@@ -489,6 +489,69 @@ All SimpleOptimizationProblems.standardProblems and the distKL problems run to
 completion.
 
 
+#----------------------------------------------------------------------------------------
+2018-01-03:|
+-------------
+
+MatrixUtils:
+added function hsNorm, some reformatting of output.
+Fixed bug in svdSolve: breeze SVD is A=UDV _not_ A=UDV' as usual!!
+MatrixUtilsTests: added diagonalizationTest
+
+Files affected:
+MatrixUtils
+MatrixUtilsTests
+
+
+#----------------------------------------------------------------------------------------
+2018-01-08:|
+-------------
+
+SimpleOptimizationProblems:
+added problem distanceFromOrigin1
+
+Status: runs successfully
+
+Files affected:
+SimpleOptimizationProblems
+Runner
+
+
+#----------------------------------------------------------------------------------------
+2018-01-09:|
+-------------
+
+Method to apply affine transformation x -> u via x=z0+Fu renamed
+from "reduced" to "affineTransformed" and systematically implemented for
+all players (see files below).
+
+May actually not be needed for the Constraints, it is not implemented for
+ConstraintSet, see the remark in the documentation of the method
+BarrierSolver.affineTransformed.
+
+Files affected:
+
+BarrierSolver
+ConvexSet
+Constraint
+ConstraintSet
+EqualityConstraint
+EqualityConstrainedSolver
+LinearConstraint
+ObjectiveFunction
+OptimizationProblem
+QuadraticConstraint
+Solver
+UnconstrainedSolver
+
+
+Status: compiles, affine transform on problems not tested.
+
+
+
+
+
+
 
 
 

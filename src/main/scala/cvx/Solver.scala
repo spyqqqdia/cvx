@@ -22,6 +22,8 @@ trait Solver {
   def startingPoint: DenseVector[Double]
   def dim = startingPoint.length
 
+  def pars:SolverParams
+
   /** @return Solution object (minimizer with additional info based on standard termination criterion.
     */
   def solve(debugLevel: Int = 0): Solution
@@ -29,5 +31,16 @@ trait Solver {
   /** @return Solution object (minimizer with additional info.
     */
   def solveSpecial(terminationCriterion: (OptimizationState) => Boolean, debugLevel: Int = 0): Solution
-}
 
+  /** The solver operating on the variable u related to the original variable x via the
+    * affine transform x = z0+Fu. This means that the underlying problem has been similarly
+    * transformed (objective function and constraints).
+    *
+    * This can be viewed as introducing and additional constraint that the solution x0 must
+    * be of the form x0 = z0+F*u0.
+    * Solution will be reported in the variable u not in x.
+    *
+    * @param u0 a vector satisfying this.startingPoint = z0 + F*u0.
+    */
+  def affineTransformed(z0:DenseVector[Double],F:DenseMatrix[Double],u0:DenseVector[Double]):Solver
+}

@@ -27,21 +27,14 @@ abstract class Constraint(val id:String, val dim:Int, val ub:Double){
   def margin(x:DenseVector[Double]):Double = ub-valueAt(x)
 
 
-  /** This constraint restricted to values of the original variable x of the form x=z+Fu
-    * now viewed as a constraint on the variable u in dimension dim-p, where p is the rank
-    * of F.
-    * F is assumed to be of full rank and this condition is not checked.
-    * The intended application is the case where the x=z+Fu are the solutions of
-    * equality constraints Ax=b.
-    *
-    * In general this reduction will induce catastrophic matrix multiplication overhead.
-    * Elimination of equality constraints Ax=b by reduction will only be used in special
-    * cases where this overhead can be avoided.
+  /** The constraint k(u) = g(z+Fu) <= ub, where g(x) <= ub is _this_ constraint.
+    * In other words: _this_ constraint under an affine change of variables
+    * x = z+Fu.
     *
     * @param z a vector of dimension dim-p (intended: special solution of Ax=b)
     * @param F a nxp matrix (intended: p = number of equality constraints)
     */
-  def reduced(z:DenseVector[Double],F:DenseMatrix[Double]):Constraint = {
+  def affineTransformed(z:DenseVector[Double],F:DenseMatrix[Double]):Constraint = {
 
     val reducedDim = dim-F.cols
     val reducedID = id+"_reduced"
@@ -160,20 +153,4 @@ object Constraint {
     cnts_SOI:::sPositive
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

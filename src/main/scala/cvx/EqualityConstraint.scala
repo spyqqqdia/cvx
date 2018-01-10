@@ -64,6 +64,11 @@ class EqualityConstraint(val A:DenseMatrix[Double], val b:DenseVector[Double]){
     MatrixUtils.print(b,logger,digits)
   }
 
+  /** The equality constraint Ax=b under change of variables x=z0+Fu.
+    * This is then rewritten as A(z0+Fu)=b, i.e. (AF)u=b-Az0.
+    */
+  def affineTransformed(z0:DenseVector[Double],F:DenseMatrix[Double]):EqualityConstraint =
+    EqualityConstraint(A*F,b-A*z0)
 }
 
 

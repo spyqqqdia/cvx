@@ -12,7 +12,7 @@ object Runner extends App {
 
     println("Doing test problems."); Console.flush()
 
-    val debugLevel=1
+    val debugLevel=2
 
     val doAdHoc = true
 
@@ -20,9 +20,9 @@ object Runner extends App {
     val doKktTests = false
 
     val doTestPowerProblems = false
-    val doTestStandardProblems = true
+    val doTestStandardProblems = false
     val doMinX1 = false
-    val doTestKlProblems = true
+    val doTestKlProblems = false
     val doTestInfeasibleKlProblems = false
     val doFeasibilityTests = false
 
@@ -30,7 +30,7 @@ object Runner extends App {
     val maxIter = 200           // max number of Newton steps computed
     val alpha = 0.05            // line search descent factor
     val beta = 0.75             // line search backtrack factor
-    val tolSolver = 1e-5        // tolerance for norm of gradient, duality gap
+    val tolSolver = 1e-8        // tolerance for norm of gradient, duality gap
     val tolEqSolve = 1e-2       // tolerance in the solution of the KKT system
     val tolFeas = 1e-9          // tolerance in inequality and equality constraints
     val delta = 1e-7            // regularization A -> A+delta*I if ill conditioned
@@ -44,8 +44,9 @@ object Runner extends App {
       val dim = 200
       val debugLevel=1
       //val problem = SimpleOptimizationProblems.normSquaredWithFreeVariables(dim,pars,debugLevel)
-      val problem = SimpleOptimizationProblems.joptP2(pars,debugLevel)
+      //val problem = SimpleOptimizationProblems.joptP2(pars,debugLevel)
       //val problem = SimpleOptimizationProblems.probabilitySimplexProblem(dim,pars,debugLevel)
+      val problem = SimpleOptimizationProblems.distanceFromOrigin1(dim,pars,debugLevel)
 
       if(false) {
         val a = DenseVector.fill[Double](dim)(1.0)
@@ -63,11 +64,12 @@ object Runner extends App {
       val dimKernel=0
       val nTests= 10
       val tol = 1e-10
-      val condNum = 1e12
+      val condNum = 1e14
       //MatrixUtilsTests.runAll(dim,nTests,tol)
       //MatrixUtilsTests.testSignCombinationMatrices
       //MatrixUtilsTests.testRandomMatrixCondNum(500,100,condNum)
       MatrixUtilsTests.testEquationSolve(nTests,dim,condNum,dimKernel,tolEqSolve,debugLevel)
+      //MatrixUtilsTests.diagonalizationTest(nTests,dim,condNum)
     }
 
     if(doKktTests){

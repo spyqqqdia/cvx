@@ -30,13 +30,30 @@ abstract class ConvexSet(val dim:Int) {
     * */
   def cross_R = new ConvexSet(self.dim+1){
 
-    override def isInSet(x:DenseVector[Double]):Boolean = self.isInSet(x(0 until self.dim))
+    override def isInSet(x:DenseVector[Double]) = self.isInSet(x(0 until self.dim))
     override def samplePoint:Option[DenseVector[Double]] = self.samplePoint match {
 
       case Some(x) => Some( DenseVector.tabulate[Double](1+self.dim){i => if(i<self.dim) x(i) else Double.MaxValue } )
       case _ => None
     }
+  }
 
+  /** _This_ convex set pulled back to the variable u under the affine transform
+    * x = z0+Fu. In other words the convex set
+    * D = {u : z0+Fu\in C }, where C is _this_ convex set.
+    *
+    * @param u0: a vector satisfying this.samplePoint = z0+F*u0.
+    */
+  def affineTransformed(
+    z0:DenseVector[Double],F:DenseMatrix[Double],u0:DenseVector[Double]
+  ):ConvexSet = {
+
+    val dim_u = F.cols
+    new ConvexSet(dim_u) {
+
+      def isInSet(u:DenseVector[Double]):Boolean = self.isInSet(z0+F*u)
+      def samplePoint = Some(u0)
+    }
   }
 }
 
@@ -49,7 +66,7 @@ object ConvexSet {
     assert(C.isInSet(x))
     new ConvexSet(C.dim) {
 
-      def isInSet(u:DenseVector[Double]):Boolean = C.isInSet(u)
+      def isInSet(u:DenseVector[Double]) = C.isInSet(u)
       def samplePoint = Some(x)
     }
   }

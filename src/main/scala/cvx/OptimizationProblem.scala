@@ -14,7 +14,8 @@ import breeze.linalg.{DenseVector, _}
 class OptimizationProblem(
   val id:String, val objectiveFunction: ObjectiveFunction, val solver:Solver,
   val logger:Logger
-) {
+){
+  self =>
 
   def solve(debugLevel:Int=0):Solution = solver.solve(debugLevel)
 
@@ -22,12 +23,12 @@ class OptimizationProblem(
     * For testing purposes.
     */
   def addSolution(optSol:KnownMinimizer): OptimizationProblem with KnownMinimizer  =
-  new OptimizationProblem(id,objectiveFunction,solver,logger) with KnownMinimizer {
+    new OptimizationProblem(id,objectiveFunction,solver,logger) with KnownMinimizer {
 
-    override def theMinimizer: DenseVector[Double] = optSol.theMinimizer
-    def isMinimizer(x:DenseVector[Double],tol:Double) = optSol.isMinimizer(x,tol)
-    def minimumValue = optSol.minimumValue
-  }
+      override def theMinimizer: DenseVector[Double] = optSol.theMinimizer
+      def isMinimizer(x:DenseVector[Double],tol:Double) = optSol.isMinimizer(x,tol)
+      def minimumValue = optSol.minimumValue
+    }
 
   /** Add the known solutions to the minimization problem. List must contain
     * all solutions. For testing purposes.
@@ -36,7 +37,7 @@ class OptimizationProblem(
     new OptimizationProblem(id,objectiveFunction,solver,logger) with KnownMinimizer {
 
       assert(sols.nonEmpty,"\naddSolutions: no solutions provided.\n")
-      override def theMinimizer: DenseVector[Double] = sols(0)
+      override def theMinimizer: DenseVector[Double] = sols.head
       def isMinimizer(x:DenseVector[Double],tol:Double) = min(sols.map(sol => norm(x-sol))) < tol
       def minimumValue = min(sols.map(sol => objectiveFunction.valueAt(sol)))
     }
@@ -65,6 +66,33 @@ class OptimizationProblem(
     logger.println(msg)
     logger.close()
   }
+
+  /** The optimization problem under change of variables x = z0 + Fu, where x is
+    * the original independent variable.
+    * WARNING: solution will be reported in the variable u not the original variable x.
+    *
+    * @param u0 a vector satisfying this.solver.startingPoint = z0+F*u0.
+    *
+    * @return the problem of minimizing k(u)=f(z+Fu) under constraints
+    *         h_j(u)=g_j(z+Fu) <= ub_j,
+    * where the original problem (_this_) was the minimization of f(x) under constraints
+    * g_j(x)<=ub_j. If the original problem had equality constraints of the form Ax=b
+    * they will also be transformed accordingly.
+    */
+  def affineTransformed(
+    z0:DenseVector[Double],F:DenseMatrix[Double], u0:DenseVector[Double]
+  ):OptimizationProblem = {
+
+    val x0 = solver.startingPoint
+    assert(
+      norm(x0-(z0+F*u0))<solver.pars.tolEqSolve,
+      "\nu0 does not map to the starting point x0.\n"
+    )
+    val transformedObjectiveFunction = objectiveFunction.affineTransformed(z0,F)
+    val transformedSolver = solver.affineTransformed(z0,F,u0)
+    val id = self.id+"_affineTransformed"
+    new OptimizationProblem(id,transformedObjectiveFunction,transformedSolver,logger)
+  }
 }
 
 /** Factory functions to allocate problems and select the solver to use.
@@ -72,8 +100,8 @@ class OptimizationProblem(
 object OptimizationProblem {
 
 
-  /** Allocates an optimization problem constrained only by $x\in C$, where C is an open convex set
-    * known to contain a minimizer (typically the full Euclidean space).
+  /** Allocates an optimization problem constrained only by $x\in C$, where C is an
+    * open convex set known to contain a minimizer (typically the full Euclidean space).
     *
     * @param id ID for problem
     * @param objF objective function
@@ -82,13 +110,13 @@ object OptimizationProblem {
     * and starting the iteration at C.samplePoint.
     */
   def apply(
-              id:String,
-              objF:ObjectiveFunction,
-              startingPoint:DenseVector[Double],
-              C: ConvexSet,
-              pars:SolverParams,
-              logger:Logger
-  ): OptimizationProblem = {
+             id:String,
+             objF:ObjectiveFunction,
+             startingPoint:DenseVector[Double],
+             C: ConvexSet,
+             pars:SolverParams,
+             logger:Logger
+           ): OptimizationProblem = {
 
     assert(objF.dim == C.dim,
       "Dimension mismatch objF.dim = "+objF.dim+", C.dim = "+C.dim+"\n"
@@ -110,14 +138,14 @@ object OptimizationProblem {
     * and starting the iteration at ineqs.feasiblePoint.
     */
   def apply(
-              id:String,
-              objF:ObjectiveFunction,
-              ineqs: ConstraintSet,
-              eqs:Option[EqualityConstraint],
-              pars:SolverParams,
-              logger:Logger,
-              debugLevel:Int=0
-  ): OptimizationProblem = {
+             id:String,
+             objF:ObjectiveFunction,
+             ineqs: ConstraintSet,
+             eqs:Option[EqualityConstraint],
+             pars:SolverParams,
+             logger:Logger,
+             debugLevel:Int
+           ): OptimizationProblem = {
 
     assert(objF.dim==ineqs.dim,"\n\nobjF.dim = "+objF.dim+", ineqs.dim = "+ineqs.dim+"\n")
     eqs.map(eqCnt => assert(eqCnt.dim==objF.dim,"\n\neqCnt.dim = "+eqCnt.dim+", objF.dim = "+objF.dim+"\n"))
@@ -127,5 +155,3 @@ object OptimizationProblem {
 
 
 }
-
-

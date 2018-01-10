@@ -4,6 +4,8 @@ import breeze.linalg.{DenseMatrix, DenseVector, rand}
 import breeze.numerics.{abs, sqrt}
 import cvx.OptimizationProblems.{normSquared, randomPowerProblem}
 
+import scala.collection.mutable.ListBuffer
+
 /**
   * Created by oar on 14.12.17.
   */
@@ -406,6 +408,59 @@ object SimpleOptimizationProblems {
     problem.addSolution(minimizer)
   }
 
+
+  /** A problem in R^^{n+1} with known solution x=e_{n+1} (where {e_j} denotes the
+    * standard basis as usual).
+    *
+    * Clearly f(x)=||x||^^2 assumes its minimum on ||x-2e_{n+1}||^^2 at the point
+    * x0 = e_{n+1} (closest point to the origin). We then add some linear constraints
+    * a dot x >= 1 through the point x0 (condition a_{n+1}=1). We do this for all
+    * a = +-e_j+e_{n+1}.
+    */
+  def distanceFromOrigin1(n:Int, pars: SolverParams, debugLevel:Int):
+  OptimizationProblem with KnownMinimizer = {
+
+    val id = "DistanceFromOrigin_1"
+    if(debugLevel>0) {
+      println("\nAllocating problem " + id)
+      Console.flush()
+    }
+    val logFilePath = "logs/"+id+"_log.txt"
+    val logger = Logger(logFilePath)
+
+    val e_np1 = DenseVector.zeros[Double](n+1); e_np1(n) = 1.0     //e_{n+1}
+
+    // constraint 0.5*||x-a||^^2 >= 0.5*r^^2 with a=e_{n+1}, rewrite as
+    // -0.5*xIx'+a'x-0.5*||a||^^2 <= -0.5*r^^2
+    val I = DenseMatrix.eye[Double](n+1)
+    val qc = QuadraticConstraint("Spherical constraint",n+1,-0.5,-0.5,e_np1,-I)
+
+    val clb = ListBuffer[Constraint](qc)
+    // now add all constraints a.x>=1, a=(+-e_j+e_{n+1})
+    for(j <- 0 until n){
+
+      val e_j = DenseVector.zeros[Double](n+1); e_j(j)=1.0
+      val id_j = "a.x>=1, where a = e_j+e_{n+1}"
+      val a:DenseVector[Double] = e_j+e_np1
+      val lc1_j = LinearConstraint(id_j,n+1,-1.0,0.0,a)
+      clb += lc1_j
+      val b:DenseVector[Double] = (-e_j)+e_np1
+      val lc2_j = LinearConstraint(id_j,n+1,-1.0,0.0,a)
+      clb += lc2_j
+    }
+    val cnts = clb.toList
+    // point where all constraints are defined
+    val x = DenseVector.fill[Double](n+1)(-1.0)    // infeasible
+    val ineqs = ConstraintSet(n+1,cnts,x)
+
+    val objF = ObjectiveFunctions.normSquared(n+1)
+    val problem = OptimizationProblem(id,objF,ineqs,None,pars,logger,debugLevel)
+
+    // the known optimal solution
+    val x_opt = e_np1
+    val minimizer = KnownMinimizer(x_opt,objF)
+    problem.addSolution(minimizer)
+  }
 
 
   /** @return list of OptimizationProblems in dimension dim with known solution as follows:

@@ -25,9 +25,9 @@ class QuadraticConstraint(
   }
   checkSymmetric(P,1e-13)
 
-  def valueAt(x:DenseVector[Double]):Double = { checkDim(x); r + (a dot x) + (x dot (P*x))/2 }
-  def gradientAt(x:DenseVector[Double]):DenseVector[Double] = { checkDim(x); a+P*x }
-  def hessianAt(x:DenseVector[Double]):DenseMatrix[Double] = { checkDim(x); P }
+  def valueAt(x:DenseVector[Double]) = { checkDim(x); r + (a dot x) + (x dot (P*x))/2 }
+  def gradientAt(x:DenseVector[Double]) = { checkDim(x); a+P*x }
+  def hessianAt(x:DenseVector[Double]) = { checkDim(x); P }
 
   /** This constraint restricted to values of the original variable x of the form x=z+Fu
     * now viewed as a constraint on the variable u in dimension dim-p, where p is the rank
@@ -41,7 +41,7 @@ class QuadraticConstraint(
     * @param z a vector of dimension dim-p (intended: special solution of Ax=b)
     * @param F a nxp matrix (intended: p = number of equality constraints)
     */
-  override def reduced(z:DenseVector[Double], F:DenseMatrix[Double]):QuadraticConstraint = {
+  override def affineTransformed(z:DenseVector[Double], F:DenseMatrix[Double]) = {
 
     val rID = id + "_reduced"
     val rDim = dim - F.cols
