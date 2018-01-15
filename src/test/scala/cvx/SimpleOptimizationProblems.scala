@@ -408,14 +408,52 @@ object SimpleOptimizationProblems {
     problem.addSolution(minimizer)
   }
 
+  /** A problem in R^^{n+1} with known solution x=e_{n+1} (where {e_j} denotes the
+    * standard basis as usual):
+    *           min f(x)=||x||^^2  on ||x-2e_{n+1}||^^2 <= 1.
+    */
+  def distanceFromOrigin0(n:Int, pars: SolverParams, debugLevel:Int):
+  OptimizationProblem with KnownMinimizer = {
+
+    val id = "DistanceFromOrigin_1"
+    if(debugLevel>0) {
+      println("\nAllocating problem " + id)
+      Console.flush()
+    }
+    val logFilePath = "logs/"+id+"_log.txt"
+    val logger = Logger(logFilePath)
+
+    val e_np1 = DenseVector.zeros[Double](n+1); e_np1(n) = 1.0     //e_{n+1}
+
+    // constraint 0.5*||x-a||^^2 <= 0.5 with a=2e_{n+1}, rewrite as
+    // 0.5*xIx'-a'x+3/2 <= 0
+    val I = DenseMatrix.eye[Double](n+1)
+    val qc = QuadraticConstraint("Spherical constraint",n+1,0.0,1.5,-e_np1*2.0,I)
+
+    val cnts = List[Constraint](qc)
+
+    // point where all constraints are defined
+    val x0 = DenseVector.fill[Double](n+1)(0.0)    // infeasible
+    val ineqs = ConstraintSet(n+1,cnts,x0)
+
+    val objF = ObjectiveFunctions.normSquared(n+1)
+    val problem = OptimizationProblem(id,objF,ineqs,None,pars,logger,debugLevel)
+
+    // the known optimal solution
+    val x_opt = e_np1
+    val minimizer = KnownMinimizer(x_opt,objF)
+    problem.addSolution(minimizer)
+  }
+
 
   /** A problem in R^^{n+1} with known solution x=e_{n+1} (where {e_j} denotes the
     * standard basis as usual).
+    *    min f(x)=||x||^^2  subject to ||x-2e_{n+1}|| <= 1 and
+    *    x_j+x_{n+1} >= 1, -x_j+x_{n+1} >= 1, j=1,2,...,n.
     *
-    * Clearly f(x)=||x||^^2 assumes its minimum on ||x-2e_{n+1}||^^2 at the point
-    * x0 = e_{n+1} (closest point to the origin). We then add some linear constraints
-    * a dot x >= 1 through the point x0 (condition a_{n+1}=1). We do this for all
-    * a = +-e_j+e_{n+1}.
+    * Note that the linear constraints are of the form a_j'x >= 1 with
+    * a_j = +-e_j+e_{n+1}. I.e. we are slicing off pieces of the the ball
+    * ||x-2e_{n+1}|| <= 1 at the bottom near the solution x = e_{n+1}.
     */
   def distanceFromOrigin1(n:Int, pars: SolverParams, debugLevel:Int):
   OptimizationProblem with KnownMinimizer = {
@@ -430,10 +468,10 @@ object SimpleOptimizationProblems {
 
     val e_np1 = DenseVector.zeros[Double](n+1); e_np1(n) = 1.0     //e_{n+1}
 
-    // constraint 0.5*||x-a||^^2 >= 0.5*r^^2 with a=e_{n+1}, rewrite as
-    // -0.5*xIx'+a'x-0.5*||a||^^2 <= -0.5*r^^2
+    // constraint 0.5*||x-a||^^2 <= 0.5 with a=2e_{n+1}, rewrite as
+    // 0.5*xIx'-a'x+3/2 <= 0
     val I = DenseMatrix.eye[Double](n+1)
-    val qc = QuadraticConstraint("Spherical constraint",n+1,-0.5,-0.5,e_np1,-I)
+    val qc = QuadraticConstraint("Spherical constraint",n+1,0.0,1.5,-e_np1*2.0,I)
 
     val clb = ListBuffer[Constraint](qc)
     // now add all constraints a.x>=1, a=(+-e_j+e_{n+1})
@@ -442,16 +480,16 @@ object SimpleOptimizationProblems {
       val e_j = DenseVector.zeros[Double](n+1); e_j(j)=1.0
       val id_j = "a.x>=1, where a = e_j+e_{n+1}"
       val a:DenseVector[Double] = e_j+e_np1
-      val lc1_j = LinearConstraint(id_j,n+1,-1.0,0.0,a)
+      val lc1_j = LinearConstraint(id_j,n+1,-1.0,0.0,-a)
       clb += lc1_j
       val b:DenseVector[Double] = (-e_j)+e_np1
-      val lc2_j = LinearConstraint(id_j,n+1,-1.0,0.0,a)
+      val lc2_j = LinearConstraint(id_j,n+1,-1.0,0.0,-a)
       clb += lc2_j
     }
     val cnts = clb.toList
     // point where all constraints are defined
-    val x = DenseVector.fill[Double](n+1)(-1.0)    // infeasible
-    val ineqs = ConstraintSet(n+1,cnts,x)
+    val x0 = DenseVector.fill[Double](n+1)(0.0)    // infeasible
+    val ineqs = ConstraintSet(n+1,cnts,x0)
 
     val objF = ObjectiveFunctions.normSquared(n+1)
     val problem = OptimizationProblem(id,objF,ineqs,None,pars,logger,debugLevel)

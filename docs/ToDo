@@ -365,7 +365,7 @@ which is indeed unsolvable to any tolerance < 1.
 -------------
 
 Phase I analysis with equality constraints:
-the first step minimizing ||Ax-b||? subject to the inequality constraints
+the first step minimizing ||Ax-b||?? subject to the inequality constraints
 breaks off too soon with completely ridiculous results making the norm huge instead of
 small in the case where the constraintSet is the probability simplex.
 
@@ -374,7 +374,7 @@ and A'A is the matrix with all entries equal to one.
 
 The problem then becomes the following:
 
-Minimize (x1+x2+...+xn - 1)? subject to xj>=0.
+Minimize (x1+x2+...+xn - 1)?? subject to xj>=0.
 
 Clearly the set of minimizers is the entire probability simplex.
 In this simple problem we can study the effects of ill conditioning and regularization.
@@ -436,7 +436,56 @@ In OptimizationProblems implement a static method to apply an affine transform t
 of problems and rewrite known solutions into the new variable. We can then efficiently
 test affine transforms and the effect of ill conditioning on all our test problems.
 
+
+
+#----------------------------------------------------------------------------------------
+2018-01-10:|
+-------------
+
 SimpleOptimizationProblems.distanceFromOrigin1
-does not reach the required accuracy in the value of the optimum (suboptimality greater than the duality gap).
-Do we need to check the accuracy of the solution of the linearized KKT equations in the original,
-nonlinear KKT equations (would have to be done in KKTSystem)?
+
+works in dimension 75 with correct solution but
+code cannot find a feasible point within tolerance 1e-8 in dimension 80.
+
+However in dimension 75 the code maxes out in the number of iterations
+(20000) with tolSolver at 1e-8.
+Here maxIter controls the number of Newton steps at a fixed parameter t
+in the outer loop of the barrier solver. This parameter t is only increased
+(by a factor of 10 in each step) until the upper bound ub(t) for the duality gap
+
+    ub(t) = numIneqs / t
+
+is below the threshold tolSolver. The number of steps in the outer loop is
+the smallest integer k such that
+
+    numIneqs / 10^^{k-1} <= tolSolver = 1e-8
+
+i.e. 2*dim-1 <= 10^^{k-9}  which is of the order of k=11,12.
+The problem is therefore clearly with the solution of the KKT system in each step
+t  of the outer loop.
+
+
+This problem is interesting since JOptimizer cannot solve it either in dimension
+80 (immediately runs out of iterations even though maxiter set to 20000!).
+
+
+On the other hand there are no problems with
+     SimpleOptimizationProblems.distanceFromOrigin0
+which is
+     min ||x||^^2  on ||x-2e_{n+1}||<=1
+with solution at x=e_{n+1}. So the problem must come from the linear
+constraints
+     x_j+x_{n+1} >= 1, j=1,2,...,n
+
+
+#----------------------------------------------------------------------------------------
+2018-01-15:|
+-------------
+
+Integrate the trust region notes into the general cvx_notes.
+Update all references to cvx_notes in the doc comments.
+Correct the link syntax in the doc scaladoc comments.
+
+Adjust regularization H -> H+delta*I to the scale of the matrix H.
+
+Recompile openblas from source.

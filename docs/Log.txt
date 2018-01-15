@@ -534,21 +534,44 @@ Files affected:
 BarrierSolver
 ConvexSet
 Constraint
-ConstraintSet
 EqualityConstraint
 EqualityConstrainedSolver
-LinearConstraint
-ObjectiveFunction
 OptimizationProblem
-QuadraticConstraint
-Solver
 UnconstrainedSolver
 
 
 Status: compiles, affine transform on problems not tested.
 
 
+#----------------------------------------------------------------------------------------
+2018-01-10:|
+-------------
 
+Fixed SimpleOptimizationProblems.distanceFromOrigin1
+
+Works in dimension 75 with correct solution but
+code cannot find a feasible point within tolerance 1e-8 in dimension 80.
+
+However in dimension 75 the code maxes out in the number of iterations
+(20000) with tolSolver at 1e-8.
+
+This problem is interesting since JOptimizer cannot solve it either in dimension
+100 (immediately runs out of iterations even though maxiter set to 20000!).
+
+
+#----------------------------------------------------------------------------------------
+2018-01-15:|
+-------------
+
+UnconstrainedSolver.solve:
+combined the backtracking line search with a trust region method based on the norm |x|_H = x'Hx
+along the lines in the latex notes.
+
+Files affected:
+UnconstrainedSolver
+
+Status: working,
+speeds up the eerily problematic SimpleOptimizationProblems.distanceFromOrigin1
 
 
 

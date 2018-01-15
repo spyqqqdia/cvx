@@ -1,6 +1,7 @@
 package cvx
 
 import breeze.linalg.{DenseMatrix, DenseVector, NotConvergedException, _}
+import breeze.numerics.sqrt
 
 /**
   * Created by oar on 12/1/16.
@@ -41,6 +42,7 @@ class UnconstrainedSolver(
     var x = startingPoint
     var y = objF.gradientAt(x)
     var normGrad = norm(y)
+    var trustRadius = Double.NaN
 
     while (iter < maxIter && newtonDecrement > tol && normGrad > tol) {
 
@@ -78,23 +80,33 @@ class UnconstrainedSolver(
       //continue only if newtonDecrement > eps
       if(newtonDecrement > tol){
 
-        // backtracking line search, in particular backtrack into the set C
+        // trust region with fallback on backtracking line search,
+        // in particular backtrack into the set C
+        val hNorm_d = sqrt(-q)                  // |d|_H = sqrt(d'Hd)
+        if(iter==0) trustRadius = hNorm_d
+        // step vector
+        val s = if(iter==0 || hNorm_d <= trustRadius) d else d * (trustRadius/hNorm_d)
         var it = 0 // safeguard against bugs
         var t = 1.0
 
-        // from x+d move back towards x into the set C
-        while (!C.isInSet(x + d*t) && (it < 100)) { t *= beta; it += 1 }
+        // from x+s move back through x+t*s towards x into the set C
+        while (!C.isInSet(x + s*t) && (it < 100)) { t *= beta; it += 1 }
         if (it == 100) throw new NotConvergedException(
           breakDown, "Line search: backtracking into the set C failed."
         )
+        // adjust the trust radius according to decrease in function value
+        val f_new = objF.valueAt(x + s*t)
+        if (f_new > f + (alpha/2) * t * q) trustRadius *= beta
+        if ((f_new < f + ((1+alpha)/2) * t * q) && trustRadius <= hNorm_d) trustRadius *= (1+beta/3)
+
         // move back further to ensure sufficient value decrease
-        while ((objF.valueAt(x + d*t) > f + alpha * t * q) && (it < 100)) { t *= beta; it += 1 }
+        while ((objF.valueAt(x + s*t) > f + alpha * t * q) && (it < 100)) { t *= beta; it += 1 }
         // cannot happen unless gradient is messed up
         if (it == 100) throw new NotConvergedException(
           breakDown, "Line search: sufficient decrease not reached after 100 iterations"
         )
         // step to next iterate
-        x = x + d*t
+        x = x + s*t
         y = objF.gradientAt(x)
         normGrad = norm(y)
       }

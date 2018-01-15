@@ -29,10 +29,10 @@ object Runner extends App {
     // solver parameters
     val maxIter = 500           // max number of Newton steps computed
     val alpha = 0.07            // line search descent factor
-    val beta = 0.6              // line search backtrack factor
+    val beta = 0.75             // line search backtrack factor
     val tolSolver = 1e-8        // tolerance for norm of gradient, duality gap
     val tolEqSolve = 1e-2       // tolerance in the solution of the KKT system
-    val tolFeas = 1e-9          // tolerance in inequality and equality constraints
+    val tolFeas = 1e-7          // tolerance in inequality and equality constraints
     val delta = 1e-7            // regularization A -> A+delta*I if ill conditioned
     val pars = SolverParams(maxIter,alpha,beta,tolSolver,tolEqSolve,tolFeas,delta)
 
@@ -41,11 +41,12 @@ object Runner extends App {
 
     if(doAdHoc){
 
-      val dim = 200
+      val dim = 85
       val debugLevel=1
       //val problem = SimpleOptimizationProblems.normSquaredWithFreeVariables(dim,pars,debugLevel)
       //val problem = SimpleOptimizationProblems.joptP2(pars,debugLevel)
       //val problem = SimpleOptimizationProblems.probabilitySimplexProblem(dim,pars,debugLevel)
+      //val problem = SimpleOptimizationProblems.distanceFromOrigin0(dim,pars,debugLevel)
       val problem = SimpleOptimizationProblems.distanceFromOrigin1(dim,pars,debugLevel)
 
       if(false) {
