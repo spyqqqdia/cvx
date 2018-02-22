@@ -52,13 +52,13 @@ class UnconstrainedSolver(
 
       // newton  step
       val d = try {
-        MatrixUtils.solveWithPreconditioning(H, -y, logger, tolEqSolve, debugLevel)
+        MatrixUtils.choleskySolve(H, -y, logger, tolEqSolve, debugLevel)
       } catch {
 
         case e: Exception => try {
 
           val M = H + DenseMatrix.eye[Double](H.rows)*1e-9
-          MatrixUtils.solveWithPreconditioning(M, -y, logger, tolEqSolve, debugLevel)
+          MatrixUtils.choleskySolve(M, -y, logger, tolEqSolve, debugLevel)
 
         } catch {
 
@@ -86,24 +86,28 @@ class UnconstrainedSolver(
         if(iter==0) trustRadius = hNorm_d
         // step vector
         val s = if(iter==0 || hNorm_d <= trustRadius) d else d * (trustRadius/hNorm_d)
-        var it = 0 // safeguard against bugs
-        var t = 1.0
 
         // from x+s move back through x+t*s towards x into the set C
-        while (!C.isInSet(x + s*t) && (it < 100)) { t *= beta; it += 1 }
+        var it = 0 // safeguard against bugs
+        var t = 1.0
+        while (!C.isInSet(x + s*t) && (it < 200)) { t *= beta; it += 1 }
         if (it == 100) throw new NotConvergedException(
           breakDown, "Line search: backtracking into the set C failed."
         )
         // adjust the trust radius according to decrease in function value
-        val f_new = objF.valueAt(x + s*t)
-        if (f_new > f + (alpha/2) * t * q) trustRadius *= beta
-        if ((f_new < f + ((1+alpha)/2) * t * q) && trustRadius <= hNorm_d) trustRadius *= (1+beta/3)
-
+        // if that step is too big, reduce the trust radius
+        val rho = 1+1/4
+        if(!C.isInSet(x + s)){ trustRadius /= rho }
+        else {
+          val f_new = objF.valueAt(x + s*t)
+          if (f_new > f + alpha * t * q) trustRadius /= rho
+          if ((f_new < f + ((1+alpha)/2) * t * q) && trustRadius <= hNorm_d) trustRadius *= rho
+        }
         // move back further to ensure sufficient value decrease
-        while ((objF.valueAt(x + s*t) > f + alpha * t * q) && (it < 100)) { t *= beta; it += 1 }
+        while ((objF.valueAt(x + s*t) > f + alpha * t * q) && (it < 200)) { t *= beta; it += 1 }
         // cannot happen unless gradient is messed up
         if (it == 100) throw new NotConvergedException(
-          breakDown, "Line search: sufficient decrease not reached after 100 iterations"
+          breakDown, "Line search: sufficient decrease not reached after 200 iterations"
         )
         // step to next iterate
         x = x + s*t
@@ -112,8 +116,12 @@ class UnconstrainedSolver(
       }
       iter+=1
     }
-    // no duality gap applies, no equality gap occurs:
-    Solution(x,newtonDecrement,dualityGap=Double.MaxValue,equalityGap=0,normGrad,iter,iter>=maxIter)
+    // None: duality gap, equality gap, slack variables, dual variables
+    Solution(
+      x,None,None,None,
+      Some(newtonDecrement),None,None,Some(normGrad),None,
+      iter,iter>=maxIter
+    )
   }
 
   /** Same as [solve(Int)], the parameter terminationCriterion is ignored. We need that only in the
@@ -191,7 +199,10 @@ object UnconstrainedSolver {
 
         val sol = super.solve(debugLevel)
         val u = sol.x; val x = z0+F*u
-        Solution(x, sol.newtonDecrement, sol.dualityGap, 0, sol.normGrad, sol.iter, sol.maxedOut)
+        Solution(
+          x,None,None,None,
+          sol.newtonDecrement,None,None,sol.normGrad,None,
+          sol.iter, sol.maxedOut)
       }
     }
   }

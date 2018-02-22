@@ -1,5 +1,7 @@
 package cvx
 
+import breeze.linalg.eigSym.EigSym
+import breeze.linalg.svd.SVD
 import breeze.linalg.{DenseMatrix, DenseVector, _}
 
 
@@ -169,7 +171,7 @@ object MatrixUtilsTests {
     val debugLevel = 3
     val tolEqSolve = 1e-8
     val logger = Logger("logs/testSolveWithPreconditioning.txt")
-    val u = MatrixUtils.solveWithPreconditioning(H,b,logger,tolEqSolve,debugLevel)
+    val u = MatrixUtils.choleskySolve(H,b,logger,tolEqSolve,debugLevel)
 
     val errSol = norm(u-x)/norm(x)
     val errVal = norm(b-H*u)/norm(b)
@@ -285,7 +287,7 @@ object MatrixUtilsTests {
       val b = MatrixUtils.nastyRHS(d,U)
 
       try{
-        logger.println("Solution via svdSolve")
+        logger.print("\n\nSolution via svdSolve")
         val  x = MatrixUtils.svdSolve(A,b,logger,tolEqSolve,debugLevel)
       } catch {
 
@@ -294,7 +296,7 @@ object MatrixUtilsTests {
           OK = false
       }
       try{
-        logger.println("\nSolution via symSolve")
+        logger.print("\n\nSolution via symSolve")
         val  x = MatrixUtils.symSolve(A,b,logger,tolEqSolve,debugLevel)
       } catch {
 
@@ -303,8 +305,8 @@ object MatrixUtilsTests {
           OK = false
       }
       try{
-        logger.println("\nSolution via Cholesky factorization")
-        val  x = MatrixUtils.solveWithPreconditioning(A,b,logger,tolEqSolve,debugLevel)
+        logger.print("\n\nSolution via Cholesky factorization")
+        val  x = MatrixUtils.choleskySolve(A,b,logger,tolEqSolve,debugLevel)
       } catch {
 
         case e:Exception =>
@@ -399,5 +401,60 @@ object MatrixUtilsTests {
     logger.close()
 
     println("\nFinished, results in logs/condNumRatio.txt.\n")
+  }
+
+  /** We test SVD and symmetric eigenvalue decomposition on ill conditioned
+    * symmetric positive definite matrices A constructed as A=UDU' with random
+    * orthogonal matrix U and diagonal matrix D with exponentially declining
+    * diagonal values from a maximum of 1 to a minimum of 1/condNum.
+    * Thus A has condition number cond(A)=condNum.
+    *
+    * In particular we report how accurately the eigenvalues (here equal to the
+    * singular values) are computed. In particular the smallest of these will be
+    * problematic. Relative errors will be reported.
+    *
+    * WARNING: breeze SVD is A=UDV instead of A=UDV' as usual.
+    */
+  def diagonalizationTest(nTests:Int, dim:Int, condNum:Double):Unit = {
+
+    val logger = Logger("logs/diagonalizationTest.txt")
+    val left = "\n\n#------------------- Test "
+    val right = " -------------------#\n"
+
+    for (nT <- 1 to nTests) {
+
+      Console.println("Doing test "+nT); Console.flush()
+      logger.println(left+nT+right)
+
+      val U = MatrixUtils.randomOrthogonalMatrix(dim)
+      // diagonal is sorted in decreasing order
+      val D = MatrixUtils.diagonalMatrix(dim, condNum, dimKernel = 0)
+      val d: DenseVector[Double] = diag(D)
+      val dUp = DenseVector(d.toArray.sortWith(_ < _))
+      val B = (U * D) * U.t
+      // make symmetric (openblas problem?)
+      val A = (B+B.t)*0.5
+      val norm_A:Double = MatrixUtils.hsNorm(A)
+
+      // WARNING: breeze SVD is A=UDV instead of A=UDV' as usual
+      val svd.SVD(u, s, v) = svd(A)
+      val svdErr = 100*MatrixUtils.hsNorm(A-(u*diag(s))*v) / norm_A
+      logger.println("\nSVD: error in factorization (trace norm, %): "+
+                     MathUtils.round(svdErr,d=4))
+      val singularValues: DenseVector[Double] = DenseVector(s.toArray.sortWith(_ < _))
+      val svErrors = (dUp - singularValues)*100.0 / dUp
+      logger.println("Errors in singular values (%):")
+      MatrixUtils.print(svErrors,logger,digits=4)
+
+      val EigSym(lambda, evs) = eigSym(A)
+      val eigErr = MatrixUtils.hsNorm(A-(evs*diag(lambda))*evs.t) / norm_A
+      logger.println("\nEigenvalue decomposition, error in factorization (trace norm, %): "+
+                      MathUtils.round(eigErr,d=4))
+      val eigValues: DenseVector[Double] = DenseVector(lambda.toArray.sortWith(_ < _))
+      val eigvalErrors = (dUp - eigValues)*100.0 / dUp
+      logger.println("Errors in eigenvalues (%):")
+      MatrixUtils.print(eigvalErrors,logger,digits=4)
+    }
+    Console.println("Finished. results in logs/diagonalizationTest.txt")
   }
 }

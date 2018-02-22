@@ -49,17 +49,7 @@ class OptimizationProblem(
 
     val x = sol.x                       // minimizer, solution found
     val y = objectiveFunction.valueAt(x)
-
-    val newtonDecrement = sol.dualityGap      // Newton decrement at solution
-    val normGrad = sol.normGrad        // norm of gradient at solution
-    val iter = sol.iter
-    val maxedOut = sol.maxedOut
-
-    var msg = "Iterations = "+iter+"; maxiter reached: "+maxedOut+"\n"
-    msg += "Newton decrement:  "+MathUtils.round(newtonDecrement,10)+"\n"
-    msg += "norm of gradient:  "+MathUtils.round(normGrad,10)+"\n"
-    msg += "value at solution y=f(x):  "+MathUtils.round(y,10)+"\n"
-    msg += "Computed solution x:\n"+x+"\n"
+    val msg = sol+"\n"+"Objective function value at computed solution: "+y+".\n"
 
     print(msg)
     Console.flush()

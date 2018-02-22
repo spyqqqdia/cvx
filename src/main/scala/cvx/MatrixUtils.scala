@@ -14,6 +14,11 @@ object MatrixUtils {
 
   val rng = scala.util.Random
 
+  /** Hilbert-Schmidt norm ||A||^^2 = sum_{ij}A_ij^^2.
+    */
+  def hsNorm(A:DenseMatrix[Double]):Double = sum(A :* A)
+
+
   /*************************************************************/
   /******************* Matrix generation ***********************/
   /*************************************************************/
@@ -438,14 +443,11 @@ object MatrixUtils {
   }
 
   /** Solve Hx=b, where H is positive semi-definite without zero row using Cholesky factorization.
-    *
-    * First we precondition the matrix H by replacing H --> Q=DHD, where D is a suitable diagonal matrix
-    * (algorithm of Ruiz), then using Cholesky factorization on the preconditioned matrix Q.
     * Throws LinSolveException if the Cholesky factorization fails (i.e. if H is not positive definite).
     *
     * @return solution vector x
     */
-  def solveWithPreconditioning(
+  def choleskySolve(
     H:DenseMatrix[Double], b:DenseVector[Double], logger:Logger, tol:Double, debugLevel:Int
   ): DenseVector[Double] = {
 
@@ -460,10 +462,9 @@ object MatrixUtils {
       logger.print("\nMatrixUtils.solveWithPreconditioning: ")
     }
 
-    // Ruiz equilibration changes H
-    val M = H.copy
-    val eqM = ruizEquilibrate(M)
-    val d = eqM._1; val Q = eqM._2  // diag(d)*M*diag(d)
+    // Ruiz equilibration does not change H
+    val eqH = ruizEquilibrate(H)
+    val d = eqH._1; val Q = eqH._2  // diag(d)*M*diag(d)
 
     val L = regularizedCholesky(Q)
 
@@ -489,10 +490,9 @@ object MatrixUtils {
 
     } else if (debugLevel > 1) {
 
-      val msg = "MatrixUtils.solveWithPreconditioning: solution successful: "+
-         "error ||Ax-b||/||b|| = " + relErrRnd + ".\n"
-      println(msg); Console.flush()
-      logger.println(msg)
+      val msg = "solution successful: "+"error ||Ax-b||/||b|| = " + relErrRnd + ".\n"
+      Console.print(msg); Console.flush()
+      logger.print(msg)
     }
     x
   }
@@ -599,7 +599,7 @@ object MatrixUtils {
     if(debugLevel>1){
 
       val msg = "MatrixUtils.diagonalizationSolve: "
-      println(msg); Console.flush()
+      Console.print(msg); Console.flush()
       logger.print(msg)
     }
     val n=U.rows
@@ -663,7 +663,6 @@ object MatrixUtils {
           val msg = "delta = " + delta + ",\t\terror ||Ax-b||/||b|| = " + MathUtils.round(relError,d=5)
           logger.println(msg)
         }
-
         curTry+=1
         delta*=10.0
       } // end while
@@ -699,16 +698,16 @@ object MatrixUtils {
 
     if(debugLevel>1){
 
-      println("\nMatrixUtils.svdSolve:"); Console.flush()
+      Console.println("\nMatrixUtils.svdSolve:"); Console.flush()
       logger.println("\nMatrixUtils.svdSolve:")
     }
     val n = A.rows; val m = A.cols
     assert(b.length==n,
       "\nMatrixUtils.svdSolve: incompatible dimensions in Mx=q, M.rows = "+n+", q.length = "+b.length+"\n"
     )
-
+    // WARNING: breeze SVD is A=UDV instead of A=UDV' as usual
     val svd.SVD(u, s, v) = svd(A)
-    diagonalizationSolve(A,u,s,v,b,logger,tol,debugLevel)
+    diagonalizationSolve(A,u,s,v.t,b,logger,tol,debugLevel)
   }
 
   /** [diagonalizationSolve] using the symmetric eigenvalue decomposition of A.
@@ -721,10 +720,10 @@ object MatrixUtils {
 
     if(debugLevel>1){
 
-      println("\nMatrixUtils.symSolve:"); Console.flush()
+      Console.println("\nMatrixUtils.symSolve:"); Console.flush()
       logger.println("\nMatrixUtils.symSolve:")
     }
-    val n = A.rows;
+    val n = A.rows
     assert(b.length==n,
       "\nMatrixUtils.symSolve: incompatible dimensions in Mx=q, M.rows = "+n+", q.length = "+b.length+"\n"
     )

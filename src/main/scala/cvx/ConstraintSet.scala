@@ -43,6 +43,32 @@ abstract class ConstraintSet(val dim:Int, val constraints:Seq[Constraint]) {
     }
   }
 
+  /** The function g(x)=(g_1(x)-u_1,...,g_m(x)-u_m), where the g_j(x) <= u_j are
+    * the (inequality) constraints of this set.
+    */
+  def constraintFunctionAt(x:DenseVector[Double]):DenseVector[Double] =
+    DenseVector.tabulate[Double](numConstraints)( i => {
+      val cnt_i = constraints(i)
+      cnt_i.valueAt(x)-cnt_i.ub
+    })
+
+
+  /** The matrix Dg(x) with rows being the gradients $\grad g_j(x)'$
+    * of the constraints $g_j(x)\leq u_j$.
+    */
+  def gradientMatrixAt(x:DenseVector[Double]):DenseMatrix[Double] = {
+
+    val dgx = DenseMatrix.zeros[Double](numConstraints,dim)
+    var j=0
+    for(cnt <- constraints){
+
+      val grad_gj = cnt.gradientAt(x)
+      dgx(j,::) := grad_gj.t
+      j+=1
+    }
+    dgx
+  }
+
 
   /**---------------------- FEASIBILITY ANALYSIS ---------------------------**/
 
@@ -247,29 +273,12 @@ abstract class ConstraintSet(val dim:Int, val constraints:Seq[Constraint]) {
       logger.println(msg)
     }
     Console.flush()
-    val feasBS = phase_I_Solver_withEqs(eqs,pars,logger,debugLevel)
-    val sol = feasBS.solve(debugLevel)
-
-    val w_feas = sol.x                  // w = c(x,s)
-    val x_feas = w_feas(0 until dim)    // unclear how many constraints that satisfies, so we check
-    val s_feas = w_feas(dim)            // if s_feas < 0, all constraints are strictly satisfied.
-
-    // for the equality constraints use the stricter pars.tol not pars.tolEqSolve which is for
-    // the ill conditioned KKT systems
-    val eqError = eqs.errorAt(x_feas)
-    val isStrictlySatisfied = s_feas < 0.0 && eqError < pars.tol
-    val violatedCnts = constraints.filter(!_.isSatisfiedStrictly(x_feas))
-
-    val s = DenseVector[Double](1)
-    s(0)=s_feas
-    val report = FeasibilityReport(x_feas,s,isStrictlySatisfied,this,Some(eqError))
-
-    if(debugLevel>1){
-      val msg = report.toString(pars.tol)
-      logger.println(msg)
-      println(msg); Console.flush()
-    }
-    report
+    // make a new constraint set by adding the equality constraints as inequalities
+    val x0 = pointWhereDefined
+    val ineqs2 = eqs.asInequalities
+    val theConstraints = constraints.toList ::: ineqs2
+    val ctSet = ConstraintSet(dim,theConstraints,x0)
+    ctSet.phase_I_Analysis_withoutEqs(pars, logger, debugLevel)
   }
 
 
@@ -294,7 +303,7 @@ abstract class ConstraintSet(val dim:Int, val constraints:Seq[Constraint]) {
     // terminate if objective function has been pushed below zero (then we are at a strictly
     // feasible point already, or if the duality gap is small enough
     val terminationCriterion = (os:OptimizationState) =>
-      (os.objectiveFunctionValue < 0 || os.dualityGap < pars.tol) && os.equalityGap < pars.tol
+      (os.objectiveFunctionValue < 0 || os.dualityGap.get < pars.tol) && os.equalityGap.get < pars.tol
     val sol = feasBS.solveSpecial(terminationCriterion,debugLevel)
 
     val w_feas = sol.x                  // w = c(x,s)
@@ -493,6 +502,42 @@ abstract class ConstraintSet(val dim:Int, val constraints:Seq[Constraint]) {
       addFeasiblePoint(x0)
     }
   }
+
+  /** The set of constraints restricted to the affine space z+Im(F)
+    * (variable transform x-> u via x = z+Fu).
+    */
+  def affineTransformed(z:DenseVector[Double],F:DenseMatrix[Double]):ConstraintSet = {
+
+    val logger = Logger("logs/ConstraintSet_affineTransformation.txt")
+    val tol = 1e-8
+    val debugLevel=0
+    val newDim = F.cols           // variable is u in x = z+Fu
+    // z+Fu0 = pointWhereDefined
+    val u0 = MatrixUtils.svdSolve(F,pointWhereDefined-z,logger,tol,debugLevel)
+    val newConstraints = constraints.map(cnt => cnt.affineTransformed(z,F))
+    ConstraintSet(newDim,newConstraints,u0)
+  }
+
+  //--------------- constraints relaxed with slack variables ------------//
+  //
+  // See docs/primaldual.pdf
+  //
+  //---- global relaxation with a single slack variable
+
+  /** ConstraintSet where the original constraints g_j(x)<=u_j are relaxed to
+    * g_j(x) <= u_j+s with one additional slack variable s>=0.
+    *
+    * This is merely the phase_I constraint set augemented with the
+    * constraint s>=0.
+    */
+  def globallyRelaxed:ConstraintSet with FeasiblePoint = {
+
+
+
+    null   // FIX ME
+  }
+
+
 }
 
 

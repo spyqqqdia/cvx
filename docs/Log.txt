@@ -564,15 +564,143 @@ This problem is interesting since JOptimizer cannot solve it either in dimension
 -------------
 
 UnconstrainedSolver.solve:
-combined the backtracking line search with a trust region method based on the norm |x|_H = x'Hx
-along the lines in the latex notes.
+combined backtracking line search with naive trust region approach,
+see cvx_notes).
 
 Files affected:
 UnconstrainedSolver
 
-Status: working,
-speeds up the eerily problematic SimpleOptimizationProblems.distanceFromOrigin1
+Status:
+speeds up the SimpleOptimizationProblems.distanceFromOrigin1
+considerably.
 
+
+#----------------------------------------------------------------------------------------
+2018-01-16:|
+-------------
+
+FeasibilityTests: added switch to turn on/off SOI analysis.
+
+Files affected:
+
+FeasibilityTests
+Runner
+
+
+#----------------------------------------------------------------------------------------
+2018-01-16:|
+-------------
+
+UnconstrainedSolver.solve:
+fixed up trustRadius adjustment
+
+Files affected:
+UnconstrainedSolver
+
+
+#----------------------------------------------------------------------------------------
+2018-01-18:|
+-------------
+
+EqualityConstraint:
+added method to turn the equalities Ax=b into a list of inequality constraints
+row_i(A).x <= b_i and row_i(A).x >= b_i.
+
+ConstraintSet:
+changed the way phase I analysis deals with equalities, now turned into inequalities.
+large speedup on all test problems.
+
+Files affected:
+EqualityConstraint
+ConstraintSet
+
+
+#----------------------------------------------------------------------------------------
+2018-02-12:|
+-------------
+
+Started on PrimalDualSolver.
+ConstraintSet (added functions constraintFunctionAt, gradientMatrixAt)
+MatrixUtils: renamed solveWithPreconditioning to choleskySolve.
+New class SymmetricLinearSystem (a wrapper for all solution algos in MatrixUtils).
+OptimizationState: added field dualResidual (needed for PrimalDualSolver).
+
+Files affected:
+
+Unknown: affected by renaming of solveWithPreconditioning
+OptimizationState
+ConstraintSet
+PrimalDualSolver
+SymmetricLinearSystem
+
+
+Status:
+compiles but PrimalDualSolver.solve methods are not fully implemented yet.
+We need to do this differently as outlined in the ToDo anyway to get rid of
+the strict feasibility necessity for the inequality constraints.
+
+
+#----------------------------------------------------------------------------------------
+2018-02-15:|
+-------------
+
+Reset maxIter in BarrierSolver to the safer value 1000/mu
+(allows 100 iterations in the outer loop for the standard value mu=10).
+Worked on PrimalDualSolver.
+
+
+Files affected:
+
+Unknown: affected by renaming of solveWithPreconditioning
+BarrierSolver
+ConstraintSet
+OptimizationState
+PrimalDualSolver
+SymmetricLinearSystem
+
+
+Status: compiles
+We need to check if the examples with the BarrierSolver still work.
+The PrimalDualSolver is not finished yet.
+
+
+#----------------------------------------------------------------------------------------
+2018-02-19:|
+-------------
+
+More work on PrimalDualSolver:
+
+Files affected:
+Solution
+UnconstrainedSolver
+EqualityConstrainedSolver
+
+Status: compiles, untested.
+
+
+#----------------------------------------------------------------------------------------
+2018-02-20:|
+-------------
+
+Cleaned up OptimizationState, fields become Options when they are not
+present in all cases. More work on PrimalDualSolver.
+
+Files affected:
+
+BarrierSolver
+CvxUtils
+Constraints
+ConstraintSet
+KnownMinimizer
+MatrixUtils
+MatrixUtilsTests
+OptimizationProblem
+OptimizationState
+PrimalDualSolver
+
+Status: compiles.
+Simple phase I analysis fails since the OptimizationState no
+longer has enough fields for the termination criterion. See ToDo.
 
 
 

@@ -2,6 +2,8 @@ package cvx
 
 import breeze.linalg.{DenseMatrix, DenseVector, _}
 
+import scala.collection.mutable.ListBuffer
+
 
 /** Affine equality constraints of the form Ax=b, where A is mxn with m < n
   *  and full rank m. The condition rank(A)=m will not be checked.
@@ -69,6 +71,27 @@ class EqualityConstraint(val A:DenseMatrix[Double], val b:DenseVector[Double]){
     */
   def affineTransformed(z0:DenseVector[Double],F:DenseMatrix[Double]):EqualityConstraint =
     EqualityConstraint(A*F,b-A*z0)
+
+  /** Turns this equality constraint Ax=b into a list of inequalities
+    * row_i(A)'x<=b_i and row_i(A)'x>=b_i.
+    */
+  def asInequalities:List[LinearConstraint] = {
+
+    val n = A.rows
+    val dim = A.cols
+    val buff = ListBuffer[LinearConstraint]()
+    for(i <- 0 until n){
+
+      val row_iA = A(i,::)
+      val id1 = "row_"+i+"(A)'x <= "+b(i)
+      val ineq1 = LinearConstraint(id1,dim,b(i),0.0,row_iA.t)
+      val id2 = "row_"+i+"(A)'x >= "+b(i)
+      val ineq2 = LinearConstraint(id2,dim,-b(i),0.0,-row_iA.t)
+      buff+=ineq1
+      buff+=ineq2
+    }
+    buff.toList
+  }
 }
 
 

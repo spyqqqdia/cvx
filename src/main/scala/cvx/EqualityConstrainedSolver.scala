@@ -98,8 +98,12 @@ extends Solver {
       }
       iter+=1
     }
-    // duality gap does not apply here
-    Solution(x,newtonDecrement,dualityGap=Double.MaxValue,norm(eqDiff),normGrad,iter,iter==maxIter)
+    val equalityGap = norm(eqDiff)
+    Solution(
+      x,None,None,None,
+      Some(newtonDecrement),None,Some(equalityGap),Some(normGrad),None,
+      iter,iter>=maxIter
+    )
   }
 
   /** Same as [solve(Int)], the parameter terminationCriterion is ignored. We need that only in the
@@ -148,7 +152,8 @@ object EqualityConstrainedSolver{
              b:DenseVector[Double],
              pars:SolverParams,
              logger:Logger
-  ):EqualityConstrainedSolver = new EqualityConstrainedSolver(objF,C,startingPoint,A,b,pars,logger)
+  ):EqualityConstrainedSolver =
+    new EqualityConstrainedSolver(objF,C,startingPoint,A,b,pars,logger)
 
 
 }

@@ -6,24 +6,40 @@ import breeze.numerics.pow
 import scala.collection.mutable.ListBuffer
 
 /**
-  * Created by vagrant on 10.10.17.
+  * Created by oar on 10.10.17.
   *
   * Some constraints we will use repeatedly.
   */
 object Constraints {
 
   val rng = scala.util.Random
+
+  /** Constraints: x_m,x_{m+1},...,x_n>0
+    *
+    * @param n dimension of problem.
+    * @param m
+    */
+  def lastCoordinatesPositive(n:Int,m:Int):List[Constraint] = {
+
+    assert(m<=n && m>=0,
+      "\nMust have 0<=m<=n but actually m="+m+" and n="+n+"\n"
+    )
+
+    (m until n).map(j => {
+
+      val id = "x_" + j + ">0"
+      val a = DenseVector.zeros[Double](n)
+      a(j) = -1.0
+      LinearConstraint(id, n, 0, 0, a)
+    }).toList
+  }
+
   /** Constraints: all x_j>0, j=1,...,n.
     *
     * @param n dimension of problem.
     */
-  def allCoordinatesPositive(n:Int):List[Constraint] =  (0 until n).map( j => {
+  def allCoordinatesPositive(n:Int):List[Constraint] = lastCoordinatesPositive(n,0)
 
-    val  id = "x_"+j+">0"
-    val a = DenseVector.zeros[Double](n)
-    a(j)= -1.0
-    LinearConstraint(id,n,0,0,a)
-  }).toList
 
   /** Equality constraint sum(x_j)=1.0 in the form Ax=b.
     * @return (A,b), where A=(1,...,1) and b=(1).
@@ -51,7 +67,7 @@ object Constraints {
     *
     * A moment constraint of the form EW^p=r is simply a special case of
     * this where the random variable W>0 is replaced with W^p, i.e the vector of
-    * values w is replaced with the vector w^p.
+    * values w is replaced with the vector w^^p.
     *
     * Likewise a probability constraint P[E]=r can be expressed as an expectation
     * constraint E[W]=r, where W is the indicator function W=1_E, i.e. the
@@ -85,7 +101,7 @@ object Constraints {
     *
     * A moment constraint of the form EW^p<r is simply a special case of
     * this where the random variable W>0 is replaced with W^p, i.e the vector of
-    * values w is replaced with the vector w^p.
+    * values w is replaced with the vector w^^p.
     *
     * Likewise a probability constraint P[E]<r can be expressed as an expectation
     * constraint E[W]=r, where W is the indicator function W=1_E, i.e. the

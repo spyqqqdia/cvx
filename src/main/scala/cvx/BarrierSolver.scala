@@ -74,15 +74,15 @@ extends Solver { self =>
     var t = 1.0
     var x = startingPoint       // iterates x=x_k
     var obfFcnValue = Double.MaxValue
-    var normGrad = Double.MaxValue
     var dualityGap = Double.MaxValue
-    var newtonDecrement = Double.MaxValue
-    val equalityGap = 0.0
-    var optimizationState = OptimizationState(normGrad,newtonDecrement,dualityGap,equalityGap,obfFcnValue)
+    // None: newton decrement, norm of gradient, equality gap
+    var optimizationState = OptimizationState(
+      None,None,Some(dualityGap),None,obfFcnValue
+    )
     var sol:Solution = null   // solutions at parameter t
 
-    // insurance against nonterminating loop, normally terminates long before that
-    val maxIter = 300/mu
+    // insurance against non terminating loop, normally terminates before that
+    val maxIter = 1000/mu
     var iter = 0
     while(!terminationCriterion(optimizationState) && iter<maxIter){
 
@@ -99,11 +99,9 @@ extends Solver { self =>
 
       x = sol.x
       obfFcnValue = objF.valueAt(x)
-      normGrad = sol.normGrad
-      newtonDecrement = sol.newtonDecrement
       dualityGap = numConstraints/t
-      optimizationState = OptimizationState(normGrad,newtonDecrement,dualityGap,equalityGap,obfFcnValue)
-
+      // None: Newton decrement, norm of gradient, equality gap
+      optimizationState = OptimizationState(None,None,Some(dualityGap),None,obfFcnValue)
       if(debugLevel>3){
         print("\nOptimization state:"+optimizationState)
         Console.flush()
@@ -120,25 +118,24 @@ extends Solver { self =>
     * @return Solution object: minimizer with additional info.
     */
   def solveWithEQs(
-                    terminationCriterion:(OptimizationState)=>Boolean,
-                    A:DenseMatrix[Double],b:DenseVector[Double],debugLevel:Int=0
-                  ):Solution = {
+      terminationCriterion:(OptimizationState)=>Boolean,
+      A:DenseMatrix[Double],b:DenseVector[Double],debugLevel:Int=0
+  ):Solution = {
 
     val tol=pars.tol // tolerance for duality gap
     val mu = 10.0    // factor to increase parameter t in barrier method.
     var t = 1.0
     var x = startingPoint     // iterates x=x_k
     var obfFcnValue = Double.MaxValue
-    var normGrad = Double.MaxValue
     var dualityGap = Double.MaxValue
-    var newtonDecrement = Double.MaxValue
     var equalityGap = Double.MaxValue
-    var optimizationState = OptimizationState(normGrad,newtonDecrement,dualityGap,equalityGap,obfFcnValue)
-    var sol:Solution = null   // solutions at parameter t
-
-
-    // insurance against nonterminating loop, normally terminates long before that
-    val maxIter = 300/mu
+    // None: newton decrement, norm of gradient
+    var optimizationState = OptimizationState(
+      None,None,Some(dualityGap),Some(equalityGap),obfFcnValue
+    )
+    var sol:Solution = null     // initialization
+    // insurance against non terminating loop, normally terminates before that
+    val maxIter = 1000/mu
     var iter = 0
     while(!terminationCriterion(optimizationState) && iter<maxIter){
 
@@ -155,12 +152,12 @@ extends Solver { self =>
 
       x = sol.x
       obfFcnValue = objF.valueAt(x)
-      normGrad = sol.normGrad
-      newtonDecrement = sol.newtonDecrement
       dualityGap = numConstraints/t
-      equalityGap = sol.equalityGap
-      optimizationState = OptimizationState(normGrad,newtonDecrement,dualityGap,equalityGap,obfFcnValue)
-
+      equalityGap = sol.equalityGap.get
+      // None: Newton decrement, norm of gradient
+      optimizationState = OptimizationState(
+        None,None,Some(dualityGap),Some(equalityGap),obfFcnValue
+      )
       if(debugLevel>3) {
         print("\nOptimization state:" + optimizationState)
         Console.flush()
@@ -178,7 +175,7 @@ extends Solver { self =>
     */
   def solve(debugLevel:Int=0):Solution = {
 
-    val terminationCriterion = (os:OptimizationState) => os.dualityGap < pars.tol
+    val terminationCriterion = (os:OptimizationState) => os.dualityGap.get < pars.tol
     solveSpecial(terminationCriterion,debugLevel)
   }
   /** Version of _this_ solver which operates on the variable u related to

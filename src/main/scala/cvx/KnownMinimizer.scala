@@ -32,14 +32,13 @@ trait KnownMinimizer {
     val isSolution = isMinimizer(x,tol)
     val knownSolution = theMinimizer
 
-    var msg = "Iterations = "+iter+"; maxiter reached: "+maxedOut+"\n"
-    msg += "Newton decrement:  "+MathUtils.round(newtonDecrement,10)+"\n"
-    msg += "norm of gradient:  "+MathUtils.round(normGrad,10)+"\n"
-    msg += "value at computed solution y=f(x):  "+MathUtils.round(objFcnValue,10)+"\n"
-    msg += "value of global min:  "+MathUtils.round(y_opt,10)+"\n"
-    msg += "known minimizer:\n"+knownSolution+"\n"
-    msg += "Computed solution x:\n"+x+"\n"
-    msg += "Is global solution at tolerance "+tol+": "+isSolution+"\n"
+    val msg = sol+"\n"+
+      "value at computed solution y=f(x):  "+MathUtils.round(objFcnValue,10)+"\n"+
+      "value of global min:  "+MathUtils.round(y_opt,10)+"\n"+
+      "known minimizer:\n"+knownSolution+"\n"+
+      "Computed solution x:\n"+x+"\n"+
+      "Is global solution at tolerance "+tol+": "+isSolution+"\n"
+
     print(msg)
     Console.flush()
     logger.println(msg)

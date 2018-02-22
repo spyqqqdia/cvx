@@ -489,3 +489,26 @@ Correct the link syntax in the doc scaladoc comments.
 Adjust regularization H -> H+delta*I to the scale of the matrix H.
 
 Recompile openblas from source.
+
+
+
+#----------------------------------------------------------------------------------------
+2018-01-20:|
+-------------
+
+
+Recall that we have made the fields in the OptimizationState Options
+putting in only the relevant values for each type of optimization.
+Now simple phase I analysis fails since the OptimizationState no
+longer has enough fields for the termination criterion. See ToDo.
+
+Also we terminate as soon as the objective function value s is < 0.
+This yields a strictly feasible point but which may not be nicely centered
+(i.e. close to the central path). Consider going back to the old approach, where we
+minimize s fully.
+
+
+
+
+
+
