@@ -50,8 +50,9 @@ object KktTest {
     * KKT system.
     */
   def testKktSystemReduction(
-     nTests:Int,nullIndices:Vector[Int],logger:Logger,pars:SolverParams,debugLevel:Int):Unit =
-  for(tt <- 1 to nTests) {
+    nTests:Int,nullIndices:Vector[Int],delta:Double,tolEqSolve:Double,
+    logger:Logger,debugLevel:Int
+  ):Unit = for(tt <- 1 to nTests) {
 
     // check if the indices in nullIndices are strictly increasing
     val n = nullIndices.length
@@ -89,7 +90,7 @@ object KktTest {
     val rr = reducedKktData.r
     val reducedKktSystem = KKTSystem(rH,rA,rg,rr)
 
-    val (rdx,nu) = reducedKktSystem.solve(pars.delta,logger,pars.tolEqSolve,debugLevel)
+    val (rdx,nu) = reducedKktSystem.solve(delta,logger,tolEqSolve,debugLevel)
     // pad the solution back to original size, nu is unaffected
     val dx = KKTData.paddVector(rdx,nullIndices)
     // the solution of the original system is now (dx,nu),

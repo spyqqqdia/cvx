@@ -12,8 +12,7 @@ import breeze.linalg.{DenseVector, _}
   * @param solver Solver for the problem
   */
 class OptimizationProblem(
-  val id:String, val objectiveFunction: ObjectiveFunction, val solver:Solver,
-  val logger:Logger
+  val id:String, val objectiveFunction: ObjectiveFunction, val solver:Solver, val logger:Logger
 ){
   self =>
 
@@ -26,8 +25,8 @@ class OptimizationProblem(
     new OptimizationProblem(id,objectiveFunction,solver,logger) with KnownMinimizer {
 
       override def theMinimizer: DenseVector[Double] = optSol.theMinimizer
-      def isMinimizer(x:DenseVector[Double],tol:Double) = optSol.isMinimizer(x,tol)
-      def minimumValue = optSol.minimumValue
+      def isMinimizer(x:DenseVector[Double],tol:Double):Boolean = optSol.isMinimizer(x,tol)
+      def minimumValue:Double = optSol.minimumValue
     }
 
   /** Add the known solutions to the minimization problem. List must contain
@@ -38,8 +37,8 @@ class OptimizationProblem(
 
       assert(sols.nonEmpty,"\naddSolutions: no solutions provided.\n")
       override def theMinimizer: DenseVector[Double] = sols.head
-      def isMinimizer(x:DenseVector[Double],tol:Double) = min(sols.map(sol => norm(x-sol))) < tol
-      def minimumValue = min(sols.map(sol => objectiveFunction.valueAt(sol)))
+      def isMinimizer(x:DenseVector[Double],tol:Double):Boolean = min(sols.map(sol => norm(x-sol))) < tol
+      def minimumValue:Double = min(sols.map(sol => objectiveFunction.valueAt(sol)))
     }
   /**
     * @param sol the computed solution
@@ -120,26 +119,60 @@ object OptimizationProblem {
     * using a barrier solver for both the actual solution and the feasibility analysis.
     *
     * @param id name for problem
+    * @param setWhereDefined: The convex set where the objective function
+    *   and all the constraints are defined, usually ConvexSets.wholeSpace.
     * @param objF objective function
     * @param ineqs inequality constraints
     * @param eqs optional equality constraint(s) in the form Ax=b
+    * @param solverType: "BR" (barrier solver), "PD0" (primal dual with one slack variable),
+    *   "PD1" (primal dual with one slack variable for each inequality constraint), see docs/primaldual.pdf.
     * @param pars solver parameters, see [SolverParams].
     * @return problem minimizing objective function under constraints applying the parameters in pars
     * and starting the iteration at ineqs.feasiblePoint.
     */
   def apply(
              id:String,
+             setWhereDefined:ConvexSet,
              objF:ObjectiveFunction,
              ineqs: ConstraintSet,
              eqs:Option[EqualityConstraint],
+             solverType:String,
              pars:SolverParams,
              logger:Logger,
              debugLevel:Int
-           ): OptimizationProblem = {
+  ): OptimizationProblem = {
 
     assert(objF.dim==ineqs.dim,"\n\nobjF.dim = "+objF.dim+", ineqs.dim = "+ineqs.dim+"\n")
     eqs.map(eqCnt => assert(eqCnt.dim==objF.dim,"\n\neqCnt.dim = "+eqCnt.dim+", objF.dim = "+objF.dim+"\n"))
-    val solver = BarrierSolver(objF,ineqs.withFeasiblePoint(eqs,pars,debugLevel),eqs,pars,logger)
+    require(solverType=="BR" || solverType == "PD0" || solverType == "PD1",
+      "\nUnknown solverType = "+solverType+", should be one of BR, PD0 or PD1.\n"
+    )
+
+    val solver:Solver =
+
+      if(solverType == "BR")
+        BarrierSolver(objF,ineqs.withFeasiblePoint(eqs,pars,debugLevel),eqs,pars,logger)
+
+      else if (solverType == "PD0"){
+
+        require(pars.K.nonEmpty,
+          "\nConstant K>0 for the primal dual solver is missing from pars.\n")
+        val K:Double = pars.K.get
+        require(pars.K.get>0,"\npars.K must be positive but is = "+K+"\n")
+        PrimalDualSolver(setWhereDefined,objF,ineqs,eqs,pars,logger,K)
+
+      } else {
+
+        require(pars.vec_K.nonEmpty,
+          "\nVector K>0 for the primal dual solver is missing from pars.\n")
+        val K:Vector[Double] = pars.vec_K.get
+        require(pars.vec_K.get.forall(_>0),"\npars.vec_K must be positive but is = "+K+"\n")
+        require(K.length==ineqs.numConstraints,
+          "Dimension mismatch: dim(K) = "+K.length+
+            " not equal to the number of inequality constraints = "+ineqs.numConstraints+".\n"
+        )
+        PrimalDualSolver(setWhereDefined,objF,ineqs,eqs,pars,logger,K)
+      }
     new OptimizationProblem(id,objF,solver,logger)
   }
 

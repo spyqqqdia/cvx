@@ -17,10 +17,10 @@ object SimpleOptimizationProblems {
     *
     * The constraint set of the problem is allocated with feasible point.
     *
-    * @param pars parameters controlling the solver behaviour (maxIter, backtracking line search
-    * parameters etc, see [SolverParams].
+    * @param solverType: "BR" (barrier solver), "PD0" (primal dual with one slack variable),
+    *   "PD1" (primal dual with one slack variable for each inequality constraint), see docs/primaldual.pdf.
     */
-  def minX1_FP(pars: SolverParams,debugLevel:Int):OptimizationProblem with KnownMinimizer = {
+  def minX1_FP(solverType:String,debugLevel:Int):OptimizationProblem with KnownMinimizer = {
 
     val id = "f(x0,x1)=x0 on x1>=exp(x0), x1 <= r+k*x0, with feasible point."
     if(debugLevel>0) {
@@ -34,9 +34,9 @@ object SimpleOptimizationProblems {
     // objective f(x0,x1)=x0
     val objF = new ObjectiveFunction(dim){
 
-      def valueAt(x:DenseVector[Double]) = x(0)
-      def gradientAt(x:DenseVector[Double]) = DenseVector(1.0,0.0)
-      def hessianAt(x:DenseVector[Double]) = DenseMatrix.zeros[Double](dim,dim)
+      def valueAt(x:DenseVector[Double]):Double = x(0)
+      def gradientAt(x:DenseVector[Double]):DenseVector[Double] = DenseVector(1.0,0.0)
+      def hessianAt(x:DenseVector[Double]):DenseMatrix[Double] = DenseMatrix.zeros[Double](dim,dim)
     }
 
     // set of inequality constraints
@@ -45,17 +45,19 @@ object SimpleOptimizationProblems {
     val ub = 0.0 // upper bound
     val ct1 = new Constraint("x2>=exp(x1)",dim,ub){
 
-      def valueAt(x:DenseVector[Double]) = Math.exp(x(0))-x(1)
-      def gradientAt(x:DenseVector[Double]) = DenseVector(Math.exp(x(0)),-1.0)
-      def hessianAt(x:DenseVector[Double]) = DenseMatrix((Math.exp(x(0)),0.0),(0.0,0.0))
+      def isDefinedAt(u:DenseVector[Double]):Boolean = true
+      def valueAt(x:DenseVector[Double]):Double = Math.exp(x(0))-x(1)
+      def gradientAt(x:DenseVector[Double]):DenseVector[Double] = DenseVector(Math.exp(x(0)),-1.0)
+      def hessianAt(x:DenseVector[Double]):DenseMatrix[Double] = DenseMatrix((Math.exp(x(0)),0.0),(0.0,0.0))
     }
     // linear inequality x1 <= r+k*x0
     val e = Math.exp(1.0); val r = 0.5*(e+1/e); val k = 0.5*(e-1/e)
     val a = DenseVector(-k,1.0)    // a dot x = x1-k*x0
     val ct2 = LinearConstraint("x1<=r+k*x0",dim,r,0.0,a)
 
-    val x = DenseVector(0.0,0.0)     // point where all the constraints are defined
-    val ineqs = ConstraintSet(dim,List(ct1,ct2),x)   // the inequality constraints
+    val x0 = DenseVector(0.0,0.0)     // point where all the constraints are defined
+    val setWhereDefined = ConvexSets.wholeSpace(dim)
+    val ineqs = ConstraintSet(dim,List(ct1,ct2),setWhereDefined,x0)   // the inequality constraints
 
     // add a feasible point
     val x_feas = DenseVector(0.0,1.01)
@@ -64,7 +66,8 @@ object SimpleOptimizationProblems {
     val doSOIAnalysis = false
 
     // None: no equality constraints
-    val problem = OptimizationProblem(id,objF,ineqsF,None,pars,logger,debugLevel)
+    val pars = SolverParams.standardParams(dim)
+    val problem = OptimizationProblem(id,setWhereDefined,objF,ineqsF,None,solverType,pars,logger,debugLevel)
 
     // add the known solution
     val x_opt = DenseVector(-1.0,1/e)    // minimizer
@@ -78,10 +81,10 @@ object SimpleOptimizationProblems {
     *
     * The constraint set of the problem is allocated without feasible point.
     *
-    * @param pars parameters controlling the solver behaviour (maxIter, backtracking line search
-    * parameters etc, see [SolverParams].
+    * @param solverType: "BR" (barrier solver), "PD0" (primal dual with one slack variable),
+    *   "PD1" (primal dual with one slack variable for each inequality constraint), see docs/primaldual.pdf.
     */
-  def minX1_no_FP(pars: SolverParams, debugLevel:Int):OptimizationProblem with KnownMinimizer = {
+  def minX1_no_FP(solverType:String,debugLevel:Int):OptimizationProblem with KnownMinimizer = {
 
     val id = "f(x0,x1)=x0 on x1>=exp(x0), x1 <= r+k*x0, no feasible point"
     if(debugLevel>0) {
@@ -95,9 +98,9 @@ object SimpleOptimizationProblems {
     // objective f(x0,x1)=x0
     val objF = new ObjectiveFunction(dim){
 
-      def valueAt(x:DenseVector[Double]) = x(0)
-      def gradientAt(x:DenseVector[Double]) = DenseVector(1.0,0.0)
-      def hessianAt(x:DenseVector[Double]) = DenseMatrix.zeros[Double](dim,dim)
+      def valueAt(x:DenseVector[Double]):Double = x(0)
+      def gradientAt(x:DenseVector[Double]):DenseVector[Double] = DenseVector(1.0,0.0)
+      def hessianAt(x:DenseVector[Double]):DenseMatrix[Double] = DenseMatrix.zeros[Double](dim,dim)
     }
 
     // set of inequality constraints
@@ -106,20 +109,22 @@ object SimpleOptimizationProblems {
     val ub = 0.0 // upper bound
     val ct1 = new Constraint("x2>=exp(x1)",dim,ub){
 
-      def valueAt(x:DenseVector[Double]) = Math.exp(x(0))-x(1)
-      def gradientAt(x:DenseVector[Double]) = DenseVector(Math.exp(x(0)),-1.0)
-      def hessianAt(x:DenseVector[Double]) = DenseMatrix((Math.exp(x(0)),0.0),(0.0,0.0))
+      def isDefinedAt(u:DenseVector[Double]):Boolean = true
+      def valueAt(x:DenseVector[Double]):Double = Math.exp(x(0))-x(1)
+      def gradientAt(x:DenseVector[Double]):DenseVector[Double] = DenseVector(Math.exp(x(0)),-1.0)
+      def hessianAt(x:DenseVector[Double]):DenseMatrix[Double] = DenseMatrix((Math.exp(x(0)),0.0),(0.0,0.0))
     }
     // linear inequality x1 <= r+k*x0
     val e = Math.exp(1.0); val r = 0.5*(e+1/e); val k = 0.5*(e-1/e)
     val a = DenseVector(-k,1.0)    // a dot x = x1-k*x0
     val ct2 = LinearConstraint("x1<=r+k*x0",dim,r,0.0,a)
 
-    val x = DenseVector(0.0,0.0)     // point where all the constraints are defined
-    val ineqs = ConstraintSet(dim,List(ct1,ct2),x)   // the inequality constraints
+    val x0 = DenseVector(0.0,0.0)     // point where all the constraints are defined
+    val setWhereDefined = ConvexSets.wholeSpace(dim)
+    val ineqs = ConstraintSet(dim,List(ct1,ct2),setWhereDefined,x0)   // the inequality constraints
 
-
-    val problem = OptimizationProblem(id,objF,ineqs,None,pars,logger,debugLevel)
+    val pars = SolverParams.standardParams(dim)
+    val problem = OptimizationProblem(id,setWhereDefined,objF,ineqs,None,solverType,pars,logger,debugLevel)
 
     // add the known solution
     val x_opt = DenseVector(-1.0,1/e)    // minimizer
@@ -130,8 +135,11 @@ object SimpleOptimizationProblems {
   /** This is the problem
     *      min -a'x  subject to  |x_j|<=|a_j|.
     * Obviously the minimum is assumed at x=a.
+    *
+    * @param solverType: "BR" (barrier solver), "PD0" (primal dual with one slack variable),
+    *   "PD1" (primal dual with one slack variable for each inequality constraint), see docs/primaldual.pdf.
     */
-  def minDotProduct(a:DenseVector[Double], pars: SolverParams, debugLevel:Int):
+  def minDotProduct(a:DenseVector[Double], solverType:String, debugLevel:Int):
   OptimizationProblem with KnownMinimizer = {
 
     val id = "Min f(x)=a'x subject to |x_j|<=|a_j|"
@@ -143,15 +151,18 @@ object SimpleOptimizationProblems {
       Console.flush()
     }
 
-    val n = a.length
+    val n = a.length  // the dimension
     val ub = abs(a)
     val cntList = Constraints.absoluteValuesBoundedBy(n,ub)
     val x0 = a*2.0   // point where all constraints are defined, deliberately infeasible
-    val cnts = ConstraintSet(n,cntList,x0)
+    val setWhereDefined = ConvexSets.wholeSpace(n)
+    val ineqs = ConstraintSet(n,cntList,setWhereDefined,x0)
 
     val objF = LinearObjectiveFunction(-a)
 
-    val problem = OptimizationProblem(id,objF,cnts,None,pars,logger,debugLevel)
+    val pars = SolverParams.standardParams(n)
+    val problem = OptimizationProblem(id,setWhereDefined,objF,ineqs,None,solverType,pars,logger,debugLevel)
+
     val theMinimizer = KnownMinimizer(a,objF)
     problem.addSolution(theMinimizer)
   }
@@ -161,8 +172,11 @@ object SimpleOptimizationProblems {
     * where p>1. We know that generally ||x||_1 <= ||x||_p with equality
     * if an only if all |x_j| are equal.
     * Thus our problem has the unique solution x_j=1/n with n=length(x).
+    *
+    * @param solverType: "BR" (barrier solver), "PD0" (primal dual with one slack variable),
+    *   "PD1" (primal dual with one slack variable for each inequality constraint), see docs/primaldual.pdf.
     */
-  def min_pNorm(dim:Int, p:Double, pars: SolverParams, debugLevel:Int):
+  def min_pNorm(dim:Int, p:Double, solverType:String, debugLevel:Int):
   OptimizationProblem with KnownMinimizer = {
 
     assert(p>=2,"\np-norm not twice differentiable unless p>=2 but p="+p+"\n")
@@ -181,9 +195,12 @@ object SimpleOptimizationProblems {
     val probEq:EqualityConstraint = Constraints.sumToOne(dim)
 
     val x0 = DenseVector.zeros[Double](dim)     // vector where all constraints are defined
-    val cnts = ConstraintSet(dim,positivityCnts,x0)
+    val setWhereDefined = ConvexSets.wholeSpace(dim)
+    val ineqs = ConstraintSet(dim,positivityCnts,setWhereDefined,x0)
     val objF = ObjectiveFunctions.p_norm_p(dim,p)
-    val problem = OptimizationProblem(id,objF,cnts,Some(probEq),pars,logger,debugLevel)
+
+    val pars = SolverParams.standardParams(dim)
+    val problem = OptimizationProblem(id,setWhereDefined,objF,ineqs,None,solverType,pars,logger,debugLevel)
 
     // minimizer is the vector x_j=1/dim
     val w = DenseVector.tabulate[Double](dim)(j => 1.0/dim)
@@ -197,8 +214,11 @@ object SimpleOptimizationProblems {
     * of solutions = convex_hull(e_j:a_j=m).
     *
     * We do this for a=linspace(1,10), so the unique solution is x=e_1.
+    *
+    * @param solverType: "BR" (barrier solver), "PD0" (primal dual with one slack variable),
+    *   "PD1" (primal dual with one slack variable for each inequality constraint), see docs/primaldual.pdf.
     */
-  def rankOneProblemSimplex(dim:Int, pars: SolverParams, debugLevel:Int):
+  def rankOneProblemSimplex(dim:Int, solverType:String, debugLevel:Int):
   OptimizationProblem with KnownMinimizer = {
 
     assert(dim>1,"\n\ndim must be >1 , but dim = "+dim+"\n\n")
@@ -218,12 +238,15 @@ object SimpleOptimizationProblems {
 
     val positivityCnts:List[Constraint] = Constraints.allCoordinatesPositive(dim)
     // point where all constraints are defined
-    val x = DenseVector.tabulate[Double](dim)(j=>1.0/dim)
-    val ineqs = ConstraintSet(dim,positivityCnts,x)
+    val x0 = DenseVector.tabulate[Double](dim)(j=>1.0/dim)
+    val setWhereDefined = ConvexSets.wholeSpace(dim)
+    val ineqs = ConstraintSet(dim,positivityCnts,setWhereDefined,x0)
 
     val probEq:EqualityConstraint = Constraints.sumToOne(dim)
 
-    val problem = OptimizationProblem(id,objF,ineqs,Some(probEq),pars,logger,debugLevel)
+
+    val pars = SolverParams.standardParams(dim)
+    val problem = OptimizationProblem(id,setWhereDefined,objF,ineqs,None,solverType,pars,logger,debugLevel)
 
     // the known optimal solution
     val x_opt = DenseVector.tabulate[Double](dim)(j => if(j==0) 1.0 else 0.0)
@@ -237,8 +260,11 @@ object SimpleOptimizationProblems {
     * of solutions = convex_hull(e_j:a_j=m)
     *
     * We do this for a=linspace(1,10), so the unique solution is x=0.
+    *
+    * @param solverType: "BR" (barrier solver), "PD0" (primal dual with one slack variable),
+    *   "PD1" (primal dual with one slack variable for each inequality constraint), see docs/primaldual.pdf.
     */
-  def rankOneProblemSphere(dim:Int, pars: SolverParams, debugLevel:Int):
+  def rankOneProblemSphere(dim:Int, solverType:String, debugLevel:Int):
   OptimizationProblem with KnownMinimizer = {
 
     assert(dim>1,"\n\ndim must be >1 , but dim = "+dim+"\n\n")
@@ -260,10 +286,12 @@ object SimpleOptimizationProblems {
     val cnts:List[Constraint] = cntSphere::Constraints.allCoordinatesPositive(dim)
 
     // point where all constraints are defined
-    val x = DenseVector.tabulate[Double](dim)(j=>1.0/dim)
-    val ineqs = ConstraintSet(dim,cnts,x)
+    val x0 = DenseVector.tabulate[Double](dim)(j=>1.0/dim)
+    val setWhereDefined = ConvexSets.wholeSpace(dim)
+    val ineqs = ConstraintSet(dim,cnts,setWhereDefined,x0)
 
-    val problem = OptimizationProblem(id,objF,ineqs,None,pars,logger,debugLevel)
+    val pars = SolverParams.standardParams(dim)
+    val problem = OptimizationProblem(id,setWhereDefined,objF,ineqs,None,solverType,pars,logger,debugLevel)
 
     // the known optimal solution
     val x_opt = DenseVector.zeros[Double](dim)
@@ -274,8 +302,11 @@ object SimpleOptimizationProblems {
   /** This problem has many free variables which need to be eliminated
     * in phase I analysis:
     * f(x)=0.5*||x||² subject to x_0<=-1.
+    *
+    * @param solverType: "BR" (barrier solver), "PD0" (primal dual with one slack variable),
+    *   "PD1" (primal dual with one slack variable for each inequality constraint), see docs/primaldual.pdf.
     */
-  def normSquaredWithFreeVariables(dim:Int, pars: SolverParams, debugLevel:Int):
+  def normSquaredWithFreeVariables(dim:Int, solverType:String, debugLevel:Int):
   OptimizationProblem with KnownMinimizer = {
 
     assert(dim>1,"\n\ndim must be >1 , but dim = "+dim+"\n\n")
@@ -294,10 +325,12 @@ object SimpleOptimizationProblems {
     val cnt = LinearConstraint("x_1<=-1",dim,-1.0,0.0,a)
 
     // point where all constraints are defined
-    val x = DenseVector.fill[Double](dim)(1.0)    // infeasible point
-    val ineqs = ConstraintSet(dim,List(cnt),x)
+    val x0 = DenseVector.fill[Double](dim)(1.0)    // infeasible point
+    val setWhereDefined = ConvexSets.wholeSpace(dim)
+    val ineqs = ConstraintSet(dim,List(cnt),setWhereDefined,x0)
 
-    val problem = OptimizationProblem(id,objF,ineqs,None,pars,logger,debugLevel)
+    val pars = SolverParams.standardParams(dim)
+    val problem = OptimizationProblem(id,setWhereDefined,objF,ineqs,None,solverType,pars,logger,debugLevel)
 
     // the known optimal solution
     val x_opt = DenseVector.zeros[Double](dim)
@@ -308,8 +341,11 @@ object SimpleOptimizationProblems {
 
   /** f(x)= sum(x) subject to ||x||²<=1.
     * Solution is all x_j=-1/sqrt(dim).
+    *
+    * @param solverType: "BR" (barrier solver), "PD0" (primal dual with one slack variable),
+    *   "PD1" (primal dual with one slack variable for each inequality constraint), see docs/primaldual.pdf.
     */
-  def joptP1(dim:Int, pars: SolverParams, debugLevel:Int):
+  def joptP1(dim:Int, solverType:String, debugLevel:Int):
   OptimizationProblem with KnownMinimizer = {
 
     assert(dim>1,"\n\ndim must be >1 , but dim = "+dim+"\n\n")
@@ -327,10 +363,12 @@ object SimpleOptimizationProblems {
 
     val cnt = Constraints.oneHalfNorm2BoundedBy(dim,1.0/2)
     // point where all constraints are defined
-    val x = DenseVector.fill[Double](dim)(2.0)    // infeasible
-    val ineqs = ConstraintSet(dim,List(cnt),x)
+    val x0 = DenseVector.fill[Double](dim)(2.0)    // infeasible
+    val setWhereDefined = ConvexSets.wholeSpace(dim)
+    val ineqs = ConstraintSet(dim,List(cnt),setWhereDefined,x0)
 
-    val problem = OptimizationProblem(id,objF,ineqs,None,pars,logger,debugLevel)
+    val pars = SolverParams.standardParams(dim)
+    val problem = OptimizationProblem(id,setWhereDefined,objF,ineqs,None,solverType,pars,logger,debugLevel)
 
     // the known optimal solution
     val x_opt = -a*1.0/sqrt(dim)
@@ -340,9 +378,11 @@ object SimpleOptimizationProblems {
 
   /** See docs/OptimizerExamples.pdf, example 1.5
     * f(x)=x'Px subject to x_j>=0, sum(x)=1 in dimension 2.
+    *
+    * @param solverType: "BR" (barrier solver), "PD0" (primal dual with one slack variable),
+    *   "PD1" (primal dual with one slack variable for each inequality constraint), see docs/primaldual.pdf.
     */
-  def joptP2(pars: SolverParams, debugLevel:Int):
-  OptimizationProblem with KnownMinimizer = {
+  def joptP2(solverType:String, debugLevel:Int): OptimizationProblem with KnownMinimizer = {
 
     val id = "example_1.5"
     if(debugLevel>0) {
@@ -360,10 +400,12 @@ object SimpleOptimizationProblems {
     val probEq:EqualityConstraint = Constraints.sumToOne(dim)
     val cnts = Constraints.allCoordinatesPositive(dim)
     // point where all constraints are defined
-    val x = DenseVector.fill[Double](dim)(2.0)    // infeasible
-    val ineqs = ConstraintSet(dim,cnts,x)
+    val x0 = DenseVector.fill[Double](dim)(2.0)    // infeasible
+    val setWhereDefined = ConvexSets.wholeSpace(dim)
+    val ineqs = ConstraintSet(dim,cnts,setWhereDefined,x0)
 
-    val problem = OptimizationProblem(id,objF,ineqs,Some(probEq),pars,logger,debugLevel)
+    val pars = SolverParams.standardParams(dim)
+    val problem = OptimizationProblem(id,setWhereDefined,objF,ineqs,None,solverType,pars,logger,debugLevel)
 
     // the known optimal solution
     val x_opt = DenseVector(0.5,0.5)
@@ -377,8 +419,11 @@ object SimpleOptimizationProblems {
     * We use it for debugging this very analysis.
     * The minimizer is obviously not uniquely determined and the set of minimizers
     * is exactly the probability simplex.
+    *
+    * @param solverType: "BR" (barrier solver), "PD0" (primal dual with one slack variable),
+    *   "PD1" (primal dual with one slack variable for each inequality constraint), see docs/primaldual.pdf.
     */
-  def probabilitySimplexProblem(n:Int, pars: SolverParams, debugLevel:Int):
+  def probabilitySimplexProblem(n:Int, solverType:String, debugLevel:Int):
   OptimizationProblem with KnownMinimizer = {
 
     val id = "Probability_simplex_problem"
@@ -397,10 +442,12 @@ object SimpleOptimizationProblems {
 
     val cnts = Constraints.allCoordinatesPositive(n)
     // point where all constraints are defined
-    val x = DenseVector.fill[Double](n)(2.0)    // infeasible
-    val ineqs = ConstraintSet(n,cnts,x)
+    val x0 = DenseVector.fill[Double](n)(2.0)    // infeasible
+    val setWhereDefined = ConvexSets.wholeSpace(n)
+    val ineqs = ConstraintSet(n,cnts,setWhereDefined,x0)
 
-    val problem = OptimizationProblem(id,objF,ineqs,None,pars,logger,debugLevel)
+    val pars = SolverParams.standardParams(n)
+    val problem = OptimizationProblem(id,setWhereDefined,objF,ineqs,None,solverType,pars,logger,debugLevel)
 
     // the known optimal solution
     val x_opt = DenseVector.fill[Double](n)(1.0/n)
@@ -411,8 +458,11 @@ object SimpleOptimizationProblems {
   /** A problem in R^^{n+1} with known solution x=e_{n+1} (where {e_j} denotes the
     * standard basis as usual):
     *           min f(x)=||x||^^2  on ||x-2e_{n+1}||^^2 <= 1.
+    *
+    * @param solverType: "BR" (barrier solver), "PD0" (primal dual with one slack variable),
+    *   "PD1" (primal dual with one slack variable for each inequality constraint), see docs/primaldual.pdf.
     */
-  def distanceFromOrigin0(n:Int, pars: SolverParams, debugLevel:Int):
+  def distanceFromOrigin0(n:Int, solverType:String, debugLevel:Int):
   OptimizationProblem with KnownMinimizer = {
 
     val id = "DistanceFromOrigin_1"
@@ -434,10 +484,13 @@ object SimpleOptimizationProblems {
 
     // point where all constraints are defined
     val x0 = DenseVector.fill[Double](n+1)(0.0)    // infeasible
-    val ineqs = ConstraintSet(n+1,cnts,x0)
+    val setWhereDefined = ConvexSets.wholeSpace(n)
+    val ineqs = ConstraintSet(n+1,cnts,setWhereDefined,x0)
 
     val objF = ObjectiveFunctions.normSquared(n+1)
-    val problem = OptimizationProblem(id,objF,ineqs,None,pars,logger,debugLevel)
+
+    val pars = SolverParams.standardParams(n)
+    val problem = OptimizationProblem(id,setWhereDefined,objF,ineqs,None,solverType,pars,logger,debugLevel)
 
     // the known optimal solution
     val x_opt = e_np1
@@ -454,8 +507,11 @@ object SimpleOptimizationProblems {
     * Note that the linear constraints are of the form a_j'x >= 1 with
     * a_j = +-e_j+e_{n+1}. I.e. we are slicing off pieces of the the ball
     * ||x-2e_{n+1}|| <= 1 at the bottom near the solution x = e_{n+1}.
+    *
+    * @param solverType: "BR" (barrier solver), "PD0" (primal dual with one slack variable),
+    *   "PD1" (primal dual with one slack variable for each inequality constraint), see docs/primaldual.pdf.
     */
-  def distanceFromOrigin1(n:Int, pars: SolverParams, debugLevel:Int):
+  def distanceFromOrigin1(n:Int, solverType:String, debugLevel:Int):
   OptimizationProblem with KnownMinimizer = {
 
     val id = "DistanceFromOrigin_1"
@@ -489,10 +545,13 @@ object SimpleOptimizationProblems {
     val cnts = clb.toList
     // point where all constraints are defined
     val x0 = DenseVector.fill[Double](n+1)(0.0)    // infeasible
-    val ineqs = ConstraintSet(n+1,cnts,x0)
+    val setWhereDefined = ConvexSets.wholeSpace(n)
+    val ineqs = ConstraintSet(n+1,cnts,setWhereDefined,x0)
 
     val objF = ObjectiveFunctions.normSquared(n+1)
-    val problem = OptimizationProblem(id,objF,ineqs,None,pars,logger,debugLevel)
+
+    val pars = SolverParams.standardParams(n)
+    val problem = OptimizationProblem(id,setWhereDefined,objF,ineqs,None,solverType,pars,logger,debugLevel)
 
     // the known optimal solution
     val x_opt = e_np1
@@ -511,10 +570,11 @@ object SimpleOptimizationProblems {
     * This list will be expanded continually.
     * @param dim common dimension of all problems, must be >= 2.
     * @param condNumber: condition number of the matrix A in the power problems.
-    * @param pars parameters controlling the solver behaviour (maxIter, backtracking line search
+    * @param solverType: "BR" (barrier solver), "PD0" (primal dual with one slack variable),
+    *   "PD1" (primal dual with one slack variable for each inequality constraint), see docs/primaldual.pdf.
     * parameters etc, see [SolverParams].
     */
-  def standardProblems(dim:Int, condNumber:Double, pars:SolverParams, debugLevel:Int):
+  def standardProblems(dim:Int, condNumber:Double, solverType:String, debugLevel:Int):
   List[OptimizationProblem with KnownMinimizer] = {
 
     var theList:List[OptimizationProblem with KnownMinimizer]
@@ -522,18 +582,18 @@ object SimpleOptimizationProblems {
 
     val q = 2.0+rand()   // needs to be >= 2 for differentiability
     val id = "Random power problem in dimension "+dim+" with m="+dim+" and exponent "+q
-    val problem0 = randomPowerProblem(id,dim,dimKernel=0,condNumber,q,pars,debugLevel)
+    val problem0 = randomPowerProblem(id,dim,dimKernel=0,condNumber,q,debugLevel)
 
-    val problem1 = minX1_no_FP(pars,debugLevel)
+    val problem1 = minX1_no_FP(solverType,debugLevel)
     val a = DenseVector.tabulate[Double](dim)(i => 1.0)
-    val problem2 = minDotProduct(a,pars,debugLevel)
-    val problem3 = min_pNorm(dim,p=2.2,pars,debugLevel)
-    val problem4 = min_pNorm(dim,p=4,pars,debugLevel)
-    val problem5 = rankOneProblemSimplex(dim,pars,debugLevel)
-    val problem6 = rankOneProblemSphere(dim,pars,debugLevel)
-    val problem7 = joptP1(dim,pars,debugLevel)
-    val problem8 = joptP2(pars,debugLevel)
-    val problem9 = normSquaredWithFreeVariables(dim,pars,debugLevel)
+    val problem2 = minDotProduct(a,solverType,debugLevel)
+    val problem3 = min_pNorm(dim,p=2.2,solverType,debugLevel)
+    val problem4 = min_pNorm(dim,p=4,solverType,debugLevel)
+    val problem5 = rankOneProblemSimplex(dim,solverType,debugLevel)
+    val problem6 = rankOneProblemSphere(dim,solverType,debugLevel)
+    val problem7 = joptP1(dim,solverType,debugLevel)
+    val problem8 = joptP2(solverType,debugLevel)
+    val problem9 = normSquaredWithFreeVariables(dim,solverType,debugLevel)
     problem0 :: problem1 :: problem2 :: problem3 :: problem4 ::
       problem5 :: problem6 :: problem7 :: problem8 :: problem9 :: theList
   }

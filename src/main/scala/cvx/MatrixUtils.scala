@@ -201,7 +201,7 @@ object MatrixUtils {
   /********************************************************/
 
   /** HS-norm sqrt(sum(A_ij*A_ij)).*/
-  def normHS(A:DenseMatrix[Double]) = Math.sqrt(sum(A:*A))
+  def normHS(A:DenseMatrix[Double]):Double = Math.sqrt(sum(A:*A))
 
   /** @return norm(Q-Q-t) < tol.*/
   def checkSymmetric(Q:DenseMatrix[Double],tol:Double):Boolean = {
@@ -306,7 +306,25 @@ object MatrixUtils {
     (d,Q)
   }
 
+  /** The vector b with m zeroes tagged on.
+    */
+  def addZeros(b:DenseVector[Double],m:Int):DenseVector[Double] = {
 
+    val zeros = DenseVector.zeros[Double](m)
+    DenseVector.vertcat[Double](b,zeros)
+  }
+  /** The square nxn matrix A is increased to dimension nx(n+m)
+    * by tagging on m zero columns to the right.
+    *
+    * @return the (n+m)x(n+m) matrix containing A in its upper left
+    *   corner and zeros elsewhere.
+    */
+  def addZeroColumns(A:DenseMatrix[Double],m:Int):DenseMatrix[Double] = {
+
+    val n=A.rows
+    val zeros = DenseMatrix.zeros[Double](n,m)
+    DenseMatrix.horzcat(A,zeros)
+  }
 
 
 
@@ -694,7 +712,7 @@ object MatrixUtils {
   def svdSolve(
     A: DenseMatrix[Double], b: DenseVector[Double],
     logger:Logger, tol:Double, debugLevel:Int
-  ) = {
+  ):DenseVector[Double] = {
 
     if(debugLevel>1){
 
@@ -716,14 +734,14 @@ object MatrixUtils {
   def symSolve(
     A: DenseMatrix[Double], b: DenseVector[Double],
     logger:Logger, tol:Double, debugLevel:Int
-  ) = {
+  ):DenseVector[Double] = {
 
     if(debugLevel>1){
 
       Console.println("\nMatrixUtils.symSolve:"); Console.flush()
       logger.println("\nMatrixUtils.symSolve:")
     }
-    val n = A.rows
+    val n = A.rows;
     assert(b.length==n,
       "\nMatrixUtils.symSolve: incompatible dimensions in Mx=q, M.rows = "+n+", q.length = "+b.length+"\n"
     )

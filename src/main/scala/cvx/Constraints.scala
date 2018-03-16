@@ -14,27 +14,41 @@ object Constraints {
 
   val rng = scala.util.Random
 
-  /** Constraints: x_m,x_{m+1},...,x_n>0
+
+  /** Constraint: x_j>=0.
+    * * Variables are numbered starting from zero (hence in dimension n,
+    * x_{n-1} is the last variable).
     *
     * @param n dimension of problem.
-    * @param m
+    * @param j coordinate on which the constraint acts, must satisfy j < n.
+    *
+    */
+  def singleCoordinatePositive(n:Int,j:Int):Constraint = {
+
+    assert(j<n && j>=0,
+      "\nMust have 0<=j<n but actually m="+j+" and n="+n+"\n"
+    )
+    val id = "x_" + j + ">0"
+    val a = DenseVector.zeros[Double](n)
+    a(j) = -1.0
+    LinearConstraint(id, n, 0, 0, a)
+  }
+
+  /** Constraints: x_m,x_{m+1},...,x_{n-1}>0.
+    * Variables are numbered starting from zero (hence in dimension n,
+    * x_{n-1} is the last variable).
+    *
+    * @param n dimension of problem.
     */
   def lastCoordinatesPositive(n:Int,m:Int):List[Constraint] = {
 
-    assert(m<=n && m>=0,
-      "\nMust have 0<=m<=n but actually m="+m+" and n="+n+"\n"
+    assert(m<n && m>=0,
+      "\nMust have 0<=m<n but actually m="+m+" and n="+n+"\n"
     )
-
-    (m until n).map(j => {
-
-      val id = "x_" + j + ">0"
-      val a = DenseVector.zeros[Double](n)
-      a(j) = -1.0
-      LinearConstraint(id, n, 0, 0, a)
-    }).toList
+    (m until n).map(j => singleCoordinatePositive(n,j)).toList
   }
 
-  /** Constraints: all x_j>0, j=1,...,n.
+  /** Constraints: all x_j>0, j=1,...,n-1.
     *
     * @param n dimension of problem.
     */
@@ -273,6 +287,7 @@ object Constraints {
     val id = "x dot x <= "+ub
     new Constraint(id,n,ub) {
 
+      def isDefinedAt(x: DenseVector[Double]): Boolean = true
       def valueAt(x:DenseVector[Double]):Double = (x dot x)/2
       def gradientAt(x:DenseVector[Double]):DenseVector[Double] = x
       def hessianAt(x:DenseVector[Double]):DenseMatrix[Double] = DenseMatrix.eye[Double](x.length)

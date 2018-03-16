@@ -53,9 +53,10 @@ object ConstraintSets {
     // set up the constraints
     val cnts:List[Constraint] = ct2::ct1::Constraints.allCoordinatesPositive(n)
 
-    // point where all constraints are defined
+    val setWhereDefined = ConvexSets.wholeSpace(n)
+    // point where all constraints are defined.
     val x = DenseVector.tabulate[Double](n)(j=>1.0/n)
-    ConstraintSet(n,cnts,x)
+    ConstraintSet(n,cnts,setWhereDefined,x)
   }
 
   /** A set of p random linear constraints of the form a'(x-x0)<=e
@@ -79,10 +80,11 @@ object ConstraintSets {
       cts += Constraints.randomQuadraticIneqConstraint(id,x0,e)
     }
     val dim = x0.length
+
+    val setWhereDefined = ConvexSets.wholeSpace(dim)
     // point where all constraints are defined, don't use x0 here
     // since some of the test optimizations have the optimum at x0
     val u = DenseVector.zeros[Double](dim)
-    ConstraintSet(dim,cts,u)
+    ConstraintSet(dim,cts,setWhereDefined,u)
   }
-
 }

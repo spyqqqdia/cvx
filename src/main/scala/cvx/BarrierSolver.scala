@@ -100,8 +100,8 @@ extends Solver { self =>
       x = sol.x
       obfFcnValue = objF.valueAt(x)
       dualityGap = numConstraints/t
-      // None: Newton decrement, norm of gradient, equality gap
-      optimizationState = OptimizationState(None,None,Some(dualityGap),None,obfFcnValue)
+      // None: Newton decrement, norm of gradient, equality gap = 0 since no equalities
+      optimizationState = OptimizationState(None,None,Some(dualityGap),Some(0),obfFcnValue)
       if(debugLevel>3){
         print("\nOptimization state:"+optimizationState)
         Console.flush()
@@ -109,7 +109,11 @@ extends Solver { self =>
       t = mu*t
       iter+=1
     }
-    sol
+    // the UnconstrainedSolver does not report the duality gap, so we must do it
+    Solution(
+      sol.x,None,None,None,sol.newtonDecrement,Some(dualityGap),None,
+      sol.normGrad,sol.normDualResidual,sol.iter,sol.maxedOut
+    )
   }
   /** Find the location $x$ of the minimum of f=objF over C with equality constraints Ax=b
     * by iteratively solving the KKT system with backtracking line search starting from the
@@ -165,7 +169,11 @@ extends Solver { self =>
       t = mu*t
       iter+=1
     }
-    sol
+    // the UnconstrainedSolver does not report the duality gap, so we must do it
+    Solution(
+      sol.x,None,None,None,sol.newtonDecrement,Some(dualityGap),Some(equalityGap),
+      sol.normGrad,sol.normDualResidual,sol.iter,sol.maxedOut
+    )
   }
   def solveSpecial(terminationCriterion:(OptimizationState)=>Boolean, debugLevel:Int=0):Solution =
     if(eqs.isDefined) solveWithEQs(terminationCriterion,eqs.get.A,eqs.get.b,debugLevel)

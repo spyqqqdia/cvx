@@ -688,21 +688,128 @@ present in all cases. More work on PrimalDualSolver.
 Files affected:
 
 BarrierSolver
-CvxUtils
 Constraints
 ConstraintSet
-KnownMinimizer
-MatrixUtils
-MatrixUtilsTests
-OptimizationProblem
 OptimizationState
 PrimalDualSolver
 
-Status: compiles.
-Simple phase I analysis fails since the OptimizationState no
-longer has enough fields for the termination criterion. See ToDo.
+Status: compiles, untested.
 
 
+#----------------------------------------------------------------------------------------
+2018-03-07:|
+-------------
+
+Changes to Constraint and ConstraintSet to support the globally relaxed constraints
+for the PrimalDualSolver. PrimalDualSolver with global relaxation is
+almost implemented (the new objective function is still missing, currently set to null).
+
+Files affected:
+
+Constraint
+Constraints
+ConstraintSet
+LinearConstraint
+QuadraticConstraint
+PrimalDualSolver
+
+tests:
+SimpleOptimizationProblems
+
+Status: compiles, untested (even the existing tests not rerun).
+
+
+#----------------------------------------------------------------------------------------
+2018-03-08:|
+-------------
+
+ObjectiveFunction:
+implemented member functions that return the objective function for the globally
+and the locally relaxed problem. Factory methods for allocation of PrimalDualSolver
+completed
+
+Files affected:
+ObjectiveFunction
+PrimalDualSolver
+
+Status: compiles, untested.
+
+
+#----------------------------------------------------------------------------------------
+2018-03-12:|
+-------------
+
+New object ConvexSets.
+Removed class FeasibleSet from ConvexSet.scala,
+made this instead member functions of ConvexSets, although these member functions are not
+needed (now implemented also in ConstraintSet).
+
+Removed the parameter pars from the test problems. They all run on
+SolverParams.standardParams now. Added abstract ::setWhereDefined to ConstraintSet.
+All tests optimization problems adapted to the new signatures.
+
+OptimizationProblem factory function gets parameter solverType to choose between the
+BarrierSolver and the two versions of the PrimalDualSolver for solution.
+
+Files affected:
+
+BarrierSolver
+ConstraintSet
+ConvexSets
+OptimizationProblem
+SolverParams
+
+Runner
+ConstraintSets
+KktTest
+OptimizationProblems
+SimpleOptimizationProblems
+
+Status: compiles
+With barrier solver the test problems go through except
+example-1.5, where it computes a better solution than known,
+thus something wrong with the example.
+
+PrimalDualSolver fails since the convex set C is not updated to
+new_C = C x R, C x R^^p in the second and third apply method of
+BarrierSolver.
+
+
+#----------------------------------------------------------------------------------------
+2018-03-13:|
+-------------
+
+Numerous BUG-fixes in PrimalDualSolver.
+
+Files affected:
+
+ConstraintSet
+EqualityConstraint
+MatrixUtils
+ObjectiveFunction
+OptimizationProblem
+
+Status: compiles,
+BarrierSolver works,
+PrimalDualSolver not working: dimension mismatch in function
+kktSystem_withEqs in the definition of q.
+
+
+
+#----------------------------------------------------------------------------------------
+2018-03-15:|
+-------------
+
+Numerous bug fixes.
+
+Files affected:
+ObjectiveFunction
+PrimalDualSolver
+
+Status: compiles,
+BarrierSolver works,
+PrimalDualSolver not working: runs but does not converge (no equality constraints)
+or line search fails (with equality constraints).
 
 
 

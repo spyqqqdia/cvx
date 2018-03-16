@@ -11,7 +11,8 @@ import breeze.linalg.{DenseMatrix, DenseVector, _}
 abstract class Constraint(val id:String, val dim:Int, val ub:Double){
 
   self: Constraint =>
-
+  def isDefinedAt(x:DenseVector[Double]):Boolean
+  /** This is g(x) _not_ g(x)-ub.*/
   def valueAt(x:DenseVector[Double]):Double
   def gradientAt(x:DenseVector[Double]):DenseVector[Double]
   def hessianAt(x:DenseVector[Double]):DenseMatrix[Double]
@@ -40,11 +41,11 @@ abstract class Constraint(val id:String, val dim:Int, val ub:Double){
     val reducedID = id+"_reduced"
     new Constraint(reducedID,reducedDim,ub) {
 
-      override def valueAt(u: DenseVector[Double]) = self.valueAt(z + F * u)
 
-      override def gradientAt(u: DenseVector[Double]) = F.t * self.gradientAt(z + F * u)
-
-      override def hessianAt(u: DenseVector[Double]) = (F.t * self.hessianAt(z + F * u)) * F
+      override def isDefinedAt(u:DenseVector[Double]):Boolean = self.isDefinedAt(z + F * u)
+      override def valueAt(u: DenseVector[Double]):Double = self.valueAt(z + F * u)
+      override def gradientAt(u: DenseVector[Double]):DenseVector[Double] = F.t * self.gradientAt(z + F * u)
+      override def hessianAt(u: DenseVector[Double]):DenseMatrix[Double] = (F.t * self.hessianAt(z + F * u)) * F
     }
   }
 
@@ -60,6 +61,8 @@ object Constraint {
     */
   def phase_I(cnt:Constraint):Constraint = new Constraint(cnt.id+"_phase_I",cnt.dim+1,cnt.ub){
 
+
+    def isDefinedAt(u:DenseVector[Double]):Boolean = cnt.isDefinedAt(u(0 until cnt.dim))
     // dim = cnt.dim+1
     def valueAt(u:DenseVector[Double]):Double = {
 
@@ -96,7 +99,7 @@ object Constraint {
   def phase_I_SOI(cnt:Constraint,p:Int,j:Int):Constraint = new Constraint(cnt.id+"_phase_I",cnt.dim+p,cnt.ub){
 
     // u=(x,s_1,...,s_p) is the new variable, note dim = cnt.dim+p
-
+    def isDefinedAt(u:DenseVector[Double]):Boolean = cnt.isDefinedAt(u(0 until cnt.dim))
     /** The variables of the original problem.*/
     def x(u:DenseVector[Double]):DenseVector[Double] = u(0 until dim-p)   // dim(x) = n = cnt.dim = dim-p
     // g_j(x(u))-s_j
@@ -142,8 +145,8 @@ object Constraint {
     // list of constraints s_j>=0, i.e. -s_j<=0
     val sPositive:List[Constraint] = (0 until p).map(j => new Constraint("s_"+j+">=0",n+p,0.0) {
 
+      def isDefinedAt(u:DenseVector[Double]) = true
       def valueAt(u:DenseVector[Double]):Double = -u(dim-p+j)    // note: dim = n+p
-
       def gradientAt(u:DenseVector[Double]):DenseVector[Double] =
         DenseVector.tabulate[Double](dim)(k => if(k==dim-p+j) -1.0 else 0.0 )
       // hessian is the zero matrix

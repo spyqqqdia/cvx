@@ -55,12 +55,11 @@ object OptimizationProblems {
     * a case.
     *
     * @param q exponent must be >= 1 for differentiability.
-    * @param pars parameters controlling the solver behaviour (maxIter, backtracking line search
     * parameters etc, see [SolverParams].
     */
   def powerProblem( id:String,
                     A:DenseMatrix[Double], alpha:DenseVector[Double], q:Double,
-                    pars:SolverParams, debugLevel:Int
+                    debugLevel:Int
     ): OptimizationProblem with KnownMinimizer = {
 
     assert(q>=1,"\nExponent q needs to be at least 1 but q="+q+"\n")
@@ -68,7 +67,8 @@ object OptimizationProblems {
       println("\nAllocating problem "+id)
       Console.flush()
     }
-    val n=A.cols; val m=A.rows
+    val n=A.cols    // dimension of problem
+    val m=A.rows
     assert(m<=n)
 
     val logFilePath = "logs/"+id+"_log.txt"
@@ -79,10 +79,11 @@ object OptimizationProblems {
     val C = ConvexSet.fullSpace(n)
     val minimizer = new KnownMinimizer {
 
-      def theMinimizer = DenseVector.zeros[Double](n)
-      def isMinimizer(x:DenseVector[Double],tol:Double) = norm(A*x)<tol
-      def minimumValue = 0.0
+      def theMinimizer:DenseVector[Double] = DenseVector.zeros[Double](n)
+      def isMinimizer(x:DenseVector[Double],tol:Double):Boolean = norm(A*x)<tol
+      def minimumValue:Double = 0.0
     }
+    val pars = SolverParams.standardParams(n)
     val problem = OptimizationProblem(id,objF,startingPoint,C,pars,logger)
     problem.addSolution(minimizer)
   }
@@ -94,31 +95,31 @@ object OptimizationProblems {
     * @param condNumber: condition number of A.
     */
   def randomPowerProblem(
-     id:String,dim:Int,dimKernel:Int,condNumber:Double,q:Double,
-     pars:SolverParams,debugLevel:Int
+     id:String,dim:Int,dimKernel:Int,condNumber:Double,q:Double, debugLevel:Int
   ): OptimizationProblem with KnownMinimizer = {
 
     assert(dimKernel<=dim)
     val A = MatrixUtils.randomMatrix(dim,condNumber)
     val alpha = DenseVector.rand[Double](dim)
-    powerProblem(id,A,alpha,q,pars,debugLevel)
+    val pars = SolverParams.standardParams(dim)
+    powerProblem(id,A,alpha,q,debugLevel)
   }
 
   /** List of power problems, the first with A the 2x2 identity matrix,
     * the second with A={{1,0},{1,1}} and in each case q=2 and alpha=(1,1).
     */
-  def powerProblems(pars:SolverParams,debugLevel:Int):List[OptimizationProblem with KnownMinimizer] = {
+  def powerProblems(debugLevel:Int):List[OptimizationProblem with KnownMinimizer] = {
 
     val q = 2.0
     val alpha = DenseVector(1.0,1.0)
     val A = DenseMatrix.eye[Double](2)
 
     val id1 = "Power problem A=I_2, alpha=(1,1), q=2"
-    val p1 = powerProblem( id1,A,alpha,q,pars,debugLevel)
+    val p1 = powerProblem( id1,A,alpha,q,debugLevel)
 
     val B = DenseMatrix.tabulate[Double](2,2)((i,j)=>1.0); B(0,1)=0.0
     val id2 = "Power problem A={{1,0},{1,1}}, alpha=(1,1), q=2"
-    val p2 = powerProblem( id2,B,alpha,q,pars,debugLevel)
+    val p2 = powerProblem( id2,B,alpha,q,debugLevel)
     List(p1,p2)
   }
 
@@ -150,10 +151,11 @@ object OptimizationProblems {
     * x_j=0.2/n,       j=n/2,n/2+1,...,n-1
     * x_j=1.08/(n-6), all other j
     *
-    *
+    * @param solverType: "BR" (barrier solver), "PD0" (primal dual with one slack variable),
+    *   "PD1" (primal dual with one slack variable for each inequality constraint), see docs/primaldual.pdf.
     * @param n must be even and bigger than 9 (to ensure feasibility).
     */
-  def kl_1(n:Int, pars: SolverParams,debugLevel:Int):OptimizationProblem with KnownMinimizer = {
+  def kl_1(n:Int,solverType:String,debugLevel:Int):OptimizationProblem with KnownMinimizer = {
 
     assert(n>9 && n%2==0, "\n\nn must be even and > 9, but n = "+n+"\n\n")
 
@@ -183,11 +185,15 @@ object OptimizationProblems {
     val constraints:Seq[Constraint] = positivityCnts:::List[Constraint](ct1,ct2)
 
     // point where all constraints are defined
-    val x = DenseVector.tabulate[Double](n)(j=>1.0/n)
-    val ineqs = ConstraintSet(n,constraints,x)
+    val x0 = DenseVector.tabulate[Double](n)(j=>1.0/n)
+    val setWhereDefined = ConvexSets.wholeSpace(n)
+    val ineqs = ConstraintSet(n,constraints,setWhereDefined,x0)
 
     val probEq:EqualityConstraint = Constraints.sumToOne(n)
-    val problem = OptimizationProblem(id,objF,ineqs,Some(probEq),pars,logger,debugLevel)
+    val pars = SolverParams.standardParams(n)
+    val problem = OptimizationProblem(
+      id,setWhereDefined,objF,ineqs,Some(probEq),solverType:String,pars,logger,debugLevel
+    )
 
     // the heuristic optimal solution
     val x_opt = if(1.8/n>0.12) DenseVector.tabulate[Double](n)(
@@ -215,9 +221,11 @@ object OptimizationProblems {
     * x_j=0.2/n,       j=n/2,n/2+1,...,n-1
     * x_j=(1-0.36-0.1)/(n-n/2-3), all other j
     *
+    * @param solverType: "BR" (barrier solver), "PD0" (primal dual with one slack variable),
+    *   "PD1" (primal dual with one slack variable for each inequality constraint), see docs/primaldual.pdf.
     * @param n must be even and bigger than 9 (to ensure feasibility).
     */
-  def kl_2(n:Int, pars: SolverParams, debugLevel:Int):OptimizationProblem with KnownMinimizer = {
+  def kl_2(n:Int, solverType:String, debugLevel:Int):OptimizationProblem with KnownMinimizer = {
 
     assert(n>9 && n%2==0, "\n\nn must be even and > 9, but n = "+n+"\n\n")
 
@@ -252,11 +260,14 @@ object OptimizationProblems {
     val positivityCnts:List[Constraint] = Constraints.allCoordinatesPositive(n)
 
     // point where all constraints are defined
-    val x = DenseVector.tabulate[Double](n)(j=>1.0/n)
-    val ineqs = ConstraintSet(n,positivityCnts,x)
+    val x0 = DenseVector.tabulate[Double](n)(j=>1.0/n)
+    val setWhereDefined = ConvexSets.wholeSpace(n)
+    val ineqs = ConstraintSet(n,positivityCnts,setWhereDefined,x0)
 
-    val problem = OptimizationProblem(id,objF,ineqs,Some(eqs),pars,logger,debugLevel)
-
+    val pars = SolverParams.standardParams(n)
+    val problem = OptimizationProblem(
+      id,setWhereDefined,objF,ineqs,Some(eqs),solverType,pars,logger,debugLevel
+    )
     // the known optimal solution
     val x_opt = DenseVector.tabulate[Double](n)(
       j => if(j<3) 0.12 else if (j>=n/2) 0.2/n else 1.08/(n-6)
@@ -268,9 +279,11 @@ object OptimizationProblems {
 
   /** A infeasible problem: sum of probabilities of disjoint events bigger than one.
     *
+    * @param solverType: "BR" (barrier solver), "PD0" (primal dual with one slack variable),
+    *   "PD1" (primal dual with one slack variable for each inequality constraint), see docs/primaldual.pdf.
     * @param n must be even and bigger than 9 (to ensure feasibility).
     */
-  def infeasible_kl_1(n:Int, pars: SolverParams,debugLevel:Int):OptimizationProblem = {
+  def infeasible_kl_1(n:Int,solverType:String,debugLevel:Int):OptimizationProblem = {
 
     assert(n>9 && n%2==0, "\n\nn must be even and > 9, but n = "+n+"\n\n")
 
@@ -291,7 +304,9 @@ object OptimizationProblems {
     // KL-distance
     val objF = Dist_KL(n)
 
-    OptimizationProblem(id,objF,ineqs,Some(probEq),pars,logger,debugLevel)
+    val pars = SolverParams.standardParams(n)
+    val setWhereDefined = ConvexSets.wholeSpace(n)
+    OptimizationProblem(id,setWhereDefined,objF,ineqs,Some(probEq),solverType,pars,logger,debugLevel)
   }
 
 

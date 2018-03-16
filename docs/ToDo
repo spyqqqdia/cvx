@@ -365,7 +365,7 @@ which is indeed unsolvable to any tolerance < 1.
 -------------
 
 Phase I analysis with equality constraints:
-the first step minimizing ||Ax-b||?? subject to the inequality constraints
+the first step minimizing ||Ax-b||² subject to the inequality constraints
 breaks off too soon with completely ridiculous results making the norm huge instead of
 small in the case where the constraintSet is the probability simplex.
 
@@ -374,7 +374,7 @@ and A'A is the matrix with all entries equal to one.
 
 The problem then becomes the following:
 
-Minimize (x1+x2+...+xn - 1)?? subject to xj>=0.
+Minimize (x1+x2+...+xn - 1)² subject to xj>=0.
 
 Clearly the set of minimizers is the entire probability simplex.
 In this simple problem we can study the effects of ill conditioning and regularization.
@@ -482,32 +482,146 @@ constraints
 2018-01-15:|
 -------------
 
-Integrate the trust region notes into the general cvx_notes.
-Update all references to cvx_notes in the doc comments.
-Correct the link syntax in the doc scaladoc comments.
+Integrate the trust region notes into cvx_notes.
 
-Adjust regularization H -> H+delta*I to the scale of the matrix H.
 
-Recompile openblas from source.
+#----------------------------------------------------------------------------------------
+2018-01-16:|
+-------------
+
+Fix SOI analysis with equalities so it becomes a one step process:
+Eliminate the equalities Ax=b and replace them with inequalities
+a_j'x<=0 and -a_j'x<=0.
+This should speed up the computation since only one optimization
+is carried out.
+
+Don't waste any more time on the barrier method, move onto
+infeasible start primal dual method.
+
+
+#----------------------------------------------------------------------------------------
+2018-02-13:|
+-------------
+
+Primal dual solver:
+needs to start from a strictly feasible point x but which need not
+satisfy the equality constraints.
+
+Transform this to the problem with 2 new slack variables s,t
+
+      min h(x,s,t):=s+K*t  such that f(x)<=s and g_i(x)<=u_i+t
+
+If t<tolFeasible the the problem is classified as feasible within
+tolerance. If K is chosen large enough, we can ensure that feasibility
+is prioritized over function value minimization.
+
+At the minimum point (x0,s0,t0) we have that f(x0)=s0 is the minimum
+over f(x) such that g_i(x)<=u_i+t.
+We just have no control over the value of t. I.e. there is a tradeoff
+between function minimization and inequality constraint satisfaction.
+
+By choosing K larger we can prioritize constraint satisfaction.
+By choosing K very large we will push down t as much as possible.
+A weakness lies in the fact that all inequalities are relaxed by the
+same amount t.
+
+Individual relaxation by slack variables t_i would solve the problem
+
+    min h(x,s,t) = s+(K,t)
+subject to
+    f(x)<=s, t_i>=0 and g_i(x)<=t_i
+
+Here K is a vector with components K_i>0, t=(t_i) is a vector of slack variables
+where we have a slack variable t_i for each constraint g_i(x)<=u_i.
+The constraints t_i>=0 make sure that get no distortion from constraints
+g_i(x) << u_i (large negative t_i) which then affects the minimum s=f(x).
+
+By choosing the K_i larger or smaller we can prioritize the constraints
+individually.
+
+This increases the number of variables substantially though the new matrices
+are sparse. Since we do not take advantage of sparsity this approach is limited
+to small problems.
+
+See docs/primaldual.pdf
+
+
+#----------------------------------------------------------------------------------------
+2018-02-15:|
+-------------
+
+We need to make the parameter mu with which the barrier penalty parameter t is
+multiplied in each step of the solution a part of the structure SolverParams.
+
+Currently this is hard coded to the value mu=10.0.
+
+(??) Derive KKTSystem from SymmetricLinearSystem. We then only have to add the method
+blockSolve as the more efficient approach to solution only available in a KKT type
+symmetric linear system. Currently though the structure of the solutions is different,
+since the KKTSystem returns the solution as a pair (x,lambda).
+
+PrimalDualSolver:
+solve_noEqs, solve_withEqs: solution sol is not updated from sol=null at start,
+will return null.
+We need to think about what we return as a solution:
+only x or x,lambda and nu.
+We may have to generalize the notion of Solution to contain the dual variables.
+dualityGap is not set correctly to the surrogate duality gap.
+
+Status:
+Project compiles but we need to check if the examples with the BarrierSolver still
+work.
+The PrimalDualSolver is not finished yet.
 
 
 
 #----------------------------------------------------------------------------------------
-2018-01-20:|
+2018-02-20:|
+-------------
+
+ConstraintSet:
+implement the methods which construct the relaxed
+constraint sets for the PrimalDualSolver.
+These are simply the phase_I constraint sets augmented with the additional
+constraint s>=0 in the case of one slack variable
+and the
+           phase_I_SOI
+constraint set itself in the case of local relaxation with multiple
+slack variables s_j (this one contains the constraints s_j>=0 already).
+See docs/primaldual.pdf
+
+
+#----------------------------------------------------------------------------------------
+2018-03-07:|
+-------------
+
+PrimalDualSolver:
+Implement member functions that transform the objective function to
+the objective function for the relaxed of objectives (global or local relaxation).
+
+With this implement the factory functions in the PrimalDualSolver object
+for solvers with no starting point and relaxed constraints.
+See docs/primaldual.pdf
+
+
+
+#----------------------------------------------------------------------------------------
+2018-03-12:|
 -------------
 
 
-Recall that we have made the fields in the OptimizationState Options
-putting in only the relevant values for each type of optimization.
-Now simple phase I analysis fails since the OptimizationState no
-longer has enough fields for the termination criterion. See ToDo.
-
-Also we terminate as soon as the objective function value s is < 0.
-This yields a strictly feasible point but which may not be nicely centered
-(i.e. close to the central path). Consider going back to the old approach, where we
-minimize s fully.
+PrimalDualSolver fails since the convex set C is not updated to
+new_C = C x R, C x R^^p in the second and third apply method of
+BarrierSolver.
+The convex set C has to be expanded in dimension with the new slack variables.
 
 
+#----------------------------------------------------------------------------------------
+2018-03-13:|
+-------------
+
+PrimalDualSolver with equality constraints not working: dimension mismatch in function
+kktSystem_withEqs in the definition of q.
 
 
 

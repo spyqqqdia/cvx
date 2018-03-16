@@ -71,9 +71,9 @@ object MinimizationTests {
 
   /** Run the two simple power problems [OptimizationProblems.powerProblems].
     */
-  def testPowerProblems(pars:SolverParams,tol:Double,debugLevel:Int):Unit = {
+  def testPowerProblems(tol:Double,debugLevel:Int):Unit = {
 
-    val problems = OptimizationProblems.powerProblems(pars,debugLevel)
+    val problems = OptimizationProblems.powerProblems(debugLevel)
     runProblemsWithKnownMinimizer(problems,tol,debugLevel)
   }
 
@@ -81,44 +81,45 @@ object MinimizationTests {
     *
     * @param dim dimension of independent variable.
     * @param condNumber: condition number of the matrix A in the power problems.
-    * @param pars parameters controlling the solver behaviour (maxIter, backtracking line search
-    * parameters etc, see [SolverParams].
+    * @param solverType: "BR" (barrier solver), "PD0" (primal dual with one slack variable),
+    *   "PD1" (primal dual with one slack variable for each inequality constraint), see
+    *    docs/primaldual.pdf.
     * @param tol tolerance for deviation from the known solution.
     */
   def testStandardProblems(
-    dim:Int,condNumber:Double,pars:SolverParams,tol:Double,debugLevel:Int
+    dim:Int,condNumber:Double,solverType:String,tol:Double,debugLevel:Int
   ):Unit = {
 
-    val problems = SimpleOptimizationProblems.standardProblems(dim,condNumber,pars,debugLevel)
+    val problems = SimpleOptimizationProblems.standardProblems(dim,condNumber,solverType,debugLevel)
     runProblemsWithKnownMinimizer(problems,tol,debugLevel)
   }
 
   /** Test the single problem OptimizationProblems.minX1.*/
-  def testMinX1(pars:SolverParams,tol:Double,debugLevel:Int):Unit = {
+  def testMinX1(solverType:String,tol:Double,debugLevel:Int):Unit = {
 
 
     val problems = List(
-      SimpleOptimizationProblems.minX1_FP(pars,debugLevel),
-      SimpleOptimizationProblems.minX1_no_FP(pars,debugLevel)
+      SimpleOptimizationProblems.minX1_FP(solverType,debugLevel),
+      SimpleOptimizationProblems.minX1_no_FP(solverType,debugLevel)
     )
     runProblemsWithKnownMinimizer(problems,tol,debugLevel)
   }
 
   /** Test the KL-problems (geometric centering) with known solutions.*/
-  def test_KL_problems(dim:Int,pars:SolverParams,tol:Double,debugLevel:Int):Unit = {
+  def test_KL_problems(dim:Int,solverType:String,tol:Double,debugLevel:Int):Unit = {
 
     val problems = List(
-      OptimizationProblems.kl_1(dim,pars,debugLevel),
-      OptimizationProblems.kl_2(dim,pars,debugLevel)
+      OptimizationProblems.kl_1(dim,solverType,debugLevel),
+      OptimizationProblems.kl_2(dim,solverType,debugLevel)
     )
     runProblemsWithKnownMinimizer(problems,tol,debugLevel)
   }
 
   /** Test the KL-problems (geometric centering) known to be infeasible.*/
-  def test_infeasible_KL_problems(pars:SolverParams,tol:Double,debugLevel:Int):Unit = {
+  def test_infeasible_KL_problems(solverType:String,tol:Double,debugLevel:Int):Unit = {
 
     val problems = List(
-      OptimizationProblems.infeasible_kl_1(12,pars,debugLevel)
+      OptimizationProblems.infeasible_kl_1(12,solverType,debugLevel)
     )
     runProblems(problems,tol,debugLevel)
   }

@@ -17,10 +17,10 @@ class EqualityConstraint(val A:DenseMatrix[Double], val b:DenseVector[Double]){
 
   assert(A.rows < A.cols, "m=A.rows="+A.rows+" is not less than n=A.cols="+A.cols)
   assert(A.rows == b.length, "m=A.rows="+A.rows+" != b.length = "+b.length)
-  val dim = A.cols
-  val solutionSpace = SolutionSpace(A,b)
-  val F = solutionSpace.F
-  val z0 = solutionSpace.z0
+  val dim:Int = A.cols
+  val solutionSpace:SolutionSpace = SolutionSpace(A,b)
+  val F:DenseMatrix[Double] = solutionSpace.F
+  val z0:DenseVector[Double] = solutionSpace.z0
 
   /** @return ||Ax-b||.*/
   def errorAt(x:DenseVector[Double]):Double = norm(A*x-b)
@@ -53,12 +53,12 @@ class EqualityConstraint(val A:DenseMatrix[Double], val b:DenseVector[Double]){
     val B = DenseMatrix.horzcat(A,zeroCols)
     EqualityConstraint(B,b)
   }
-  def printSelf = {
+  def printSelf:Unit = {
 
     val msg = "\nEquality constraints, matrix A:\n"+A+"\nvector b:\n"+b+"\n\n"
     print(msg)
   }
-  def printSelf(logger:Logger,digits:Int) = {
+  def printSelf(logger:Logger,digits:Int):Unit = {
 
     logger.print("\nEquality constraints, matrix A:\n")
     MatrixUtils.print(A,logger,digits)
@@ -91,6 +91,17 @@ class EqualityConstraint(val A:DenseMatrix[Double], val b:DenseVector[Double]){
       buff+=ineq2
     }
     buff.toList
+  }
+
+  /** The same equality constraint Ax=b after numSlacks slack variables
+    * have been added which are not constrained by any equality constraints.
+    * This has the effect of adding numSlacks zero columns to the matrix A
+    * on the right while b remains unaffected.
+    */
+  def withSlackVariables(numSlacks:Int):EqualityConstraint = {
+
+    val new_A = MatrixUtils.addZeroColumns(A,numSlacks)
+    EqualityConstraint(new_A,b)
   }
 }
 
