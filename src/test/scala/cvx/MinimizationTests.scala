@@ -99,7 +99,7 @@ object MinimizationTests {
 
 
     val problems = List(
-      SimpleOptimizationProblems.minX1_FP(solverType,debugLevel),
+      SimpleOptimizationProblems.minX1_withFP(solverType,debugLevel),
       SimpleOptimizationProblems.minX1_no_FP(solverType,debugLevel)
     )
     runProblemsWithKnownMinimizer(problems,tol,debugLevel)

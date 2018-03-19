@@ -21,14 +21,14 @@ object Runner extends App {
 
     val doTestPowerProblems = false
     val doTestStandardProblems = false
-    val doMinX1 = false
+    val doMinX1 = true
     val doTestKlProblems = true
     val doTestInfeasibleKlProblems = false
     val doFeasibilityTests = false
 
     val tolEqSolve = 1e-2
     val tolSolution = 1e-2      // tolerance for solution identification
-    val solverType = "BR"       // "BR", "PD0", "PD1"
+    val solverType = "PD"       // "BR", "PD"
 
 
     if(doAdHoc){

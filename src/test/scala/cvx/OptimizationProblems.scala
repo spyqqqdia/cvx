@@ -83,7 +83,7 @@ object OptimizationProblems {
       def isMinimizer(x:DenseVector[Double],tol:Double):Boolean = norm(A*x)<tol
       def minimumValue:Double = 0.0
     }
-    val pars = SolverParams.standardParams(n)
+    val pars = SolverParams.standardParams(0)
     val problem = OptimizationProblem(id,objF,startingPoint,C,pars,logger)
     problem.addSolution(minimizer)
   }
@@ -101,7 +101,7 @@ object OptimizationProblems {
     assert(dimKernel<=dim)
     val A = MatrixUtils.randomMatrix(dim,condNumber)
     val alpha = DenseVector.rand[Double](dim)
-    val pars = SolverParams.standardParams(dim)
+    val pars = SolverParams.standardParams(0)
     powerProblem(id,A,alpha,q,debugLevel)
   }
 
@@ -151,8 +151,7 @@ object OptimizationProblems {
     * x_j=0.2/n,       j=n/2,n/2+1,...,n-1
     * x_j=1.08/(n-6), all other j
     *
-    * @param solverType: "BR" (barrier solver), "PD0" (primal dual with one slack variable),
-    *   "PD1" (primal dual with one slack variable for each inequality constraint), see docs/primaldual.pdf.
+    * @param solverType: "BR" (barrier solver), "PD" (primal dual solver).
     * @param n must be even and bigger than 9 (to ensure feasibility).
     */
   def kl_1(n:Int,solverType:String,debugLevel:Int):OptimizationProblem with KnownMinimizer = {
@@ -190,8 +189,8 @@ object OptimizationProblems {
     val ineqs = ConstraintSet(n,constraints,setWhereDefined,x0)
 
     val probEq:EqualityConstraint = Constraints.sumToOne(n)
-    val pars = SolverParams.standardParams(n)
-    val problem = OptimizationProblem(
+    val pars = SolverParams.standardParams(ineqs.numConstraints)
+    val problem = OptimizationProblem.withoutFeasiblePoint(
       id,setWhereDefined,objF,ineqs,Some(probEq),solverType:String,pars,logger,debugLevel
     )
 
@@ -221,8 +220,7 @@ object OptimizationProblems {
     * x_j=0.2/n,       j=n/2,n/2+1,...,n-1
     * x_j=(1-0.36-0.1)/(n-n/2-3), all other j
     *
-    * @param solverType: "BR" (barrier solver), "PD0" (primal dual with one slack variable),
-    *   "PD1" (primal dual with one slack variable for each inequality constraint), see docs/primaldual.pdf.
+    * @param solverType: "BR" (barrier solver), "PD" (primal dual solver).
     * @param n must be even and bigger than 9 (to ensure feasibility).
     */
   def kl_2(n:Int, solverType:String, debugLevel:Int):OptimizationProblem with KnownMinimizer = {
@@ -264,8 +262,8 @@ object OptimizationProblems {
     val setWhereDefined = ConvexSets.wholeSpace(n)
     val ineqs = ConstraintSet(n,positivityCnts,setWhereDefined,x0)
 
-    val pars = SolverParams.standardParams(n)
-    val problem = OptimizationProblem(
+    val pars = SolverParams.standardParams(ineqs.numConstraints)
+    val problem = OptimizationProblem.withoutFeasiblePoint(
       id,setWhereDefined,objF,ineqs,Some(eqs),solverType,pars,logger,debugLevel
     )
     // the known optimal solution
@@ -279,8 +277,7 @@ object OptimizationProblems {
 
   /** A infeasible problem: sum of probabilities of disjoint events bigger than one.
     *
-    * @param solverType: "BR" (barrier solver), "PD0" (primal dual with one slack variable),
-    *   "PD1" (primal dual with one slack variable for each inequality constraint), see docs/primaldual.pdf.
+    * @param solverType: "BR" (barrier solver), "PD" (primal dual solver).
     * @param n must be even and bigger than 9 (to ensure feasibility).
     */
   def infeasible_kl_1(n:Int,solverType:String,debugLevel:Int):OptimizationProblem = {
@@ -304,9 +301,11 @@ object OptimizationProblems {
     // KL-distance
     val objF = Dist_KL(n)
 
-    val pars = SolverParams.standardParams(n)
+    val pars = SolverParams.standardParams(ineqs.numConstraints)
     val setWhereDefined = ConvexSets.wholeSpace(n)
-    OptimizationProblem(id,setWhereDefined,objF,ineqs,Some(probEq),solverType,pars,logger,debugLevel)
+    OptimizationProblem.withoutFeasiblePoint(
+      id,setWhereDefined,objF,ineqs,Some(probEq),solverType,pars,logger,debugLevel
+    )
   }
 
 

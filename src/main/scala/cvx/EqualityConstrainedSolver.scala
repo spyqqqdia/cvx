@@ -100,7 +100,7 @@ extends Solver {
     }
     val equalityGap = norm(eqDiff)
     Solution(
-      x,None,None,None,
+      x,None,None,
       Some(newtonDecrement),None,Some(equalityGap),Some(normGrad),None,
       iter,iter>=maxIter
     )

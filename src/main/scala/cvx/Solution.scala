@@ -15,7 +15,6 @@ import breeze.linalg.{DenseVector, _}
   * PrimalDualSolver: x,s,lambda,nu,dualityGap,normResidual.
   *
   * @param x minimizer
-  * @param s slack variables relaxing the inequality constraints, see docs/primaldual.pdf
   * @param lambda dual variable attached to the inequality constraints
   * @param nu dual variable attached to the equality constraints
   * @param dualityGap duality gap at minimizer or Newton decrement (if unconstrained).
@@ -32,7 +31,6 @@ import breeze.linalg.{DenseVector, _}
   */
 case class Solution(
                      x:DenseVector[Double],
-                     s:Option[DenseVector[Double]],
                      lambda:Option[DenseVector[Double]],
                      nu:Option[DenseVector[Double]],
                      newtonDecrement:Option[Double],
@@ -48,7 +46,6 @@ case class Solution(
 
     "\nSolution:"+
     "\nDecision variables x: "+x+
-    "\nSlack variables s: "+s.getOrElse("None")+
     "\nDual variable lambda: "+lambda.getOrElse("None")+
     "\nDual variable nu: "+nu.getOrElse("None")+
     "\nNewton decrement: "+newtonDecrement.getOrElse("None")+

@@ -118,7 +118,7 @@ class UnconstrainedSolver(
     }
     // None: duality gap, equality gap, slack variables, dual variables
     Solution(
-      x,None,None,None,
+      x,None,None,
       Some(newtonDecrement),None,None,Some(normGrad),None,
       iter,iter>=maxIter
     )
@@ -200,7 +200,7 @@ object UnconstrainedSolver {
         val sol = super.solve(debugLevel)
         val u = sol.x; val x = z0+F*u
         Solution(
-          x,None,None,None,
+          x,None,None,
           sol.newtonDecrement,None,None,sol.normGrad,None,
           sol.iter, sol.maxedOut)
       }

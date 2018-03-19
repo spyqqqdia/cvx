@@ -25,7 +25,8 @@ abstract class ConstraintSet(val dim: Int, val constraints: Seq[Constraint]) {
   def numConstraints:Int = constraints.size
   def getListOfConstraints:List[Constraint] = constraints.toList
 
-  def isSatisfiedStrictlyBy(x: DenseVector[Double]): Boolean = constraints.forall(_.isSatisfiedStrictly(x))
+  def isSatisfiedStrictlyBy(x: DenseVector[Double]): Boolean =
+    constraints.forall(_.isSatisfiedStrictly(x))
 
   /** Set of points where the constraints are satisfied strictly. */
   def strictlyFeasibleSet:ConvexSet = new ConvexSet(dim) {
@@ -85,16 +86,29 @@ abstract class ConstraintSet(val dim: Int, val constraints: Seq[Constraint]) {
   def gradientMatrixAt(x: DenseVector[Double]): DenseMatrix[Double] = {
 
     val dgx = DenseMatrix.zeros[Double](numConstraints, dim)
-    var j = 0
-    for (cnt <- constraints) {
+    for (i <- 0 until numConstraints) {
 
-      val grad_gj = cnt.gradientAt(x)
-      dgx(j, ::) := grad_gj.t
-      j += 1
+      val cnt_i = constraints(i)
+      val grad_gj = cnt_i.gradientAt(x)
+      dgx(i, ::) := grad_gj.t
     }
     dgx
   }
+  /** Vector lambda(i) = -1/(g_i(x)-u_i) where the ith constraint is g_i(x)<=u_i.
+    * This is used as a starting value for the dual variable lambda in the
+    * PrimalDualSolver, where the heuristic derived from the BarrierSolver is
+    * lambda(i) = -1(t*(g_i(x)-u_i)).
+    */
+  def lambda(x:DenseVector[Double]):DenseVector[Double] = {
 
+    val res = DenseVector.zeros[Double](numConstraints)
+    for(i <- 0 until numConstraints){
+
+      val cnt_i = constraints(i)
+      res(i) = -1.0 / (cnt_i.valueAt(x)-cnt_i.ub)
+    }
+    res
+  }
 
   /** ---------------------- FEASIBILITY ANALYSIS --------------------------- **/
 
@@ -161,7 +175,7 @@ abstract class ConstraintSet(val dim: Int, val constraints: Seq[Constraint]) {
     val id = "phase_I_Constraints_withEqs::feasibilityProblem"
     val solverType = "BR"  // we are using the barrier solver for this
 
-    val feasibilityProblem = OptimizationProblem(
+    val feasibilityProblem = OptimizationProblem.withoutFeasiblePoint(
       id,setWhereDefined,objF,this,None,solverType,pars,logger,debugLevel
     )
     val sol: Solution = feasibilityProblem.solve(debugLevel)
@@ -563,34 +577,6 @@ abstract class ConstraintSet(val dim: Int, val constraints: Seq[Constraint]) {
     val newConstraints = constraints.map(cnt => cnt.affineTransformed(z, F))
     ConstraintSet(newDim,newConstraints,C,u0)
   }
-
-  //--------------- constraints relaxed with slack variables ------------//
-  //
-  // See docs/primaldual.pdf
-  //
-  //---- global relaxation with a single slack variable
-
-  /** ConstraintSet where the original constraints g_j(x)<=u_j are relaxed to
-    * g_j(x) <= u_j+s with one additional slack variable s>=0.
-    *
-    * This is merely the phase_I constraint set augmented with the
-    * constraint s>=0.
-    */
-  def globallyRelaxed(
-    eqs: Option[EqualityConstraint], pars: SolverParams, logger: Logger, debugLevel: Int
-
-  ): ConstraintSet with FeasiblePoint = {
-
-    val cts = phase_I_Constraints(eqs,pars,logger,debugLevel)
-    val n = cts.dim
-    val lastCoordPositive = Constraints.singleCoordinatePositive(n,n-1)
-    val newFeasiblePoint = cts.feasiblePoint.copy
-    // increase the last coordinate so as to be nonnegative,
-    // this preserves feasibility with the old constraints
-    if(newFeasiblePoint(n-1)<0) newFeasiblePoint(n-1) = 1e-10
-    cts.addConstraint(lastCoordPositive).addFeasiblePoint(newFeasiblePoint)
-  }
-
 }
 
 

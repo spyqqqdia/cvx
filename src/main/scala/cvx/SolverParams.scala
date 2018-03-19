@@ -24,11 +24,6 @@ import breeze.linalg.DenseVector
   *                Distance from singularity of H will be determined from the size of the smallest
   *                diagonal element of the Cholesky factor H=LL'.
   *                If this is smaller than sqrt(delta), the regularization will be applied.
-  * @param K       constant in the relaxed objective function h(x,s)=f(x)+Ks of the primal dual solver
-  *                with one additional slack variable, see docs/primaldual.pdf.
-  * @param vec_K   constant in the relaxed objective function h(x,s)=f(x)+(K dot s) of the primal dual
-  *                solver with one additional slack variable for each inequality constraint, see
-  *                docs/primaldual.pdf.
   */
 case class SolverParams(
                          maxIter:Int,
@@ -37,14 +32,15 @@ case class SolverParams(
                          tol:Double,
                          tolEqSolve:Double,
                          tolFeas:Double,
-                         delta:Double,
-                         K:Option[Double]=None,
-                         vec_K:Option[DenseVector[Double]]=None
+                         delta:Double
 )
 object SolverParams {
 
-
-  def standardParams(dim:Int):SolverParams = {
+  /**
+    * @param numSlacks number of slack variables assigned to the inequality
+    *  constraints (this is equal to the number of inequality constraints).
+    */
+  def standardParams(numSlacks:Int):SolverParams = {
 
     // solver parameters
     val maxIter = 1000          // max number of Newton steps computed
@@ -54,8 +50,6 @@ object SolverParams {
     val tolEqSolve = 1e-2       // tolerance in the solution of the KKT system
     val tolFeas = 1e-7          // tolerance in inequality and equality constraints
     val delta = 1e-7            // regularization A -> A+delta*I if ill conditioned
-    val K = 1e7                 // constant K for primal dual solver, see docs/primaldual.pdf
-    val vec_K = DenseVector.fill[Double](dim)(K)
-    SolverParams(maxIter,alpha,beta,tolSolver,tolEqSolve,tolFeas,delta,Some(K),Some(vec_K))
+    SolverParams(maxIter,alpha,beta,tolSolver,tolEqSolve,tolFeas,delta)
   }
 }

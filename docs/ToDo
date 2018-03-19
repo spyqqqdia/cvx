@@ -624,5 +624,20 @@ PrimalDualSolver with equality constraints not working: dimension mismatch in fu
 kktSystem_withEqs in the definition of q.
 
 
+#----------------------------------------------------------------------------------------
+2018-03-19:|
+-------------
+
+PrimalDualSolver: basic approach is incorrect:
+h(x,s) = f(x)+s*K will not necessarily lead to s=0 if the original
+problem is feasible, simply because we can possibly generate very large
+negative values for f(x) by selecting infeasible x which nonetheless
+only imply small s (i.e. are almost feasible).
+
+Abandon this approach and start out with a phase_I analysis
+based on the BarrierSolver.
+
+
+
 
 

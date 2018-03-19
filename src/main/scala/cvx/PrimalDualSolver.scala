@@ -5,35 +5,20 @@ import breeze.numerics.{abs, log}
 
 
 
-
-// WARNING: 
-// in the barrier method handle the multiplications with the dimension reducing
-// matrix x = x0+Fu _outside_ the sum in the barrier function (bilinear!) or else we will matrix
-// multiply ourselves to death.
-// This is the reason why we do not put this operation into the constraints themselves.
-
 /** Solver for constrained convex optimization using the barrier method.
   * C.samplePoint will be used as the starting point of the optimization.
-  *
-  * Note: C, objF, constraintSet, eqs all are in the dimension of the
-  * original variable with slack variables added as in docs/primaldual.pdf.
-  * Below x always denotes this larger variable.
   *
   * @param C domain of definition of the Problem
   * @param objF objective function of the optimization problem (needed to
   *            monitor the optimization state)
   * @param eqs Optional equality constraint(s) of the form Ax=b
-  * @param numIneqsWithoutSlacks original number of inequality constraints before the
-  *              positivity constraints on slack variables, see docs/primaldual.pdf
-  * @param numSlacks number of slack variables relaxing the constraints,
-  *                  see docs/primaldual.pdf
   * @param pars see [SolverParams]
   */
 class PrimalDualSolver(
   val C:ConvexSet, val startingPoint:DenseVector[Double],
   val objF:ObjectiveFunction,
   val constraintSet:ConstraintSet, val eqs:Option[EqualityConstraint],
-  val numIneqsWithoutSlacks:Int, val numSlacks:Int, val pars:SolverParams, val logger:Logger
+  val pars:SolverParams, val logger:Logger
 )
   extends Solver { self =>
 
@@ -53,17 +38,10 @@ class PrimalDualSolver(
   })
 
   override val dim:Int = C.dim
-  /** Number of inequality constraints. This contains inequalities on
-    * slack variables if such are present!*/
-  val numIneqsWithSlacks:Int = constraintSet.numConstraints
+  val numIneqs = constraintSet.numConstraints
   /** Number of equality constraints.*/
   val numEqConstraints:Int = if(eqs.nonEmpty) eqs.get.A.rows else 0
 
-  assert(numIneqsWithSlacks == numIneqsWithoutSlacks + numSlacks,
-    "\nTotal number of inequalities with slacks = "+numIneqsWithSlacks+" is not the sum of "+
-    "\nthe number of original inequalities = "+numIneqsWithoutSlacks+" and"+
-    "\nthe number of slack variables = "+numSlacks+"\n"
-  )
 
   def checkDim(x:DenseVector[Double]):Unit =
     assert(x.length==dim,"Dimension mismatch x.length="+x.length+" unequal to dim="+dim)
@@ -119,11 +97,11 @@ class PrimalDualSolver(
     t:Double, x:DenseVector[Double], lambda:DenseVector[Double]
   ): DenseVector[Double] = {
 
-    assert(lambda.length==numIneqsWithSlacks,
-      "\ndim(lambda)="+lambda.length+"not equal to numConstraints="+numIneqsWithSlacks+"\n"
+    assert(lambda.length==numIneqs,
+      "\ndim(lambda)="+lambda.length+"not equal to numInequalities="+numIneqs+"\n"
     )
     val g = constraintSet.constraintFunctionAt(x)
-    DenseVector.tabulate[Double](numIneqsWithSlacks)(i => -lambda(i)*g(i)-1.0/t)
+    DenseVector.tabulate[Double](numIneqs)(i => -lambda(i)*g(i)-1.0/t)
   }
   /** Primal residual r_prim(t,x,lambda), see boyd-vandenberghe, p610.
     * This is only defined equality constraints are present in which case
@@ -184,7 +162,7 @@ class PrimalDualSolver(
 
     val cnts = constraintSet.constraints
     var result = -objF.gradientAt(x)
-    assert(cnts.length==numIneqsWithSlacks)
+    assert(cnts.length==numIneqs)
     for(cnt <- cnts) {
 
       // constraint cnt: g(x)<=ub, f(x)=g(x)-ub <= 0
@@ -206,7 +184,7 @@ class PrimalDualSolver(
     t:Double,x:DenseVector[Double],dx:DenseVector[Double],lambda:DenseVector[Double]
   ):DenseVector[Double] = {
 
-    val nIneqs = numIneqsWithSlacks  // number of inequality constrains
+    val nIneqs = numIneqs  // number of inequality constrains
     assert(lambda.length == nIneqs,
       "\n dim(lambda) = "+lambda.length+" is not equal to numIneqs = "+nIneqs+".\n"
     )
@@ -225,7 +203,7 @@ class PrimalDualSolver(
       "\ndim(w) = "+w.length+" not equal to dim(lambda) = "+lambda.length+".\n"
     )
     // skip the active constraints
-    for(i <- 0 until nIneqs) w(i) = -w(i)*(lambda(i)/gx(i)) + r_cent(i)/gx(i)
+    for(i <- 0 until nIneqs) w(i) = (-w(i)*lambda(i) + r_cent(i))/gx(i)
     w
   }
 
@@ -238,13 +216,13 @@ class PrimalDualSolver(
     x:DenseVector[Double], lambda:DenseVector[Double]
   ):DenseMatrix[Double] = {
 
-    assert(lambda.length==numIneqsWithSlacks,
-      "\ndim(lambda)="+lambda.length+"not equal to numConstraints="+numIneqsWithSlacks+"\n"
+    assert(lambda.length==numIneqs,
+      "\ndim(lambda)="+lambda.length+"not equal to numInequalities="+numIneqs+"\n"
     )
     val cnts = constraintSet.constraints
     // the upper left block containing the Hessians
     var hpd = objF.hessianAt(x)
-    for(i <- 0 until numIneqsWithSlacks) {
+    for(i <- 0 until numIneqs) {
 
       val li = lambda(i)
       val cnt_i = cnts(i)
@@ -309,8 +287,8 @@ class PrimalDualSolver(
     x:DenseVector[Double],lambda:DenseVector[Double]
   ): Double ={
 
-    assert(lambda.length==numIneqsWithSlacks,
-      "\ndim(lambda)="+lambda.length+"not equal to numConstraints="+numIneqsWithSlacks+"\n"
+    assert(lambda.length==numIneqs,
+      "\ndim(lambda)="+lambda.length+"not equal to numInequalities="+numIneqs+"\n"
     )
     -constraintSet.constraintFunctionAt(x) dot lambda
   }
@@ -331,7 +309,7 @@ class PrimalDualSolver(
     t:Double, z:DenseVector[Double], dz:DenseVector[Double]
   ):DenseVector[Double]  = {
 
-    val nIneqs = numIneqsWithSlacks
+    val nIneqs = numIneqs
     assert(z.length == dim+nIneqs,
       "Dimension of z = "+z.length+" is not equal to dim(x)+dim(lambda),\n" +
       "dim(x) = "+dim+", dim(lambda) = numConstraints = "+nIneqs + ".\n"
@@ -415,14 +393,14 @@ class PrimalDualSolver(
     // numIneqs: number of inequality constraints before constraints on slacks
     // numIneqConstraints: number of inequality constraints including constraints on slacks
     var x = startingPoint       // iterates x=x_k
-    var lambda = DenseVector.ones[Double](numIneqsWithSlacks)
+    var lambda = constraintSet.lambda(x)
 
     var obfFcnValue = Double.MaxValue
     var dualityGap = surrogateDualityGap(x,lambda)
     val equalityGap = 0.0
     var normDualResidual = Double.MaxValue
 
-    var t = mu*numIneqsWithSlacks/dualityGap      // barrier penalty analogue
+    var t = mu*numIneqs/dualityGap      // barrier penalty analogue
 
     // None: norm of gradient, Newton decrement
     var optimizationState = OptimizationState(
@@ -453,7 +431,7 @@ class PrimalDualSolver(
       }
 
       x = u_next(0 until dim)
-      lambda = u_next(dim until dim+numIneqsWithSlacks)
+      lambda = u_next(dim until dim+numIneqs)
 
       obfFcnValue = objF.valueAt(x)
       dualityGap = surrogateDualityGap(x,lambda)
@@ -466,15 +444,13 @@ class PrimalDualSolver(
         print("\nOptimization state:"+optimizationState)
         Console.flush()
       }
-      t = mu*numIneqsWithSlacks/dualityGap
+      t = mu*numIneqs/dualityGap
       iter+=1
     }
     // split x into slacks s and original variables w
-    val w = x(0 until (dim-numSlacks))
-    val s = if(numSlacks==0) None else Some(x((dim-numSlacks) until dim))
     val maxedOut = iter==maxIter
     Solution(
-      w,s,Some(lambda),None,
+      x,Some(lambda),None,
       None,Some(dualityGap),None,None,Some(normDualResidual),
       iter-1,maxedOut
     )
@@ -502,20 +478,19 @@ class PrimalDualSolver(
       "\nlineSearch_withEQs undefined when no equality constraints are present.\n"
     )
     val nEqs = numEqConstraints     // number of equality constraints
-    val nIneqs = numIneqsWithSlacks     // number of inequality constraints
-    assert(z.length == dim+nIneqs+nEqs,
+    assert(z.length == dim+numIneqs+nEqs,
       "Dimension of z = "+z.length+" is not equal to dim(x)+dim(lambda)+dim(nu),\n" +
-        "dim(x) = "+dim+", dim(lambda) = numIneqs = "+nIneqs + ", dim(nu) = numEqs = "+nEqs+".\n"
+        "dim(x) = "+dim+", dim(lambda) = numIneqs = "+numIneqs + ", dim(nu) = numEqs = "+nEqs+".\n"
     )
     val x = z(0 until dim)
-    val lambda = z(dim until dim+nIneqs)
-    val nu = z(dim+nIneqs until dim+nIneqs+nEqs)
+    val lambda = z(dim until dim+numIneqs)
+    val nu = z(dim+numIneqs until dim+numIneqs+nEqs)
 
     assert(lambda.forall(_>0.0),"\nlambda not positive,\nlambda = "+lambda+"\n")
 
     val dx = dz(0 until dim)
-    val dLambda = dz(dim until dim+nIneqs)
-    val dNu = dz(dim+nIneqs until dim+nIneqs+nEqs)
+    val dLambda = dz(dim until dim+numIneqs)
+    val dNu = dz(dim+numIneqs until dim+numIneqs+nEqs)
 
     // compute s0=s_max
     var s0 = 1.0
@@ -567,9 +542,7 @@ class PrimalDualSolver(
     // primal dual starting points
     // iterates x=x_k, includes the slack variables s_j
     var x = startingPoint
-    // only the original variables x_j without slacks s_j
-    var w = x(0 until dim-numSlacks)
-    var lambda = DenseVector.ones[Double](numIneqsWithSlacks)
+    var lambda = constraintSet.lambda(x)
     var nu = DenseVector.zeros[Double](A.rows)   // A.rows: number of equality constraints
     var u:DenseVector[Double] = DenseVector.vertcat(x,lambda,nu)  // starting iterate
 
@@ -578,7 +551,7 @@ class PrimalDualSolver(
     var equalityGap = Double.MaxValue
     var normDualResidual = Double.MaxValue
 
-    var t = mu*numIneqsWithSlacks/dualityGap   // analogue of t in barrier method
+    var t = mu*numIneqs/dualityGap   // analogue of t in barrier method
 
     // None: norm of gradient, Newton decrement
     var optimizationState = OptimizationState(
@@ -598,13 +571,12 @@ class PrimalDualSolver(
       val du = DenseVector.vertcat[Double](dx,dLambda,dNu)
       val u_next = lineSearch_withEQs(t,u,du)
 
-      x = u_next(0 until dim)        // contains the slack variables!
-      w = x(0 until dim-numSlacks)   // the original variables without slacks
-      lambda = u_next(dim until dim+numIneqsWithSlacks)
-      nu = u_next(dim+numIneqsWithSlacks until dim+numIneqsWithSlacks+nEqs)
+      x = u_next(0 until dim)
+      lambda = u_next(dim until dim+numIneqs)
+      nu = u_next(dim+numIneqs until dim+numIneqs+nEqs)
 
       obfFcnValue = objF.valueAt(x)
-      equalityGap = norm(A*w-b)
+      equalityGap = norm(A*x-b)
       dualityGap = surrogateDualityGap(x,lambda)
       normDualResidual = norm(residual_withEqs(t,x,lambda,nu))
       // None: norm of gradient, Newton decrement
@@ -615,15 +587,12 @@ class PrimalDualSolver(
         print("\nOptimization state:"+optimizationState)
         Console.flush()
       }
-      t = mu*numIneqsWithSlacks/dualityGap
+      t = mu*numIneqs/dualityGap
       iter+=1
     }
-    // split x into slacks s and original variables w
-    w = x(0 until (dim-numSlacks))
-    val s = if(numSlacks==0) None else Some(x(dim until dim+numSlacks))
     val maxedOut = iter==maxIter
     Solution(
-      w,s,Some(lambda),None,
+      x,Some(lambda),None,
       None,Some(dualityGap),Some(equalityGap),None,Some(normDualResidual),
       iter-1,maxedOut
     )
@@ -687,8 +656,7 @@ class PrimalDualSolver(
     val transformedEqs = eqs.map(_.affineTransformed(z0,F))
 
     new PrimalDualSolver(
-      D,u0,transformedObjF,transformedConstraintSet,transformedEqs,
-      numIneqsWithoutSlacks,numSlacks,pars,logger
+      D,u0,transformedObjF,transformedConstraintSet,transformedEqs,pars,logger
     )
   }
   /** As [[affineTransformed(z0:DenseVector[Double],F:DenseMatrix[Double], u0:DenseVector[Double])]]
@@ -702,7 +670,7 @@ class PrimalDualSolver(
     affineTransformed(z0,F,u0)
   }
 
-  /** As As [[affineTransformed(z0:DenseVector[Double],F:DenseMatrix[Double], u0:DenseVector[Double])]]
+  /** As [[affineTransformed(z0:DenseVector[Double],F:DenseMatrix[Double], u0:DenseVector[Double])]]
     * with z0,F,u0 computed by the solution space sol. This usually implies a dimension reduction
     * in the independent variable ( x -> u ).
     */
@@ -724,124 +692,16 @@ object PrimalDualSolver {
   /** PrimalDualSolver for minimization with or without equality constraints Ax=b.
     * Here we have a starting point satisfying the inequalities strictly.
     * Therefore no slack variables s are introduced which relax these inequalities.
-    *
-    * @param startingPoint a point satisfying the inequality constraints in the
-    *                      constraintSet strictly.
     */
   def apply(
-    C:ConvexSet, startingPoint:DenseVector[Double], objF:ObjectiveFunction,
-    constraintSet:ConstraintSet, eqs:Option[EqualityConstraint],
+    C:ConvexSet, objF:ObjectiveFunction,
+    constraintSet:ConstraintSet with FeasiblePoint, eqs:Option[EqualityConstraint],
     pars:SolverParams, logger:Logger
   ): PrimalDualSolver = {
 
-    val numSlacks = 0
-    val numIneqsWithoutSlacks = constraintSet.numConstraints
+    val startingPoint = constraintSet.feasiblePoint
     new PrimalDualSolver(
-      C,startingPoint,objF,constraintSet,eqs,
-      numIneqsWithoutSlacks,numSlacks,pars,logger
+      C,startingPoint,objF,constraintSet,eqs,pars,logger
     )
   }
-
-  //------------- Solvers with relaxed inequalities, no starting point ---------//
-
-
-
-
-  /** PrimalDualSolver with global relaxation of constraints.
-    *
-    * PrimalDualSolver for minimization with or without equality constraints Ax=b.
-    * Here we have no starting point satisfying the inequalities strictly.
-    * The inequality constraints g_i(x) <= u_i are relaxed globally to
-    * g_j(x) <= u_j+s with one additional slack variable s>=0 and the objective
-    * function f(x) is changed to h(x,s)=f(x)+Ks.
-    *
-    * For this problem there always exists a strictly feasible point (if
-    * the convex set C is the whole space as usual). The parameter K>0 controls the
-    * tradeoff between minimizing the slack s on the constraints and the value f(x)
-    * of the objective function.
-    *
-    * If the original problem has a feasible point, then the solution (x,s) of the
-    * new problem satisfies s=0 and f(x) minimizes the original problem,
-    * see docs/primaldual.pdf.
-    *
-    * Here C, objF, constraintSet and eqs denote the entities of the origina
-    * problem before the slack variable for global relaxation of the constraints
-    * has been added.
-    *
-    */
-  def apply(
-    C:ConvexSet, objF:ObjectiveFunction,
-    constraintSet:ConstraintSet, eqs:Option[EqualityConstraint],
-    pars:SolverParams, logger:Logger, K:Double
-  ): PrimalDualSolver = {
-
-    val numIneqsBeforeSlacks = constraintSet.numConstraints
-    val numSlacks = 1
-    val newConstraintSet = constraintSet.globallyRelaxed(eqs,pars,logger,debugLevel = 0)
-    val newObjF:ObjectiveFunction = objF.forGloballyRelaxedProblem(K)
-    val new_C = ConvexSets.cartesianProduct(C,ConvexSets.wholeSpace(numSlacks))
-
-    val new_Eqs = eqs.map(eqCnt => eqCnt.withSlackVariables(numSlacks))
-
-    val startingPoint = newConstraintSet.feasiblePoint
-    new PrimalDualSolver(
-      new_C, startingPoint, newObjF, newConstraintSet, new_Eqs,
-      numIneqsBeforeSlacks, numSlacks, pars, logger
-    )
-  }
-  /** PrimalDualSolver with local relaxation of constraints.
-    *
-    * PrimalDualSolver for minimization with or without equality constraints Ax=b.
-    * Here we have no starting point satisfying the inequalities strictly.
-    * The inequality constraints g_i(x) <= u_i are relaxed idividually to
-    * g_j(x) <= u_j+s_j with one additional slack variable s_j for each inequality
-    * constraint and the objective function f(x) is changed to h(x,s)=f(x)+(K dot s).
-    *
-    * For this problem there always exists a strictly feasible point (if
-    * the convex set C is the whole space as usual). The parameter K with K_j>0
-    * controls the tradeoff between minimizing the slacks s_j on the constraints
-    * and the value f(x) of the objective function.
-    *
-    * If the original problem has a feasible point, then the solution (x,s) of the
-    * new problem satisfies s=0 and f(x) minimizes the original problem,
-    * see docs/primaldual.pdf.
-    *
-    * The individual relaxation of the constraints with dedicated slack variables
-    * gives more fine grained control in case no feasible point exists.
-    * We can prioritize a constraint g_j(x) <= u_j by making the constant K_j
-    * large which will put more emphasis on minimizing s_j and hence the slack on
-    * the relaxed constraint g_j(x) <= u_j+s_j.
-    *
-    * Here C, objF, constraintSet and eqs denote the entities of the original
-    * problem before the slack variables for local relaxation of the constraints
-    * have been added.
-    *
-    */
-  def apply(
-    C:ConvexSet, objF:ObjectiveFunction,
-    constraintSet:ConstraintSet, eqs:Option[EqualityConstraint],
-    pars:SolverParams, logger:Logger, K:Vector[Double]
-  ): PrimalDualSolver = {
-
-    val numIneqsBeforeSlacks = constraintSet.numConstraints
-    val numSlacks = numIneqsBeforeSlacks
-    require(K.length==numSlacks,
-      "\nDimension of K = "+K.length+" is not equal to the number "+numSlacks+
-        " of slack variables s_j.\n"
-    )
-    // the relaxed constraints g_j(x) <= u_j+s_j with s_j>=0 are exactly
-    // the phase I SOI constraints
-    val newConstraintSet = constraintSet.phase_I_SOI_Constraints
-    val newObjF:ObjectiveFunction = objF.forLocallyRelaxedProblem(K)
-    val new_C = ConvexSets.cartesianProduct(C,ConvexSets.wholeSpace(numSlacks))
-
-    val new_Eqs = eqs.map(eqCnt => eqCnt.withSlackVariables(numSlacks))
-
-    val startingPoint = newConstraintSet.feasiblePoint
-    new PrimalDualSolver(
-      new_C, startingPoint, newObjF, newConstraintSet, new_Eqs,
-      numIneqsBeforeSlacks, numSlacks, pars, logger
-    )
-  }
-
 }

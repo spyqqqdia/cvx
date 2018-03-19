@@ -111,7 +111,7 @@ extends Solver { self =>
     }
     // the UnconstrainedSolver does not report the duality gap, so we must do it
     Solution(
-      sol.x,None,None,None,sol.newtonDecrement,Some(dualityGap),None,
+      sol.x,None,None,sol.newtonDecrement,Some(dualityGap),None,
       sol.normGrad,sol.normDualResidual,sol.iter,sol.maxedOut
     )
   }
@@ -171,7 +171,7 @@ extends Solver { self =>
     }
     // the UnconstrainedSolver does not report the duality gap, so we must do it
     Solution(
-      sol.x,None,None,None,sol.newtonDecrement,Some(dualityGap),Some(equalityGap),
+      sol.x,None,None,sol.newtonDecrement,Some(dualityGap),Some(equalityGap),
       sol.normGrad,sol.normDualResidual,sol.iter,sol.maxedOut
     )
   }

@@ -812,7 +812,35 @@ PrimalDualSolver not working: runs but does not converge (no equality constraint
 or line search fails (with equality constraints).
 
 
+#----------------------------------------------------------------------------------------
+2018-03-19:|
+-------------
 
+Bug fix: approach in PrimalDualSolver with relaxation of constraints was incorrect.
+Eliminated. Phase I analysis using the BarrierSolver is now used instead to find a
+feasible starting point.
+
+Files affected:
+
+BarrierSolver
+ConstraintSet
+EqualityConstrainedSolver
+OptimizationProblem
+PrimalDualSolver
+Solution
+SolverParams
+UnconstrainedSolver
+
+Runner
+OptimizationProblems
+SimpleOptimizationProblems
+MinimizationTests
+
+
+Status:
+compiles and runs, but line search unsuccessful in PrimalDualSolver.
+
+Note PrimalDual <---> Barrier analogy:   lambda(i) = - 1/[t*(g_i(x)-u_i)]
 
 
 
