@@ -820,6 +820,8 @@ Bug fix: approach in PrimalDualSolver with relaxation of constraints was incorre
 Eliminated. Phase I analysis using the BarrierSolver is now used instead to find a
 feasible starting point.
 
+Note PrimalDual <---> Barrier analogy:   lambda(i) = - 1/[t*(g_i(x)-u_i)]
+
 Files affected:
 
 BarrierSolver
@@ -839,8 +841,10 @@ MinimizationTests
 
 Status:
 compiles and runs, but line search unsuccessful in PrimalDualSolver.
+BarrierSolver is working on all test problems.
 
-Note PrimalDual <---> Barrier analogy:   lambda(i) = - 1/[t*(g_i(x)-u_i)]
+Warning: branch off with the next update which seems to destroy the BarrierSolver also.
+
 
 
 

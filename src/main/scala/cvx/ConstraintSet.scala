@@ -329,6 +329,8 @@ abstract class ConstraintSet(val dim: Int, val constraints: Seq[Constraint]) {
     val x0 = pointWhereDefined
     val setWhereDefined =
       ConvexSets.cartesianProduct(self.setWhereDefined,ConvexSets.wholeSpace(1))
+    // FIX ME: can't push s below zero that way, nay not get strictly feasible point and then
+    // the follow up barrier solver fails:
     val ineqs2 = eqs.asInequalities
     val theConstraints = constraints.toList ::: ineqs2
     val ctSet = ConstraintSet(dim,theConstraints,setWhereDefined,x0)
