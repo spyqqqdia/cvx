@@ -73,9 +73,15 @@ class EqualityConstraint(val A:DenseMatrix[Double], val b:DenseVector[Double]){
     EqualityConstraint(A*F,b-A*z0)
 
   /** Turns this equality constraint Ax=b into a list of inequalities
-    * row_i(A)'x<=b_i and row_i(A)'x>=b_i.
+    * row_i(A)'x<=b_i+tol and row_i(A)'x>=b_i-tol.
+    *
+    * We need the tolerance tol for example in phase I analysis where
+    * these inequalities become row_i(A)'x<=b_i+tol+s and
+    * row_i(A)'x>=b_i-tol-s with a slack variable s. There the objective
+    * is to push the slack variable s below zero to get a strictly feasible
+    * point for the inequality constraints.
     */
-  def asInequalities:List[LinearConstraint] = {
+  def asInequalities(tol:Double):List[LinearConstraint] = {
 
     val n = A.rows
     val dim = A.cols
@@ -84,9 +90,9 @@ class EqualityConstraint(val A:DenseMatrix[Double], val b:DenseVector[Double]){
 
       val row_iA = A(i,::)
       val id1 = "row_"+i+"(A)'x <= "+b(i)
-      val ineq1 = LinearConstraint(id1,dim,b(i),0.0,row_iA.t)
+      val ineq1 = LinearConstraint(id1,dim,b(i)+tol,0.0,row_iA.t)
       val id2 = "row_"+i+"(A)'x >= "+b(i)
-      val ineq2 = LinearConstraint(id2,dim,-b(i),0.0,-row_iA.t)
+      val ineq2 = LinearConstraint(id2,dim,-b(i)+tol,0.0,-row_iA.t)
       buff+=ineq1
       buff+=ineq2
     }

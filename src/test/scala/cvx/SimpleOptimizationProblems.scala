@@ -201,7 +201,7 @@ object SimpleOptimizationProblems {
 
     val pars = SolverParams.standardParams(ineqs.numConstraints)
     val problem = OptimizationProblem.withoutFeasiblePoint(
-      id,setWhereDefined,objF,ineqs,None,solverType,pars,logger,debugLevel
+      id,setWhereDefined,objF,ineqs,Some(probEq),solverType,pars,logger,debugLevel
     )
     // minimizer is the vector x_j=1/dim
     val w = DenseVector.tabulate[Double](dim)(j => 1.0/dim)
@@ -246,7 +246,7 @@ object SimpleOptimizationProblems {
 
     val pars = SolverParams.standardParams(ineqs.numConstraints)
     val problem = OptimizationProblem.withoutFeasiblePoint(
-      id,setWhereDefined,objF,ineqs,None,solverType,pars,logger,debugLevel
+      id,setWhereDefined,objF,ineqs,Some(probEq),solverType,pars,logger,debugLevel
     )
     // the known optimal solution
     val x_opt = DenseVector.tabulate[Double](dim)(j => if(j==0) 1.0 else 0.0)
@@ -405,7 +405,7 @@ object SimpleOptimizationProblems {
 
     val pars = SolverParams.standardParams(ineqs.numConstraints)
     val problem = OptimizationProblem.withoutFeasiblePoint(
-      id,setWhereDefined,objF,ineqs,None,solverType,pars,logger,debugLevel
+      id,setWhereDefined,objF,ineqs,Some(probEq),solverType,pars,logger,debugLevel
     )
     // the known optimal solution
     val x_opt = DenseVector(0.5,0.5)

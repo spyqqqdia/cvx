@@ -101,14 +101,10 @@ abstract class ConstraintSet(val dim: Int, val constraints: Seq[Constraint]) {
     */
   def lambda(x:DenseVector[Double]):DenseVector[Double] = {
 
-    val res = DenseVector.zeros[Double](numConstraints)
-    for(i <- 0 until numConstraints){
-
-      val cnt_i = constraints(i)
-      res(i) = -1.0 / (cnt_i.valueAt(x)-cnt_i.ub)
-    }
-    res
+    val gx = constraintFunctionAt(x)
+    DenseVector.tabulate[Double](gx.length)(i => -1.0/gx(i))
   }
+
 
   /** ---------------------- FEASIBILITY ANALYSIS --------------------------- **/
 
@@ -329,9 +325,8 @@ abstract class ConstraintSet(val dim: Int, val constraints: Seq[Constraint]) {
     val x0 = pointWhereDefined
     val setWhereDefined =
       ConvexSets.cartesianProduct(self.setWhereDefined,ConvexSets.wholeSpace(1))
-    // FIX ME: can't push s below zero that way, nay not get strictly feasible point and then
-    // the follow up barrier solver fails:
-    val ineqs2 = eqs.asInequalities
+    val tolEqs = 1e-6
+    val ineqs2 = eqs.asInequalities(tolEqs)
     val theConstraints = constraints.toList ::: ineqs2
     val ctSet = ConstraintSet(dim,theConstraints,setWhereDefined,x0)
     ctSet.phase_I_Analysis_withoutEqs(pars, logger, debugLevel)
@@ -357,10 +352,11 @@ abstract class ConstraintSet(val dim: Int, val constraints: Seq[Constraint]) {
     Console.flush()
     val feasBS = phase_I_Solver_withoutEqs(pars, logger, debugLevel)
 
-    // terminate if objective function has been pushed below zero (then we are at a strictly
-    // feasible point already, or if the duality gap is small enough
-    val terminationCriterion = (os: OptimizationState) =>
-      (os.objectiveFunctionValue < 0 || os.dualityGap.get < pars.tol) && os.equalityGap.get < pars.tol
+    // full minimization of the slack variable s to get nicely centered
+    val terminationCriterion = CvxUtils.phase_I_TerminationCriterion
+
+    //(os: OptimizationState) =>
+    //(os.objectiveFunctionValue < 0 || os.dualityGap.get < pars.tol) && os.equalityGap.get < pars.tol
     val sol = feasBS.solveSpecial(terminationCriterion, debugLevel)
 
     val w_feas = sol.x // w = c(x,s)
@@ -376,7 +372,7 @@ abstract class ConstraintSet(val dim: Int, val constraints: Seq[Constraint]) {
     val report = FeasibilityReport(x_feas, s, isStrictlySatisfied, this, Some(eqError))
 
     if (debugLevel > 1) {
-      val msg = report.toString(pars.tol)
+      val msg = report.toString(pars.tolSolver)
       logger.println(msg)
       println(msg)
       Console.flush()
@@ -449,7 +445,7 @@ abstract class ConstraintSet(val dim: Int, val constraints: Seq[Constraint]) {
     // for the equality constraints use the stricter pars.tol not pars.tolEqSolve which is for
     // the ill conditioned KKT systems
     val eqError = eqs.errorAt(x_feas)
-    val isStrictlySatisfied = (s_feas < 0.0) && (eqError < pars.tol)
+    val isStrictlySatisfied = (s_feas < 0.0) && (eqError < pars.tolSolver)
 
     val s = DenseVector[Double](1)
     s(0) = s_feas
@@ -458,7 +454,7 @@ abstract class ConstraintSet(val dim: Int, val constraints: Seq[Constraint]) {
     if (debugLevel > 1) {
       val logFilePath = "logs/ConstraintSet_phase_I_log.txt"
       val logger = Logger(logFilePath)
-      val msg = "\nConstraintSet.phase_I_Analysis, result:\n" + report.toString(pars.tol)
+      val msg = "\nConstraintSet.phase_I_Analysis, result:\n" + report.toString(pars.tolSolver)
       logger.println(msg)
       println(msg)
       Console.flush()
@@ -519,14 +515,14 @@ abstract class ConstraintSet(val dim: Int, val constraints: Seq[Constraint]) {
     // for the equality constraints use the stricter pars.tol not pars.tolEqSolve which is for
     // the ill conditioned KKT systems
     val eqError = eqs.map(eqs => eqs.errorAt(x_feas))
-    val isStrictlySatisfied = (0 until n).forall(j => s_feas(j) < 0) && (eqError.getOrElse(0.0) < pars.tol)
+    val isStrictlySatisfied = (0 until n).forall(j => s_feas(j) < 0) && (eqError.getOrElse(0.0) < pars.tolSolver)
 
     val report = FeasibilityReport(x_feas, s_feas, isStrictlySatisfied, this, eqError)
 
     if (debugLevel > 1) {
       val logFilePath = "logs/ConstraintSet_phase_I_log.txt"
       val logger = Logger(logFilePath)
-      val msg = report.toString(pars.tol)
+      val msg = report.toString(pars.tolSolver)
       logger.println(msg)
       println(msg)
       Console.flush()
@@ -551,7 +547,7 @@ abstract class ConstraintSet(val dim: Int, val constraints: Seq[Constraint]) {
     if (this.isInstanceOf[ConstraintType]) this.asInstanceOf[ConstraintType] else {
       // perform a feasibility analysis and add a feasible point
 
-      val tol = pars.tol
+      val tol = pars.tolSolver
       val feasibilityReport: FeasibilityReport = phase_I_Analysis(eqs, pars, debugLevel)
       val x0 = feasibilityReport.x0
       val s = feasibilityReport.s

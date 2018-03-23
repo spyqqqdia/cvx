@@ -5,6 +5,7 @@ import breeze.numerics.{abs, log}
 
 
 
+
 /** Solver for constrained convex optimization using the barrier method.
   * C.samplePoint will be used as the starting point of the optimization.
   *
@@ -203,7 +204,7 @@ class PrimalDualSolver(
       "\ndim(w) = "+w.length+" not equal to dim(lambda) = "+lambda.length+".\n"
     )
     // skip the active constraints
-    for(i <- 0 until nIneqs) w(i) = (-w(i)*lambda(i) + r_cent(i))/gx(i)
+    for(i <- 0 until nIneqs) w(i) = (-lambda(i)*w(i) + r_cent(i))/gx(i)
     w
   }
 
@@ -230,7 +231,9 @@ class PrimalDualSolver(
       val grad_gi = cnt_i.gradientAt(x)
       val grad2_gi = cnt_i.hessianAt(x)
 
-      assert(fi<0,"\nfi = "+fi+" not < 0, line search pulled back into strictly feasible region?\n")
+      assert(fi<0,
+        "\nfi = "+fi+" not < 0, line search did not pull back into strictly feasible region!\n"
+      )
       hpd += grad2_gi * li - (grad_gi * grad_gi.t) * (li / fi)
     }
     hpd
@@ -339,28 +342,28 @@ class PrimalDualSolver(
     val beta = pars.beta
     val r_t = residual_noEqs(t,x,lambda)
     var x_s = x+dx*s
-    var lambda_s = lambda+dLambda*s
+    var lambda_s = lambda+dLambda*s     // lambda_s>0 for all 0<s<s_0 by choice of s_0
+    assert(lambda_s.forall(_>0))
     var r_ts = residual_noEqs(t,x_s,lambda_s)
     var isInC = C.isInSet(x_s)
-    var isStrictlyFeasible = constraintSet.isSatisfiedStrictlyBy(x_s)
-    var lambdaIsPositive = lambda_s.forall(_>0)
-    var residualDecreased = norm(r_ts) < (1-alpha*s)*norm(r_t)
+    var isFeasible_xs = constraintSet.isSatisfiedStrictlyBy(x_s)
+    val norm_rt = norm(r_t)
+    var norm_rts = norm(r_ts)
+    var residualDecreased = norm_rts < (1-alpha*s)*norm_rt
     var iter = 0
     val maxIter = -30/log(beta)
 
-    while(!(
-        isInC && isStrictlyFeasible && lambdaIsPositive && residualDecreased
-      ) && iter <= maxIter
-    ){
+    while(!(isInC && isFeasible_xs && residualDecreased) && iter <= maxIter){
 
       s *= beta
       x_s = x+dx*s
       lambda_s = lambda+dLambda*s
+      assert(lambda_s.forall(_>0))
       r_ts = residual_noEqs(t,x_s,lambda_s)
       isInC = C.isInSet(x_s)
-      isStrictlyFeasible = constraintSet.isSatisfiedStrictlyBy(x_s)
-      lambdaIsPositive = lambda_s.forall(_>0)
-      residualDecreased = norm(r_ts) < (1-alpha*s)*norm(r_t)
+      isFeasible_xs = constraintSet.isSatisfiedStrictlyBy(x_s)
+      norm_rts = norm(r_ts)
+      residualDecreased = norm_rts < (1-alpha*s)*norm_rt
       iter += 1
     }
     if(iter>=maxIter){
@@ -385,7 +388,7 @@ class PrimalDualSolver(
       println(msg)
       logger.println(msg)
     }
-    val tol=pars.tol // tolerance for duality gap
+    val tol=pars.tolSolver // tolerance for duality gap
     val mu = 10.0    // factor to increase parameter t
 
     // primal dual starting points,
@@ -429,9 +432,9 @@ class PrimalDualSolver(
         println(msg)
         logger.println(msg)
       }
-
-      x = u_next(0 until dim)
-      lambda = u_next(dim until dim+numIneqs)
+      u = u_next
+      x = u(0 until dim)
+      lambda = u(dim until dim+numIneqs)
 
       obfFcnValue = objF.valueAt(x)
       dualityGap = surrogateDualityGap(x,lambda)
@@ -465,6 +468,8 @@ class PrimalDualSolver(
     ***********************************************************************/
 
 
+
+
   /** The backtracking line search, boyd-vandenberghe, section 11.7.3, p612,
     * when no equality constraints are present.
     * @param z current iterate (z=(x,lambda,nu)).
@@ -474,23 +479,24 @@ class PrimalDualSolver(
     t:Double, z:DenseVector[Double], dz:DenseVector[Double]
   ):DenseVector[Double]  = {
 
-    assert(eqs.nonEmpty,
-      "\nlineSearch_withEQs undefined when no equality constraints are present.\n"
+    val nIneqs = numIneqs
+    val nEqs = numEqConstraints
+    assert(z.length == dim+nIneqs+nEqs,
+      "Dimension of z = "+z.length+" is not equal to dim(x)+dim(lambda)+dim(nu) = dim(x)+nIneqs+nEqs,\n" +
+        "dim(x) = "+dim+", dim(lambda) = numConstraints = "+nIneqs + ", + dim(nu) = "+nEqs+".\n"
     )
-    val nEqs = numEqConstraints     // number of equality constraints
-    assert(z.length == dim+numIneqs+nEqs,
-      "Dimension of z = "+z.length+" is not equal to dim(x)+dim(lambda)+dim(nu),\n" +
-        "dim(x) = "+dim+", dim(lambda) = numIneqs = "+numIneqs + ", dim(nu) = numEqs = "+nEqs+".\n"
+    assert(z.length == dz.length,
+      "Dimension of z = "+z.length+" is not equal to dim(dz) = "+dz.length+".\n"
     )
     val x = z(0 until dim)
-    val lambda = z(dim until dim+numIneqs)
-    val nu = z(dim+numIneqs until dim+numIneqs+nEqs)
+    val lambda = z(dim until dim+nIneqs)
+    val nu = z(dim+nIneqs until dim+nIneqs+nEqs)
 
     assert(lambda.forall(_>0.0),"\nlambda not positive,\nlambda = "+lambda+"\n")
 
     val dx = dz(0 until dim)
-    val dLambda = dz(dim until dim+numIneqs)
-    val dNu = dz(dim+numIneqs until dim+numIneqs+nEqs)
+    val dLambda = dz(dim until dim+nIneqs)
+    val dNu = dz(dim+nIneqs until dim+nIneqs+nEqs)
 
     // compute s0=s_max
     var s0 = 1.0
@@ -500,24 +506,40 @@ class PrimalDualSolver(
       if(dLambda(i)<0 && -lambda(i)/dLambda(i)<s0) s0 = -lambda(i)/dLambda(i)
       i+=1
     }
-    s0 = 0.99*s0
+    var s = 0.99*s0
+    // data for termination criterion
+    val alpha = pars.alpha
+    val beta = pars.beta
+    var x_s = x+dx*s
+    var lambda_s = lambda+dLambda*s    // lambda_s>0 for all 0<s<s_0 by choice of s_0
+    assert(lambda_s.forall(_>0))
+    var nu_s = nu+dNu*s
+    var isInC = C.isInSet(x_s)
+    var isFeasible_x = constraintSet.isSatisfiedStrictlyBy(x_s)
+    val norm_rt = norm(residual_withEqs(t,x,lambda,nu))
+    var norm_rts = norm(residual_withEqs(t,x_s,lambda_s,nu_s))
+    var residualDecreased = norm_rts < (1-alpha*s)*norm_rt
+    var iter = 0
+    val maxIter = -30/log(beta)
 
-    // termination criterion
-    val r_t = residual_noEqs(t,x,lambda)
-    val lineSearchTC:(Double)=>Boolean = (s:Double) => {
+    while(!(isInC && isFeasible_x && residualDecreased) && iter <= maxIter){
 
-      val x_s = x+dx*s
-      val lambda_s = lambda+dLambda*s
-      val nu_s = nu+dNu*s
-
-      val r_ts = residual_withEqs(t,x_s,lambda_s,nu_s)
-      val alpha = pars.alpha
-      C.isInSet(x_s) &&
-        constraintSet.isSatisfiedStrictlyBy(x_s) &&
-          lambda_s.forall(_>0) &&
-            norm(r_ts) < (1-alpha*s)*norm(r_t)
+      s *= beta
+      x_s = x+dx*s
+      lambda_s = lambda+dLambda*s
+      nu_s = nu+dNu*s
+      assert(lambda_s.forall(_>0))
+      isInC = C.isInSet(x_s)
+      isFeasible_x = constraintSet.isSatisfiedStrictlyBy(x_s)
+      norm_rts = norm(residual_withEqs(t,x_s,lambda_s,nu_s))
+      residualDecreased = norm_rts < (1-alpha*s)*norm_rt
+      iter += 1
     }
-    CvxUtils.lineSearch(z,dz,lineSearchTC,pars.beta,s0)
+    if(iter>=maxIter){
+      val msg = "\nLine search unsuccessful.\n"
+      throw LineSearchFailedException(msg)
+    }
+    DenseVector.vertcat(x_s,lambda_s,nu_s)
   }
 
   /** Find the location $x$ of the minimum of f=objF over C by the Newton method
@@ -536,7 +558,7 @@ class PrimalDualSolver(
     val b = eqs.get.b
     val nEqs = numEqConstraints         // number of equality constraints
 
-    val tol=pars.tol // tolerance for duality gap
+    val tol=pars.tolSolver // tolerance for duality gap
     val mu = 10.0    // factor to increase parameter t in barrier method.
 
     // primal dual starting points
@@ -592,7 +614,7 @@ class PrimalDualSolver(
     }
     val maxedOut = iter==maxIter
     Solution(
-      x,Some(lambda),None,
+      x,Some(lambda),Some(nu),
       None,Some(dualityGap),Some(equalityGap),None,Some(normDualResidual),
       iter-1,maxedOut
     )
@@ -606,7 +628,7 @@ class PrimalDualSolver(
   def solve(debugLevel:Int=0):Solution = {
 
     val terminationCriterion = (os:OptimizationState) =>
-      os.dualityGap.get < pars.tol && os.normDualResidual.get < pars.tol
+      os.dualityGap.get < pars.tolSolver && os.normDualResidual.get < pars.tolSolver
     solveSpecial(terminationCriterion,debugLevel)
   }
 

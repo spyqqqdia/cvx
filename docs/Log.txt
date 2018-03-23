@@ -820,14 +820,11 @@ Bug fix: approach in PrimalDualSolver with relaxation of constraints was incorre
 Eliminated. Phase I analysis using the BarrierSolver is now used instead to find a
 feasible starting point.
 
-Note PrimalDual <---> Barrier analogy:   lambda(i) = - 1/[t*(g_i(x)-u_i)]
-
 Files affected:
 
 BarrierSolver
 ConstraintSet
 EqualityConstrainedSolver
-OptimizationProblem
 PrimalDualSolver
 Solution
 SolverParams
@@ -836,20 +833,85 @@ UnconstrainedSolver
 Runner
 OptimizationProblems
 SimpleOptimizationProblems
-MinimizationTests
 
 
 Status:
 compiles and runs, but line search unsuccessful in PrimalDualSolver.
-BarrierSolver is working on all test problems.
 
-Warning: branch off with the next update which seems to destroy the BarrierSolver also.
-
+Note PrimalDual <---> Barrier analogy:   lambda(i) = - 1/[t*(g_i(x)-u_i)]
 
 
+#----------------------------------------------------------------------------------------
+2018-03-20:|
+-------------
+
+Defined some termination criteria in CvxUtils, the used in BarrierSolver
+and phase I analysis in ConstraintSet.
+
+Files affected:
+
+BarrierSolver
+ConstraintSet
+CvxUtils
+SolverParams
+
+Status: compiles but LineSearchFailedException now occurs
+also with the BarrierSolver in the phase I analysis of the dist_KL_1
+problem in low dimension.
 
 
 
+#----------------------------------------------------------------------------------------
+2018-03-21:|
+-------------
+
+ConstraintSet::phase_I_analysis_withEquations: BUG detected:
+
+we replace the equations Ax=b by two opposite inequalities:
+Ax<=b and Ax>=b.
+This is a bad idea since then we obviously cannot push the slack variable s
+for the inequality constraints below zero and so cannot obtain a strictly feasible point!!!
+
+
+#----------------------------------------------------------------------------------------
+2018-03-22:|
+-------------
+
+Fixed above problem and BUG in PrimalDualSolver: line search did not update
+the variable u!
+
+Files affected:
+
+ConstraintSet
+CvxUtils
+PrimalDualSolver
+SolverParams
+
+Runner
+
+Status:
+BarrierSolver is working,
+PrimalDualSolver seems to be working on problems without equality constraints
+but seems to disregard the equality constraints.
+
+
+#----------------------------------------------------------------------------------------
+2018-03-23:|
+-------------
+
+Fixed BUGs in PrimalDualSolver: line search rewritten so as to be explicit and easy to debug.
+Fixed BUGs in SimpleOptimizationProblems (some problems failed to include the equality constraints).
+
+Files affected:
+
+PrimalDualSolver
+SimpleOptimizationProblems
+
+Runner
+
+Status:
+BarrierSolver is working on all problems,
+PrimalDualSolver working on most problems but fails on dist_KL_1 and some of the SimpleOptimizationProblems.
 
 
 

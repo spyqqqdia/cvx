@@ -54,4 +54,36 @@ object CvxUtils {
   }
 
 
+  /** Standard criterion for Barrier and PrimalDualSolver:
+    * terminates optimization as soon as the duality gap and equality
+    * gap are small enough.
+    */
+  def standardTerminationCriterion(pars:SolverParams):(OptimizationState)=>Boolean =
+
+    (optState:OptimizationState) => {
+
+      assert(optState.dualityGap.nonEmpty,
+        "\nNonempty duality gap required, Solver should be Barrier or PrimalDual.\n"
+      )
+      (optState.dualityGap.get < pars.tolSolver) &&
+        (optState.equalityGap.isEmpty || optState.equalityGap.get < pars.tolSolver)
+  }
+
+
+  /** Criterion terminates for simple phase I analysis:
+    * optimization as soon as the objective function value is less than zero
+    * (sufficient to get a strictly feasible point) and the duality and equality gap
+    * are reasonably small.
+    */
+  def phase_I_TerminationCriterion:(OptimizationState)=>Boolean =
+
+    (optState:OptimizationState) => {
+
+      assert(optState.dualityGap.nonEmpty,
+        "\nNonempty duality gap required, Solver should be Barrier or PrimalDual.\n"
+      )
+      (optState.objectiveFunctionValue < 0) &&
+        (optState.equalityGap.isEmpty || optState.equalityGap.get < 1e-6)
+  }
+
 }

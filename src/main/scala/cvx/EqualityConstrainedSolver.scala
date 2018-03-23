@@ -37,7 +37,7 @@ extends Solver {
   def solve(debugLevel:Int):Solution = {
 
     val maxIter = pars.maxIter; val alpha=pars.alpha; val beta=pars.beta
-    val tol=pars.tol; val tolEqSolve=pars.tolEqSolve; val delta=pars.delta
+    val tol=pars.tolSolver; val tolEqSolve=pars.tolEqSolve; val delta=pars.delta
 
     val breakDown = NotConvergedException.Breakdown
     var iter = 0

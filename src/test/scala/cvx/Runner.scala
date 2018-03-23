@@ -20,31 +20,31 @@ object Runner extends App {
     val doKktTests = false
 
     val doTestPowerProblems = false
+    val doMinX1 = false
     val doTestStandardProblems = false
-    val doMinX1 = true
     val doTestKlProblems = true
     val doTestInfeasibleKlProblems = false
     val doFeasibilityTests = false
 
-    val tolEqSolve = 1e-2
+    val tolEqSolve = 1e-1
     val tolSolution = 1e-2      // tolerance for solution identification
-    val solverType = "BR"       // "BR", "PD"
+    val solverType = "PD"       // "BR", "PD"
 
 
     if(doAdHoc){
 
-      val dim = 100   // at dim 41 distanceFromOrigin1 gets 20 times slower
+      val dim = 10   // at dim 41 distanceFromOrigin1 gets 20 times slower
+      val p = 3
+      val a = DenseVector.fill[Double](dim)(1.0)
       val debugLevel=1
+      val problem = SimpleOptimizationProblems.min_pNorm(dim,p,solverType,debugLevel)
       //val problem = SimpleOptimizationProblems.normSquaredWithFreeVariables(dim,solverType,debugLevel)
       //val problem = SimpleOptimizationProblems.joptP2(solverType,debugLevel)
       //val problem = SimpleOptimizationProblems.probabilitySimplexProblem(dim,solverType,debugLevel)
       //val problem = SimpleOptimizationProblems.distanceFromOrigin0(dim,solverType,debugLevel)
-      val problem = SimpleOptimizationProblems.distanceFromOrigin1(dim,solverType,debugLevel)
+      //val problem = SimpleOptimizationProblems.distanceFromOrigin1(dim,solverType,debugLevel)
+      //val problem = SimpleOptimizationProblems.minDotProduct(a,solverType,debugLevel)
 
-      if(false) {
-        val a = DenseVector.fill[Double](dim)(1.0)
-        val problem = SimpleOptimizationProblems.minDotProduct(a,solverType,debugLevel)
-      }
       MinimizationTests.runProblemWithKnownMinimizer(problem,tolSolution,debugLevel)
 
       //MatrixUtilsTests.testRuizEquilibration
@@ -86,21 +86,21 @@ object Runner extends App {
       MinimizationTests.testPowerProblems(tolSolution,debugLevel)
     }
 
-    if(doTestStandardProblems ){
-
-      val dim = 100               // dimension of objective function
-      val condNumber = 100   // condition number of matrix A
-      MinimizationTests.testStandardProblems(dim,condNumber,solverType,tolSolution,debugLevel)
-    }
-
     if(doMinX1){
 
       MinimizationTests.testMinX1(solverType,tolSolution,debugLevel)
     }
 
+    if(doTestStandardProblems ){
+
+      val dim = 10               // dimension of objective function
+      val condNumber = 100   // condition number of matrix A
+      MinimizationTests.testStandardProblems(dim,condNumber,solverType,tolSolution,debugLevel)
+    }
+
     if(doTestKlProblems){
 
-      val dim = 12
+      val dim = 120
       MinimizationTests.test_KL_problems(dim,solverType,tolSolution,debugLevel)
     }
 
@@ -113,7 +113,7 @@ object Runner extends App {
 
       val doSOI = false
       val debugLevel = 1
-      val n = 100
+      val n = 10
       val p = 10; val q = 5
       val x0 = DenseVector.tabulate[Double](10)(j => 1.0)
       val pars = SolverParams.standardParams(n)

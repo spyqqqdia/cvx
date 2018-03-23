@@ -69,7 +69,7 @@ extends Solver { self =>
     */
   def solveWithoutEQs(terminationCriterion:(OptimizationState)=>Boolean, debugLevel:Int=0):Solution = {
 
-    val tol=pars.tol // tolerance for duality gap
+    val tol=pars.tolSolver // tolerance for duality gap
     val mu = 10.0    // factor to increase parameter t in barrier method.
     var t = 1.0
     var x = startingPoint       // iterates x=x_k
@@ -126,7 +126,7 @@ extends Solver { self =>
       A:DenseMatrix[Double],b:DenseVector[Double],debugLevel:Int=0
   ):Solution = {
 
-    val tol=pars.tol // tolerance for duality gap
+    val tol=pars.tolSolver // tolerance for duality gap
     val mu = 10.0    // factor to increase parameter t in barrier method.
     var t = 1.0
     var x = startingPoint     // iterates x=x_k
@@ -183,7 +183,7 @@ extends Solver { self =>
     */
   def solve(debugLevel:Int=0):Solution = {
 
-    val terminationCriterion = (os:OptimizationState) => os.dualityGap.get < pars.tol
+    val terminationCriterion = CvxUtils.standardTerminationCriterion(pars)
     solveSpecial(terminationCriterion,debugLevel)
   }
   /** Version of _this_ solver which operates on the variable u related to

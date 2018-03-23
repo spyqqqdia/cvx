@@ -365,7 +365,7 @@ which is indeed unsolvable to any tolerance < 1.
 -------------
 
 Phase I analysis with equality constraints:
-the first step minimizing ||Ax-b||² subject to the inequality constraints
+the first step minimizing ||Ax-b||?? subject to the inequality constraints
 breaks off too soon with completely ridiculous results making the norm huge instead of
 small in the case where the constraintSet is the probability simplex.
 
@@ -374,7 +374,7 @@ and A'A is the matrix with all entries equal to one.
 
 The problem then becomes the following:
 
-Minimize (x1+x2+...+xn - 1)² subject to xj>=0.
+Minimize (x1+x2+...+xn - 1)?? subject to xj>=0.
 
 Clearly the set of minimizers is the entire probability simplex.
 In this simple problem we can study the effects of ill conditioning and regularization.
@@ -636,6 +636,37 @@ only imply small s (i.e. are almost feasible).
 
 Abandon this approach and start out with a phase_I analysis
 based on the BarrierSolver.
+
+
+#----------------------------------------------------------------------------------------
+2018-03-21:|
+-------------
+
+ConstraintSet::phase_I_analysis_withEquations: BUG detected:
+
+we replace the equations Ax=b by two opposite inequalities:
+Ax<=b and Ax>=b.
+This is a bad idea since then we obviously cannot push the slack variable s
+for the inequality constraints below zero and so cannot obtain a strictly feasible point!!!
+
+
+
+#----------------------------------------------------------------------------------------
+2018-03-22:|
+-------------
+
+PrimalDualSolver seems to be working on problems without equality constraints
+but seems to disregard the equality constraints.
+
+
+#----------------------------------------------------------------------------------------
+2018-03-23:|
+-------------
+
+
+PrimalDualSolver fails on dist_KL_1 and some of the SimpleOptimizationProblems.
+
+
 
 
 
