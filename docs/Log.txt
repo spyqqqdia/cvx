@@ -895,23 +895,92 @@ PrimalDualSolver seems to be working on problems without equality constraints
 but seems to disregard the equality constraints.
 
 
+
 #----------------------------------------------------------------------------------------
-2018-03-23:|
+2018-03-26:|
 -------------
 
-Fixed BUGs in PrimalDualSolver: line search rewritten so as to be explicit and easy to debug.
-Fixed BUGs in SimpleOptimizationProblems (some problems failed to include the equality constraints).
+Fixed up the ad hoc problems in Runner to contain all the SimpleOptimizationProblems.
+Moved class Dist_KL to member function ObjectiveFunctions.dist_KL.
+new Trait: Duality.
 
 Files affected:
 
-PrimalDualSolver
-SimpleOptimizationProblems
+Duality
+ObjectiveFunction
+OptimizationProblems
 
 Runner
 
-Status:
-BarrierSolver is working on all problems,
-PrimalDualSolver working on most problems but fails on dist_KL_1 and some of the SimpleOptimizationProblems.
+
+
+#----------------------------------------------------------------------------------------
+2018-03-27:|
+-------------
+
+Completed trait Duality,
+SolverParams.standardParams: superfluous parameter numSlacks eliminated.
+MinimizationTests.runTests: rewritten so it handles problems with duality
+by computing the solution both ways.
+
+Files affected:
+
+Duality
+SolverParams
+
+Runner
+MinimizationTests
+OptimizationProblems
+
+Status: same as previous.
+
+
+
+#----------------------------------------------------------------------------------------
+2018-03-28:|
+-------------
+
+Deleted unused class EqualityConstraints.
+OptimizationProblem: added factory function for a problem without inequality constraints.
+Work on Dist_KL.
+
+Files affected:
+
+ConstraintSet
+Dist_KL
+OptimizationProblem
+
+
+#----------------------------------------------------------------------------------------
+2018-04-04:|
+-------------
+
+Work on Dist_KL. Implemented almost all of the dual problem
+BUT: current approach does not work, see function ::optimizationProblem.
+See ToDo.
+Status: compiles.
+
+Files affected: Dist_KL
+
+
+
+#----------------------------------------------------------------------------------------
+2018-04-05:|
+-------------
+
+Work on Dist_KL, streamlined running the problems in MinimizationTests
+Status: compiles, the new versions of the Optimization problems do not work.
+
+Files affected:
+Constraints
+ConstraintSet
+Dist_KL
+EqualityConstrainedSolver
+MinimizationTests
+
+
+
+
 
 
 

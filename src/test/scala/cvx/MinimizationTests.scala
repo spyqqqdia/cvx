@@ -13,8 +13,8 @@ object MinimizationTests {
     * @param tol tolerance for distance between an actual (usually the unique) solution and the
     * solution found by the solver, see [OptimizationSolution].
     */
-  def runProblemsWithKnownMinimizer(
-    optProblems:List[OptimizationProblem with KnownMinimizer], tol:Double, debugLevel:Int
+  def runProblems(
+    optProblems:List[OptimizationProblem], tol:Double, debugLevel:Int
   ):Unit = for(problem <- optProblems) try {
 
     print("\n\n#-----Problem: "+problem.id+":\n\n")
@@ -23,36 +23,64 @@ object MinimizationTests {
     val sol = problem.solve(debugLevel)
     val x = sol.x                       // minimizer, solution found
     val y = problem.objectiveFunction.valueAt(x)     // value at solution found
-    problem.reportWithKnownSolution(sol,y,tol,problem.logger)
 
-  } catch {
 
-    case e:Exception => {
+    problem match {
 
-      print("\n\nException "+e.getClass+" occurred")
-      print("\nMessage: "+e.getMessage)
-      print("\nStacktrace:\n")
-      e.printStackTrace()
-      problem.logger.close()
+      case p:OptimizationProblem with Duality with KnownMinimizer => {
+
+        print("\n\nDirect solution:")
+        val pars = SolverParams.standardParams
+        val logger = problem.logger
+        val sol = p.solve(debugLevel)
+        val x = sol.x                       // minimizer, solution found
+        val y = problem.objectiveFunction.valueAt(x)     // value at solution found
+        p.reportWithKnownSolution(sol,y,tol,problem.logger)
+
+        print("\n\nSolution via Duality with BarrierSolver:")
+        val solverType = "BR"
+        val solD = p.solveDual(solverType,pars,logger,debugLevel)
+        val xD = solD.x                       // minimizer, solution found
+        val yD = problem.objectiveFunction.valueAt(xD)     // value at solution found
+        p.reportWithKnownSolution(solD,yD,tol,problem.logger)
+      }
+      case p:OptimizationProblem with KnownMinimizer => {
+
+        print("\n\nDirect solution:")
+        val pars = SolverParams.standardParams
+        val logger = problem.logger
+        val sol = p.solve(debugLevel)
+        val x = sol.x                       // minimizer, solution found
+        val y = problem.objectiveFunction.valueAt(x)     // value at solution found
+        p.reportWithKnownSolution(sol,y,tol,problem.logger)
+      }
+      case p:OptimizationProblem with Duality => {
+
+        print("\n\nDirect solution:")
+        val pars = SolverParams.standardParams
+        val logger = problem.logger
+        val sol = p.solve(debugLevel)
+        val x = sol.x                       // minimizer, solution found
+        val y = problem.objectiveFunction.valueAt(x)     // value at solution found
+        p.report(sol,tol)
+
+        print("\n\nSolution via Duality with BarrierSolver:")
+        val solverType = "BR"
+        val solD = p.solveDual(solverType,pars,logger,debugLevel)
+        val xD = solD.x                       // minimizer, solution found
+        p.report(solD,tol)
+      }
+      case _ => {
+
+        print("\n\nDirect solution:")
+        val pars = SolverParams.standardParams
+        val logger = problem.logger
+        val sol = problem.solve(debugLevel)
+        val x = sol.x                       // minimizer, solution found
+        val y = problem.objectiveFunction.valueAt(x)     // value at solution found
+        problem.report(sol,tol)
+      }
     }
-  }
-  def runProblemWithKnownMinimizer(
-    optProblem:OptimizationProblem with KnownMinimizer, tol:Double, debugLevel:Int
-  ):Unit = runProblemsWithKnownMinimizer(List(optProblem),tol,debugLevel)
-
-  /** Solve a list of Optimization problems where the solution may not be known
-    * or is known to be infeasible.
-    *
-    * @param tol tolerance for all sorts of things.
-    */
-  def runProblems(
-    optProblems:List[OptimizationProblem], tol:Double, debugLevel:Int
-  ):Unit = for(problem <- optProblems) try {
-
-    print("\n\n#-----Problem: "+problem.id+":\n\n")
-
-    val sol = problem.solve(debugLevel)
-    problem.report(sol,tol)
 
   } catch {
 
@@ -69,21 +97,20 @@ object MinimizationTests {
     optProblem:OptimizationProblem, tol:Double, debugLevel:Int
   ):Unit = runProblems(List(optProblem),tol,debugLevel)
 
+
   /** Run the two simple power problems [OptimizationProblems.powerProblems].
     */
   def testPowerProblems(tol:Double,debugLevel:Int):Unit = {
 
     val problems = OptimizationProblems.powerProblems(debugLevel)
-    runProblemsWithKnownMinimizer(problems,tol,debugLevel)
+    runProblems(problems,tol,debugLevel)
   }
 
   /** Test the standard list, [OptimizationProblems.standardProblems] in dimension dim.
     *
     * @param dim dimension of independent variable.
     * @param condNumber: condition number of the matrix A in the power problems.
-    * @param solverType: "BR" (barrier solver), "PD0" (primal dual with one slack variable),
-    *   "PD1" (primal dual with one slack variable for each inequality constraint), see
-    *    docs/primaldual.pdf.
+    * @param solverType: "BR" (barrier solver), "PD" (primal dual solver).
     * @param tol tolerance for deviation from the known solution.
     */
   def testStandardProblems(
@@ -91,7 +118,7 @@ object MinimizationTests {
   ):Unit = {
 
     val problems = SimpleOptimizationProblems.standardProblems(dim,condNumber,solverType,debugLevel)
-    runProblemsWithKnownMinimizer(problems,tol,debugLevel)
+    runProblems(problems,tol,debugLevel)
   }
 
   /** Test the single problem OptimizationProblems.minX1.*/
@@ -102,7 +129,7 @@ object MinimizationTests {
       SimpleOptimizationProblems.minX1_withFP(solverType,debugLevel),
       SimpleOptimizationProblems.minX1_no_FP(solverType,debugLevel)
     )
-    runProblemsWithKnownMinimizer(problems,tol,debugLevel)
+    runProblems(problems,tol,debugLevel)
   }
 
   /** Test the KL-problems (geometric centering) with known solutions.*/
@@ -112,7 +139,7 @@ object MinimizationTests {
       OptimizationProblems.kl_1(dim,solverType,debugLevel),
       OptimizationProblems.kl_2(dim,solverType,debugLevel)
     )
-    runProblemsWithKnownMinimizer(problems,tol,debugLevel)
+    runProblems(problems,tol,debugLevel)
   }
 
   /** Test the KL-problems (geometric centering) known to be infeasible.*/

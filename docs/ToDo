@@ -365,7 +365,7 @@ which is indeed unsolvable to any tolerance < 1.
 -------------
 
 Phase I analysis with equality constraints:
-the first step minimizing ||Ax-b||?? subject to the inequality constraints
+the first step minimizing ||Ax-b||² subject to the inequality constraints
 breaks off too soon with completely ridiculous results making the norm huge instead of
 small in the case where the constraintSet is the probability simplex.
 
@@ -374,7 +374,7 @@ and A'A is the matrix with all entries equal to one.
 
 The problem then becomes the following:
 
-Minimize (x1+x2+...+xn - 1)?? subject to xj>=0.
+Minimize (x1+x2+...+xn - 1)² subject to xj>=0.
 
 Clearly the set of minimizers is the entire probability simplex.
 In this simple problem we can study the effects of ill conditioning and regularization.
@@ -660,15 +660,66 @@ but seems to disregard the equality constraints.
 
 
 #----------------------------------------------------------------------------------------
-2018-03-23:|
+2018-03-26:|
 -------------
 
+If the BarrierSolver during phase I analysis determines a feasible point which happens to be
+the locus of the optimum, then the PrimalDualSolver will compute a dx = 0 for the first line
+search whereupon the norm decrease condition cannot be obtained and we get a
+LineSearchFailed exception.
 
-PrimalDualSolver fails on dist_KL_1 and some of the SimpleOptimizationProblems.
+So we need to check in advance of the loop in PrimalDualSolver::solveXXX whether
+we are at the optimum already. We actually do this but the starting values for
+the dual variables lambda, nu seem to prevent the termination criterion from returning
+true.
+
+Example: SimpleOptimizationProblems::jopt2
+UNFIXED as of yet!
+
+
+Duality: implement ::solveDual (see FIX ME).
+Then implement the dist_KL problems as OptimizationProblems with Duality.
+
+
+#----------------------------------------------------------------------------------------
+2018-03-27:|
+-------------
+
+Work out class Dist_KL as an OptimizationProblem with Duality:
+as the Kullback-Leibler distance minimization
+argmin_Q dist_KL(Q,P)  subject to HQ<=ub, AQ=r
+
+where P=(p_j) is a given arbitrary discrete probability distribution
+with p_j>0, for all j.
+
+See docs/maxent.pdf
+
+
+#----------------------------------------------------------------------------------------
+2018-04-04:|
+-------------
+
+Simplify the Trait Duality, should only have one abstract function returning the dual
+OptimizationProblem and one function to compute the primal optimum from the dual
+optimum.
+
+Then swallow the bitter pill and implement
+Dist_KL::optimizationProblem: OptimizationProblem with Duality
+from scratch, extending the code for
+Dist_KL::primalProblem.
 
 
 
+#----------------------------------------------------------------------------------------
+2018-04-05:|
+-------------
 
+OptimizationProblems.dist_KL_2A: the direct approach does not converge
+(reaches iteration limit with equality gap 0.4)
+OptimizationProblems.dist_KL_1A: the direct approach works
+
+In both problems the dual approach does not work, terminates after only one iteration
+with duality gap 1e-9.
 
 
 

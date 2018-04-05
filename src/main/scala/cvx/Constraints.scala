@@ -34,6 +34,20 @@ object Constraints {
     LinearConstraint(id, n, 0, 0, a)
   }
 
+  /** Constraints: x_0,x_1,...,x_{m-1}>0.
+    * Variables are numbered starting from zero (hence in dimension n,
+    * x_{n-1} is the last variable).
+    *
+    * @param n dimension of problem.
+    */
+  def firstCoordinatesPositive(n:Int,m:Int):List[Constraint] = {
+
+    assert(m<=n && m>=0,
+      "\nMust have 0<=m<n but actually m="+m+" and n="+n+"\n"
+    )
+    (0 until m).map(j => singleCoordinatePositive(n,j)).toList
+  }
+
   /** Constraints: x_m,x_{m+1},...,x_{n-1}>0.
     * Variables are numbered starting from zero (hence in dimension n,
     * x_{n-1} is the last variable).

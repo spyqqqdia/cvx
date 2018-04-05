@@ -1,6 +1,7 @@
 package cvx
 
 import breeze.linalg.DenseVector
+import cvx.SimpleOptimizationProblems._
 
 
 /** Main class, runs all tests from main method.
@@ -14,38 +15,39 @@ object Runner extends App {
 
     val debugLevel=0
 
-    val doAdHoc = false
+    val doAdHoc = true
 
     val doTestMatrixUtils = false
     val doKktTests = false
 
     val doTestPowerProblems = false
-    val doMinX1 = false
     val doTestStandardProblems = false
-    val doTestKlProblems = true
+    val doTestKlProblems = false
     val doTestInfeasibleKlProblems = false
     val doFeasibilityTests = false
 
     val tolEqSolve = 1e-1
     val tolSolution = 1e-2      // tolerance for solution identification
-    val solverType = "PD"       // "BR", "PD"
+    val solverType = "BR"       // "BR", "PD"
 
 
     if(doAdHoc){
 
-      val dim = 10   // at dim 41 distanceFromOrigin1 gets 20 times slower
-      val p = 3
-      val a = DenseVector.fill[Double](dim)(1.0)
       val debugLevel=1
-      val problem = SimpleOptimizationProblems.min_pNorm(dim,p,solverType,debugLevel)
-      //val problem = SimpleOptimizationProblems.normSquaredWithFreeVariables(dim,solverType,debugLevel)
-      //val problem = SimpleOptimizationProblems.joptP2(solverType,debugLevel)
-      //val problem = SimpleOptimizationProblems.probabilitySimplexProblem(dim,solverType,debugLevel)
-      //val problem = SimpleOptimizationProblems.distanceFromOrigin0(dim,solverType,debugLevel)
-      //val problem = SimpleOptimizationProblems.distanceFromOrigin1(dim,solverType,debugLevel)
-      //val problem = SimpleOptimizationProblems.minDotProduct(a,solverType,debugLevel)
+      val dim = 10   // at dim 41 distanceFromOrigin1 gets 20 times slower
+      //val problem = minX1_no_FP(solverType,debugLevel)
+      //val a = DenseVector.tabulate[Double](dim)(i => 1.0)
+      //val problem = minDotProduct(a,solverType,debugLevel)
+      //val problem = min_pNorm(dim,p=2.2,solverType,debugLevel)
+      //val problem = min_pNorm(dim,p=4,solverType,debugLevel)
+      //val problem = rankOneProblemSimplex(dim,solverType,debugLevel)
+      //val problem = rankOneProblemSphere(dim,solverType,debugLevel)
+      //val problem = joptP1(dim,solverType,debugLevel)
+      //val problem = joptP2(solverType,debugLevel)
+      //val problem = normSquaredWithFreeVariables(dim,solverType,debugLevel)
+      val problem = OptimizationProblems.kl_2A(dim,solverType,debugLevel)
 
-      MinimizationTests.runProblemWithKnownMinimizer(problem,tolSolution,debugLevel)
+      MinimizationTests.runProblem(problem,tolSolution,debugLevel)
 
       //MatrixUtilsTests.testRuizEquilibration
     }
@@ -86,11 +88,6 @@ object Runner extends App {
       MinimizationTests.testPowerProblems(tolSolution,debugLevel)
     }
 
-    if(doMinX1){
-
-      MinimizationTests.testMinX1(solverType,tolSolution,debugLevel)
-    }
-
     if(doTestStandardProblems ){
 
       val dim = 10               // dimension of objective function
@@ -116,7 +113,7 @@ object Runner extends App {
       val n = 10
       val p = 10; val q = 5
       val x0 = DenseVector.tabulate[Double](10)(j => 1.0)
-      val pars = SolverParams.standardParams(n)
+      val pars = SolverParams.standardParams
 
       FeasibilityTests.checkFeasibilityProbabilitySimplex(doSOI,n,pars,debugLevel)
       //FeasibilityTests.checkRandomFeasibleConstraints(doSOI,x0,p,q,pars,debugLevel)

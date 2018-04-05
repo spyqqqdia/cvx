@@ -155,5 +155,17 @@ object EqualityConstrainedSolver{
   ):EqualityConstrainedSolver =
     new EqualityConstrainedSolver(objF,C,startingPoint,A,b,pars,logger)
 
+  def apply(
+    objF:ObjectiveFunction,
+    C:ConvexSet,
+    startingPoint:DenseVector[Double],
+    eqs:EqualityConstraint,
+    pars:SolverParams,
+    logger:Logger
+  ):EqualityConstrainedSolver =
+    new EqualityConstrainedSolver(objF,C,startingPoint,eqs.A,eqs.b,pars,logger)
+
+
+
 
 }

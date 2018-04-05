@@ -65,7 +65,7 @@ object SimpleOptimizationProblems {
     val doSOIAnalysis = false
 
     // None: no equality constraints
-    val pars = SolverParams.standardParams(ineqs.numConstraints)
+    val pars = SolverParams.standardParams
     val problem = OptimizationProblem(
       id,setWhereDefined,objF,ineqsF,None,solverType,pars,logger,debugLevel
     )
@@ -123,7 +123,7 @@ object SimpleOptimizationProblems {
     val setWhereDefined = ConvexSets.wholeSpace(dim)
     val ineqs = ConstraintSet(dim,List(ct1,ct2),setWhereDefined,x0)   // the inequality constraints
 
-    val pars = SolverParams.standardParams(ineqs.numConstraints)
+    val pars = SolverParams.standardParams
     val problem = OptimizationProblem.withoutFeasiblePoint(
       id,setWhereDefined,objF,ineqs,None,solverType,pars,logger,debugLevel
     )
@@ -160,7 +160,7 @@ object SimpleOptimizationProblems {
 
     val objF = LinearObjectiveFunction(-a)
 
-    val pars = SolverParams.standardParams(ineqs.numConstraints)
+    val pars = SolverParams.standardParams
     val problem = OptimizationProblem.withoutFeasiblePoint(
       id,setWhereDefined,objF,ineqs,None,solverType,pars,logger,debugLevel
     )
@@ -199,7 +199,7 @@ object SimpleOptimizationProblems {
     val ineqs = ConstraintSet(dim,positivityCnts,setWhereDefined,x0)
     val objF = ObjectiveFunctions.p_norm_p(dim,p)
 
-    val pars = SolverParams.standardParams(ineqs.numConstraints)
+    val pars = SolverParams.standardParams
     val problem = OptimizationProblem.withoutFeasiblePoint(
       id,setWhereDefined,objF,ineqs,Some(probEq),solverType,pars,logger,debugLevel
     )
@@ -244,7 +244,7 @@ object SimpleOptimizationProblems {
 
     val probEq:EqualityConstraint = Constraints.sumToOne(dim)
 
-    val pars = SolverParams.standardParams(ineqs.numConstraints)
+    val pars = SolverParams.standardParams
     val problem = OptimizationProblem.withoutFeasiblePoint(
       id,setWhereDefined,objF,ineqs,Some(probEq),solverType,pars,logger,debugLevel
     )
@@ -289,7 +289,7 @@ object SimpleOptimizationProblems {
     val setWhereDefined = ConvexSets.wholeSpace(dim)
     val ineqs = ConstraintSet(dim,cnts,setWhereDefined,x0)
 
-    val pars = SolverParams.standardParams(ineqs.numConstraints)
+    val pars = SolverParams.standardParams
     val problem = OptimizationProblem.withoutFeasiblePoint(
       id,setWhereDefined,objF,ineqs,None,solverType,pars,logger,debugLevel
     )
@@ -328,7 +328,7 @@ object SimpleOptimizationProblems {
     val setWhereDefined = ConvexSets.wholeSpace(dim)
     val ineqs = ConstraintSet(dim,List(cnt),setWhereDefined,x0)
 
-    val pars = SolverParams.standardParams(ineqs.numConstraints)
+    val pars = SolverParams.standardParams
     val problem = OptimizationProblem.withoutFeasiblePoint(
       id,setWhereDefined,objF,ineqs,None,solverType,pars,logger,debugLevel
     )
@@ -366,7 +366,7 @@ object SimpleOptimizationProblems {
     val setWhereDefined = ConvexSets.wholeSpace(dim)
     val ineqs = ConstraintSet(dim,List(cnt),setWhereDefined,x0)
 
-    val pars = SolverParams.standardParams(ineqs.numConstraints)
+    val pars = SolverParams.standardParams
     val problem = OptimizationProblem.withoutFeasiblePoint(
       id,setWhereDefined,objF,ineqs,None,solverType,pars,logger,debugLevel
     )
@@ -403,7 +403,7 @@ object SimpleOptimizationProblems {
     val setWhereDefined = ConvexSets.wholeSpace(dim)
     val ineqs = ConstraintSet(dim,cnts,setWhereDefined,x0)
 
-    val pars = SolverParams.standardParams(ineqs.numConstraints)
+    val pars = SolverParams.standardParams
     val problem = OptimizationProblem.withoutFeasiblePoint(
       id,setWhereDefined,objF,ineqs,Some(probEq),solverType,pars,logger,debugLevel
     )
@@ -445,7 +445,7 @@ object SimpleOptimizationProblems {
     val setWhereDefined = ConvexSets.wholeSpace(n)
     val ineqs = ConstraintSet(n,cnts,setWhereDefined,x0)
 
-    val pars = SolverParams.standardParams(ineqs.numConstraints)
+    val pars = SolverParams.standardParams
     val problem = OptimizationProblem.withoutFeasiblePoint(
       id,setWhereDefined,objF,ineqs,None,solverType,pars,logger,debugLevel
     )
@@ -488,7 +488,7 @@ object SimpleOptimizationProblems {
 
     val objF = ObjectiveFunctions.normSquared(n+1)
 
-    val pars = SolverParams.standardParams(ineqs.numConstraints)
+    val pars = SolverParams.standardParams
     val problem = OptimizationProblem.withoutFeasiblePoint(
       id,setWhereDefined,objF,ineqs,None,solverType,pars,logger,debugLevel
     )
@@ -549,7 +549,7 @@ object SimpleOptimizationProblems {
 
     val objF = ObjectiveFunctions.normSquared(n+1)
 
-    val pars = SolverParams.standardParams(ineqs.numConstraints)
+    val pars = SolverParams.standardParams
     val problem = OptimizationProblem.withoutFeasiblePoint(
       id,setWhereDefined,objF,ineqs,None,solverType,pars,logger,debugLevel
     )
@@ -577,7 +577,7 @@ object SimpleOptimizationProblems {
   List[OptimizationProblem with KnownMinimizer] = {
 
     var theList:List[OptimizationProblem with KnownMinimizer]
-      = List(normSquared(dim,debugLevel))
+    = List(normSquared(dim,debugLevel))
 
     val q = 2.0+rand()   // needs to be >= 2 for differentiability
     val id = "Random power problem in dimension "+dim+" with m="+dim+" and exponent "+q

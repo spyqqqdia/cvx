@@ -83,7 +83,7 @@ object OptimizationProblems {
       def isMinimizer(x:DenseVector[Double],tol:Double):Boolean = norm(A*x)<tol
       def minimumValue:Double = 0.0
     }
-    val pars = SolverParams.standardParams(0)
+    val pars = SolverParams.standardParams
     val problem = OptimizationProblem(id,objF,startingPoint,C,pars,logger)
     problem.addSolution(minimizer)
   }
@@ -101,7 +101,7 @@ object OptimizationProblems {
     assert(dimKernel<=dim)
     val A = MatrixUtils.randomMatrix(dim,condNumber)
     val alpha = DenseVector.rand[Double](dim)
-    val pars = SolverParams.standardParams(0)
+    val pars = SolverParams.standardParams
     powerProblem(id,A,alpha,q,debugLevel)
   }
 
@@ -167,7 +167,7 @@ object OptimizationProblems {
     val logger = Logger(logFilePath)
 
     // objective f(x0,x1)=x0
-    val objF = Dist_KL(n)
+    val objF = Dist_KL.objectiveFunction(n)
 
     // set up the constraints
     val positivityCnts:List[Constraint] = Constraints.allCoordinatesPositive(n)
@@ -189,7 +189,7 @@ object OptimizationProblems {
     val ineqs = ConstraintSet(n,constraints,setWhereDefined,x0)
 
     val probEq:EqualityConstraint = Constraints.sumToOne(n)
-    val pars = SolverParams.standardParams(ineqs.numConstraints)
+    val pars = SolverParams.standardParams
     val problem = OptimizationProblem.withoutFeasiblePoint(
       id,setWhereDefined,objF,ineqs,Some(probEq),solverType:String,pars,logger,debugLevel
     )
@@ -198,10 +198,49 @@ object OptimizationProblems {
     val x_opt = if(1.8/n>0.12) DenseVector.tabulate[Double](n)(
       j => if(j<3) 1.8/n else if (j>=n/2) 0.2/n else (1.8*n-10.8)/(n*(n-6))
     ) else DenseVector.tabulate[Double](n)(
-      j => if(j<3) 0.12 else if (j>=n/2) 0.2/n else (1.08)/(n-6)
+      j => if(j<3) 0.12 else if (j>=n/2) 0.2/n else 1.08/(n-6)
     )
     val minimizer = KnownMinimizer(x_opt,objF)
     problem.addSolution(minimizer)
+  }
+
+  /** Exactly as [[kl_1A]] but this time allocated as an instance of [[Dist_KL]].
+    *
+    * @param solverType: "BR" (barrier solver), "PD" (primal dual solver).
+    * @param n must be even and bigger than 9 (to ensure feasibility).
+    */
+  def kl_1A(n:Int, solverType:String, debugLevel:Int):
+  OptimizationProblem with Duality with KnownMinimizer = {
+
+    assert(n>9 && n%2==0, "\n\nn must be even and > 9, but n = "+n+"\n\n")
+
+    val id = "dist_KL problem 2"
+    if(debugLevel>0) {
+      println("\nAllocating problem " + id)
+      Console.flush()
+    }
+    val logFilePath = "logs/"+id+"_log.txt"
+    val logger = Logger(logFilePath)
+
+    // indicator function 1_A
+    val I_A = DenseVector.tabulate[Double](n)(j => if(j<3) 1.0 else 0.0)
+    // indicator function 1_B
+    val I_B = DenseVector.tabulate[Double](n)(j => if(j>=n/2) 1.0 else 0.0)
+
+    val H:DenseMatrix[Double] = DenseVector.horzcat(-I_A,I_B).t
+    val u = DenseVector(-0.36,0.1)
+
+    val pars = SolverParams.standardParams
+    val problem = Dist_KL(id,n,Some(H),Some(u),None,None,solverType,pars,logger,debugLevel)
+
+    // the heuristic optimal solution
+    val x_opt = if(1.8/n>0.12) DenseVector.tabulate[Double](n)(
+      j => if(j<3) 1.8/n else if (j>=n/2) 0.2/n else (1.8*n-10.8)/(n*(n-6))
+    ) else DenseVector.tabulate[Double](n)(
+      j => if(j<3) 0.12 else if (j>=n/2) 0.2/n else 1.08/(n-6)
+    )
+    val minimizer = KnownMinimizer(x_opt,problem.objectiveFunction)
+    problem.addKnownMinimizer(minimizer)
   }
 
 
@@ -252,7 +291,7 @@ object OptimizationProblems {
     if(debugLevel>1) eqs.printSelf(logger,3)
 
     // KL-distance
-    val objF = Dist_KL(n)
+    val objF = Dist_KL.objectiveFunction(n)
 
     // set up the constraints
     val positivityCnts:List[Constraint] = Constraints.allCoordinatesPositive(n)
@@ -262,7 +301,7 @@ object OptimizationProblems {
     val setWhereDefined = ConvexSets.wholeSpace(n)
     val ineqs = ConstraintSet(n,positivityCnts,setWhereDefined,x0)
 
-    val pars = SolverParams.standardParams(ineqs.numConstraints)
+    val pars = SolverParams.standardParams
     val problem = OptimizationProblem.withoutFeasiblePoint(
       id,setWhereDefined,objF,ineqs,Some(eqs),solverType,pars,logger,debugLevel
     )
@@ -273,6 +312,61 @@ object OptimizationProblems {
     val minimizer = KnownMinimizer(x_opt,objF)
     problem.addSolution(minimizer)
   }
+
+
+
+
+  /** A feasible problem with known analytic solution.
+    * Minimize the Kullback-Leibler distance d_KL(x,p) from the uniform
+    * distribution p_j=1/n on the set Omega={0,1,2,...,n-1} subject to the
+    * equality constraints
+    *                     P^x(A)=0.36 and P^x(B)=0.1
+    * where A={0,1,2} and B={n/2,n/2+1,...,n-1}.
+    *
+    * Using symmetry and it can be shown that the optimum occurs at the following
+    * probability distribution x (see docs/Dist_KL.pdf):
+    * IF 1.8/n>=0.12:
+    *
+    * x_j=0.36/3, j=0,1,2
+    * x_j=0.2/n,       j=n/2,n/2+1,...,n-1
+    * x_j=(1-0.36-0.1)/(n-n/2-3), all other j
+    *
+    * @param solverType: "BR" (barrier solver), "PD" (primal dual solver).
+    * @param n must be even and bigger than 9 (to ensure feasibility).
+    */
+  def kl_2A(n:Int, solverType:String, debugLevel:Int):
+  OptimizationProblem with Duality with KnownMinimizer = {
+
+    assert(n>9 && n%2==0, "\n\nn must be even and > 9, but n = "+n+"\n\n")
+
+    val id = "dist_KL problem 2"
+    if(debugLevel>0) {
+      println("\nAllocating problem " + id)
+      Console.flush()
+    }
+    val logFilePath = "logs/"+id+"_log.txt"
+    val logger = Logger(logFilePath)
+
+    // indicator function 1_A
+    val I_A = DenseVector.tabulate[Double](n)(j => if(j<3) 1.0 else 0.0)
+    // indicator function 1_B
+    val I_B = DenseVector.tabulate[Double](n)(j => if(j>=n/2) 1.0 else 0.0)
+
+    val A:DenseMatrix[Double] = DenseVector.horzcat(I_A,I_B).t
+    val r = DenseVector(0.36,0.1)
+
+    val pars = SolverParams.standardParams
+    val problem = Dist_KL(id,n,None,None,Some(A),Some(r),solverType,pars,logger,debugLevel)
+
+    // the known optimal solution
+    val x_opt = DenseVector.tabulate[Double](n)(
+      j => if(j<3) 0.12 else if (j>=n/2) 0.2/n else 1.08/(n-6)
+    )
+    val minimizer = KnownMinimizer(x_opt,problem.objectiveFunction)
+    problem.addKnownMinimizer(minimizer)
+  }
+
+
 
 
   /** A infeasible problem: sum of probabilities of disjoint events bigger than one.
@@ -299,9 +393,9 @@ object OptimizationProblems {
     val pA=0.51; val pB=0.51
     val ineqs = ConstraintSets.probAB(n,I_A,pA,sgnA,I_B,pB,sgnB)   // p(A)>=0.51, p(B)>=0.51
     // KL-distance
-    val objF = Dist_KL(n)
+    val objF = Dist_KL.objectiveFunction(n)
 
-    val pars = SolverParams.standardParams(ineqs.numConstraints)
+    val pars = SolverParams.standardParams
     val setWhereDefined = ConvexSets.wholeSpace(n)
     OptimizationProblem.withoutFeasiblePoint(
       id,setWhereDefined,objF,ineqs,Some(probEq),solverType,pars,logger,debugLevel

@@ -69,6 +69,20 @@ abstract class ConstraintSet(val dim: Int, val constraints: Seq[Constraint]) {
     val x0 = pointWhereDefined
     ConstraintSet(dim,newConstraints,setWhereDefined,x0)
   }
+  /** Add a list of constraints to this ConstraintSet.
+    */
+  def addConstraints(cts:List[Constraint]):ConstraintSet = {
+
+    require(cts.forall(_.dim==dim),
+      s"\nAll new constraints must have dimension ${dim} but have dimensions ${cts.map(_.dim)}"
+    )
+    require(cts.forall(_.isDefinedAt(pointWhereDefined)),
+      s"New constraints must all be defined at x = ${pointWhereDefined}.\n"
+    )
+    val newConstraints = getListOfConstraints:::cts
+    val x0 = pointWhereDefined
+    ConstraintSet(dim,newConstraints,setWhereDefined,x0)
+  }
 
   /** The function g(x)=(g_1(x)-u_1,...,g_m(x)-u_m), where the g_j(x) <= u_j are
     * the (inequality) constraints of this set.
@@ -101,8 +115,8 @@ abstract class ConstraintSet(val dim: Int, val constraints: Seq[Constraint]) {
     */
   def lambda(x:DenseVector[Double]):DenseVector[Double] = {
 
-    val gx = constraintFunctionAt(x)
-    DenseVector.tabulate[Double](gx.length)(i => -1.0/gx(i))
+    val h = constraintFunctionAt(x)
+    DenseVector.tabulate(h.length)(i => -1.0/h(i))
   }
 
 
@@ -600,5 +614,26 @@ object ConstraintSet {
       val pointWhereDefined:DenseVector[Double] = x0
     }
 
+  /** The (coordinatewise) linear inequalities Hx<=u, that is,
+    *   [row_i(H)\cdot x \leq u_i,\quad i=1,\dots,H.rows]
+    * as a ConstraintSet restricted to the given set of definition C.
+    */
+  def apply(H:DenseMatrix[Double],u:DenseVector[Double],C:ConvexSet):ConstraintSet = {
 
+    require(H.rows==u.length,
+      s"\nMust have H.rows=u.length=${u.length} but H.rows=${H.rows}.\n"
+    )
+    val dim = H.cols
+    var cntList = List.empty[Constraint]
+    for(i <- (H.rows-1) to 0 by -1 ){
+
+      // allocate the constraint row_i(H)x <= u_i
+      val id = s"row_${i}(H)x<=u(${i})"
+      val a:DenseVector[Double] = H(i,::).t
+      val cnt_i = LinearConstraint(id,dim, u(i),0,a)
+      cntList = cnt_i :: cntList
+    }
+    val x0 = DenseVector.fill(dim)(1.0/dim)  // ideal for the probability simplex
+    ConstraintSet(dim,cntList,C,x0)
+  }
 }

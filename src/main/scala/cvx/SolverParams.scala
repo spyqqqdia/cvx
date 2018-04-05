@@ -32,11 +32,7 @@ case class SolverParams(
 )
 object SolverParams {
 
-  /**
-    * @param numSlacks number of slack variables assigned to the inequality
-    *  constraints (this is equal to the number of inequality constraints).
-    */
-  def standardParams(numSlacks:Int):SolverParams = {
+  def standardParams:SolverParams = {
 
     // solver parameters
     val maxIter = 1000          // max number of Newton steps computed
