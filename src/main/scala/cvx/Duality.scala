@@ -104,11 +104,11 @@ trait Duality {
     val setWhereDefined = ConvexSets.wholeSpace(dualDim)
     val theObjF = objF
     val cnts = dualConstraintSet
-    val dualFeasiblePoint = DenseVector.zeros[Double](dualDim)
-    for(i <- 0 until numInequalities) dualFeasiblePoint(i) = 1.0
+    val dualFeasiblePoint = DenseVector.fill[Double](dualDim)(0.001)
     val ineqs = cnts.addFeasiblePoint(dualFeasiblePoint)
 
     OptimizationProblem(theId,setWhereDefined,theObjF,ineqs,None,solverType,pars,logger,debugLevel)
+
   }
 
   /** Solve the primal problem via duality.

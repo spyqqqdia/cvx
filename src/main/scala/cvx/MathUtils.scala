@@ -20,6 +20,8 @@ object MathUtils {
     val f = pow(10,d)
     Math.round(u*f)/f
   }
+  def roundVec(u:DenseVector[Double],d:Int):DenseVector[Double] =
+    DenseVector.tabulate[Double](u.length)(j => round(u(j),d))
 
   ////------------------- One dimensional minimization  ------------------------////
 

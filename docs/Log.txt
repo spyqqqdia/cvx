@@ -969,7 +969,8 @@ Files affected: Dist_KL
 -------------
 
 Work on Dist_KL, streamlined running the problems in MinimizationTests
-Status: compiles, the new versions of the Optimization problems do not work.
+Status: compiles, dual approach in the new versions of the Optimization problems
+does not work.
 
 Files affected:
 Constraints
@@ -980,8 +981,62 @@ MinimizationTests
 
 
 
+#----------------------------------------------------------------------------------------
+2018-04-10:|
+-------------
+
+BarrierSolver: cosmetics in error messages.
+
+Fixed up the dist_KL problems (analytic solution made a separate function).
+Dist_KL.objectiveFunction:
+switched P,Q in the definition of the Kullback-Leibler distance. We were averaging
+with respect to P = unif, thereby considering P as the true distribution but the
+intended interpretation is that the distribution Q to be computed is the true
+distribution.
+
+Thus the appropriate KL distance is d(Q,P)=E_Q[log(dQ/dP] not the other way around.
+
+Fixed BUG in MatrixUtils.diagonalizationSolve.
+
+Status: compiles, dist_KL_1A,2A don't work via the direct approach, the dual
+approach now works. BarrierSolver seems to hit the solution before the duality gap
+drops below tolerance and then the running point x is no longer strictly feasible.
+We need to check the duality gap independently of dualityGap = numIneqs/t
+to check for termination.
+But why do the same problems kl1, kl2, set up directly (not as instances of Dist_KL)
+work?? What's the difference?
+
+Slight streamlining of Duality, fixed Dist_KL by adding the constraint
+E_Q[1]=sum(Q)=1 to the matrix A and vector r for the equality constraints.
 
 
+Files affected:
+
+BarrierSolver
+Dist_KL
+Duality
+KnownMinimizer
+OptimizationProblems
+
+
+#----------------------------------------------------------------------------------------
+2018-04-11:|
+-------------
+
+Fixed BUG in ConstraintSet.appy(H,u): rows of H had to be _copied_.
+Cosmetics (rounding results etc.).
+
+Status: compiles and runs.
+PrimalDualSolver fails on problem dist_KL_1.
+BarrierSolver works on all problems.
+
+Files affected:
+
+ConstraintSet
+Dist_KL
+KnownMinimizer
+MathUtils
+Solution
 
 
 

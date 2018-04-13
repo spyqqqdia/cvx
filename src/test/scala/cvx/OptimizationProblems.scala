@@ -2,6 +2,7 @@ package cvx
 
 import breeze.linalg.{DenseVector, _}
 import breeze.numerics.{abs, sqrt}
+import cvx.OptimizationProblems.kl_1
 
 
 /**
@@ -58,9 +59,9 @@ object OptimizationProblems {
     * parameters etc, see [SolverParams].
     */
   def powerProblem( id:String,
-                    A:DenseMatrix[Double], alpha:DenseVector[Double], q:Double,
-                    debugLevel:Int
-    ): OptimizationProblem with KnownMinimizer = {
+    A:DenseMatrix[Double], alpha:DenseVector[Double], q:Double,
+    debugLevel:Int
+  ): OptimizationProblem with KnownMinimizer = {
 
     assert(q>=1,"\nExponent q needs to be at least 1 but q="+q+"\n")
     if(debugLevel>0){
@@ -95,7 +96,7 @@ object OptimizationProblems {
     * @param condNumber: condition number of A.
     */
   def randomPowerProblem(
-     id:String,dim:Int,dimKernel:Int,condNumber:Double,q:Double, debugLevel:Int
+    id:String,dim:Int,dimKernel:Int,condNumber:Double,q:Double, debugLevel:Int
   ): OptimizationProblem with KnownMinimizer = {
 
     assert(dimKernel<=dim)
@@ -125,9 +126,22 @@ object OptimizationProblems {
 
 
 
+
   /**********************************************************************************/
   /** Minimization of Kullback-Leibler distance from discrete uniform distribution **/
   /**********************************************************************************/
+
+  /** The analytic solution of [[kl_1]] derived from symmetry heuristics.
+    */
+  def kl1_analyticSolution(n:Int):DenseVector[Double] =
+    if(n<=15) DenseVector.tabulate[Double](n)(
+      j => if(j<n/2) 1.8/n else 0.2/n
+    ) else DenseVector.tabulate[Double](n)(
+      j => if(j<3) 0.12 else if (j>=n/2) 0.2/n else 1.08/(n-6)
+    )
+
+
+
 
   /** A feasible problem with known analytic solution.
     * Minimize the Kullback-Leibler distance d_KL(x,p) from the uniform
@@ -139,17 +153,13 @@ object OptimizationProblems {
     * From manual optimization using symmetry and heuristics the optimum is given
     * as follows:
     *
-    * IF 1.8/n>=0.12:
-    *
-    * x_j=1.8/n, j=0,1,2
-    * x_j=0.2/n,       j=n/2,n/2+1,...,n-1
-    * x_j=(1.8*n-10.8)/n(n-6), all other j
-    *
-    * IF 1.8/n <= 0.12:
-    *
-    * x_j=0.12, j=0,1,2
-    * x_j=0.2/n,       j=n/2,n/2+1,...,n-1
-    * x_j=1.08/(n-6), all other j
+    * IF n<=15:
+    *    x_j = 0.1/(n/2) = 0.2/n,      j=n/2,n/2+1,...,n-1
+    *    x_j = (1-0.1)/(n/2) = 1.8/n,  all other j
+    * ELSE
+    *    x_j = 0.12,                                j=0,1,2
+    *    x_j = 0.2/n,                               j=n/2,n/2+1,...,n-1
+    *    x_j = (1-0.36-0.1)/(n-n/2-3) = 1.08/(n-6), all other j
     *
     * @param solverType: "BR" (barrier solver), "PD" (primal dual solver).
     * @param n must be even and bigger than 9 (to ensure feasibility).
@@ -158,7 +168,7 @@ object OptimizationProblems {
 
     assert(n>9 && n%2==0, "\n\nn must be even and > 9, but n = "+n+"\n\n")
 
-    val id = "dist_KL problem 1"
+    val id = "dist_KL_1"
     if(debugLevel>0) {
       println("\nAllocating problem " + id)
       Console.flush()
@@ -166,7 +176,6 @@ object OptimizationProblems {
     val logFilePath = "logs/"+id+"_log.txt"
     val logger = Logger(logFilePath)
 
-    // objective f(x0,x1)=x0
     val objF = Dist_KL.objectiveFunction(n)
 
     // set up the constraints
@@ -195,11 +204,7 @@ object OptimizationProblems {
     )
 
     // the heuristic optimal solution
-    val x_opt = if(1.8/n>0.12) DenseVector.tabulate[Double](n)(
-      j => if(j<3) 1.8/n else if (j>=n/2) 0.2/n else (1.8*n-10.8)/(n*(n-6))
-    ) else DenseVector.tabulate[Double](n)(
-      j => if(j<3) 0.12 else if (j>=n/2) 0.2/n else 1.08/(n-6)
-    )
+    val x_opt = kl1_analyticSolution(n)
     val minimizer = KnownMinimizer(x_opt,objF)
     problem.addSolution(minimizer)
   }
@@ -214,7 +219,7 @@ object OptimizationProblems {
 
     assert(n>9 && n%2==0, "\n\nn must be even and > 9, but n = "+n+"\n\n")
 
-    val id = "dist_KL problem 2"
+    val id = "dist_KL_1A"
     if(debugLevel>0) {
       println("\nAllocating problem " + id)
       Console.flush()
@@ -233,15 +238,17 @@ object OptimizationProblems {
     val pars = SolverParams.standardParams
     val problem = Dist_KL(id,n,Some(H),Some(u),None,None,solverType,pars,logger,debugLevel)
 
-    // the heuristic optimal solution
-    val x_opt = if(1.8/n>0.12) DenseVector.tabulate[Double](n)(
-      j => if(j<3) 1.8/n else if (j>=n/2) 0.2/n else (1.8*n-10.8)/(n*(n-6))
-    ) else DenseVector.tabulate[Double](n)(
-      j => if(j<3) 0.12 else if (j>=n/2) 0.2/n else 1.08/(n-6)
-    )
+    val x_opt = kl1_analyticSolution(n)
     val minimizer = KnownMinimizer(x_opt,problem.objectiveFunction)
     problem.addKnownMinimizer(minimizer)
   }
+
+
+  /** The analytic solution of [[kl_2]] derived from symmetry heuristics.
+    */
+  def kl2_analyticSolution(n:Int):DenseVector[Double] = DenseVector.tabulate[Double](n)(
+      j => if(j<3) 0.12 else if (j>=n/2) 0.2/n else 1.08/(n-6)
+  )
 
 
   /** A feasible problem with known analytic solution.
@@ -253,11 +260,10 @@ object OptimizationProblems {
     *
     * Using symmetry and it can be shown that the optimum occurs at the following
     * probability distribution x (see docs/Dist_KL.pdf):
-    * IF 1.8/n>=0.12:
     *
-    * x_j=0.36/3, j=0,1,2
-    * x_j=0.2/n,       j=n/2,n/2+1,...,n-1
-    * x_j=(1-0.36-0.1)/(n-n/2-3), all other j
+    *   x_j=0.36/3,                 j=0,1,2
+    *   x_j=0.2/n,                  j=n/2,n/2+1,...,n-1
+    *   x_j=(1-0.36-0.1)/(n-n/2-3), all other j
     *
     * @param solverType: "BR" (barrier solver), "PD" (primal dual solver).
     * @param n must be even and bigger than 9 (to ensure feasibility).
@@ -266,7 +272,7 @@ object OptimizationProblems {
 
     assert(n>9 && n%2==0, "\n\nn must be even and > 9, but n = "+n+"\n\n")
 
-    val id = "dist_KL problem 2"
+    val id = "dist_KL_2"
     if(debugLevel>0) {
       println("\nAllocating problem " + id)
       Console.flush()
@@ -306,9 +312,7 @@ object OptimizationProblems {
       id,setWhereDefined,objF,ineqs,Some(eqs),solverType,pars,logger,debugLevel
     )
     // the known optimal solution
-    val x_opt = DenseVector.tabulate[Double](n)(
-      j => if(j<3) 0.12 else if (j>=n/2) 0.2/n else 1.08/(n-6)
-    )
+    val x_opt = kl2_analyticSolution(n)
     val minimizer = KnownMinimizer(x_opt,objF)
     problem.addSolution(minimizer)
   }
@@ -339,7 +343,7 @@ object OptimizationProblems {
 
     assert(n>9 && n%2==0, "\n\nn must be even and > 9, but n = "+n+"\n\n")
 
-    val id = "dist_KL problem 2"
+    val id = "dist_KL_2A"
     if(debugLevel>0) {
       println("\nAllocating problem " + id)
       Console.flush()
@@ -359,9 +363,7 @@ object OptimizationProblems {
     val problem = Dist_KL(id,n,None,None,Some(A),Some(r),solverType,pars,logger,debugLevel)
 
     // the known optimal solution
-    val x_opt = DenseVector.tabulate[Double](n)(
-      j => if(j<3) 0.12 else if (j>=n/2) 0.2/n else 1.08/(n-6)
-    )
+    val x_opt = kl2_analyticSolution(n)
     val minimizer = KnownMinimizer(x_opt,problem.objectiveFunction)
     problem.addKnownMinimizer(minimizer)
   }

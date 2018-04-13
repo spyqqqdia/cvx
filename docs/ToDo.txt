@@ -714,12 +714,19 @@ Dist_KL::primalProblem.
 2018-04-05:|
 -------------
 
-OptimizationProblems.dist_KL_2A: the direct approach does not converge
-(reaches iteration limit with equality gap 0.4)
-OptimizationProblems.dist_KL_1A: the direct approach works
+OptimizationProblems.dist_KL_2A:
+does not seem to implement the constraints as intended, check them manually.
+dual solution does not work at all, check the function that converts from dual to
+primal solution.
 
-In both problems the dual approach does not work, terminates after only one iteration
-with duality gap 1e-9.
+
+#----------------------------------------------------------------------------------------
+2018-04-11:|
+-------------
+
+Find out why the PrimalDualSolver fails on problem dist_KL_1.
+Work on documentation.
+
 
 
 

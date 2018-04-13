@@ -28,7 +28,7 @@ object Runner extends App {
 
     val tolEqSolve = 1e-1
     val tolSolution = 1e-2      // tolerance for solution identification
-    val solverType = "BR"       // "BR", "PD"
+    val solverType = "PD"       // "BR", "PD"
 
 
     if(doAdHoc){

@@ -45,16 +45,16 @@ case class Solution(
   override def toString:String = {
 
     "\nSolution:"+
-    "\nDecision variables x: "+x+
-    "\nDual variable lambda: "+lambda.getOrElse("None")+
-    "\nDual variable nu: "+nu.getOrElse("None")+
-    "\nNewton decrement: "+newtonDecrement.getOrElse("None")+
-    "\nDuality gap: "+dualityGap.getOrElse("None")+
-    "\nEquality gap: "+equalityGap.getOrElse("None")+
-    "\nNorm of gradient: "+normGrad.getOrElse("None")+
-    "\nNorm of dual residual: "+normDualResidual.getOrElse("None")+
-    "\nIterations: "+iter+
-    "\nIteration limit reached: "+maxedOut+"\n"
+    s"\nDecision variables x: ${MathUtils.roundVec(x,d=9)}"+
+    s"\nDual variable lambda: ${lambda.getOrElse("None")}"+
+    s"\nDual variable nu: ${nu.getOrElse("None")}"+
+    s"\nNewton decrement: ${newtonDecrement.getOrElse("None")}"+
+    s"\nDuality gap: ${dualityGap.getOrElse("None")}"+
+    s"\nEquality gap: ${equalityGap.getOrElse("None")}"+
+    s"\nNorm of gradient: ${normGrad.getOrElse("None")}"+
+    s"\nNorm of dual residual: ${normDualResidual.getOrElse("None")}"+
+    s"\nIterations: ${iter}"+
+    s"\nIteration limit reached: ${maxedOut}\n"
   }
 }
 

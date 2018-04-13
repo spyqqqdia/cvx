@@ -19,30 +19,35 @@ import breeze.numerics.{exp, log}
   *
   * Here the inequality HQ >= u is to be interpreted coordinatewise
   * ($(HQ)_i>=u_i$, for all $i$) and
-  *   [ dist_KL(Q,P)=\sum_jq_j(log(q_j)-log(p_j)) ]
-  * denotes the Kullback-Leibler distance of Q from P (this is the negentropy of Q
-  * with respect to P).
-  * The matrix-vector product HQ has the following probabilistc interpetation:
-  * the discrete probabilites P,Q are viewed as probabilities on the set
-  * $\Omega = \{1,2,\dots,n\}$. Now consider the random vector $X:\Omega\mapsto R^^n$
+  *   [ dist_KL(Q,P)= E_Q[dQ/dP] = \sum_jq_j(log(q_j)-log(p_j)) ]
+  * denotes the Kullback-Leibler distance of Q from P, where $E_Q$ denotes
+  * the expectation with  respect to the probability Q.
+  * This is also known as the negentropy of P with respect to Q.
+  *
+  * Here we average the difference of the probabilities of
+  * atomic events $E={j}$ in the probabilities P and Q, where the average is taken
+  * under Q since we consider Q to be the "true" probability.
+  *
+  * The matrix-vector product HQ has the following probabilistic interpretation:
+  * the discrete probabilities P,Q are viewed as probabilities on the set
+  * $\Omega = \{1,2,\dots,n\}$. Now consider the random vector $X:\Omega\mapsto R_n$
   * given by
   *   [ X(j) = col_j(H). ]
   * Then we have
-  *   [ HQ = \sum_jq_jcol_j(H) = \sum_jq_jX(j) = E_Q(X) ],
-  * where $E_Q$ denotes the expectation with  respect to the probability Q.
+  *   [ HQ = \sum_jq_jcol_j(H) = \sum_jq_jX(j) = E_Q(X) ].
   * Thus the constraints are expectation constraints
-  *   [ E^^Q(X)\leq u]  and [ E^^Q(Y)=r ],
+  *   [ E_Q(X)\leq u]  and [ E_Q(Y)=r ],
   * where the random vector Y is defined analogeously.
   *
   * Each row of the matrix H defines and expectation constraint for a scalar
   * random variable. Indeed $row_i(H)$ defines the constraint
   *   [ row_i(H)\cdot Q = \sum_jq_jH_{ij} \leq u_i. ]
   *
-  * In other words $row_i(H)$ defines the constraint $E^^Q(X_i)\leq u_i$
+  * In other words $row_i(H)$ defines the constraint $E_Q(X_i)\leq u_i$
   * on the scalar random variable $X_i$ with values $X_i(j)=H_{ij}$, i.e. $X_i$
   * can be identified with $row_i(H)$.
   *
-  * Similarly $row_i(A)$ defines the constraint $E^^Q(Y_i)\leq u_i$ on the
+  * Similarly $row_i(A)$ defines the constraint $E_Q(Y_i)\leq u_i$ on the
   * scalar random variable $Y_i:j\in\Omega\mapsto A_{ij}$ which can be identified
   * with $row_i(A)$.
   *
@@ -82,6 +87,7 @@ with Duality { self =>
   // if H is given, the so must be u, if A is given we need r
   require(if(H.nonEmpty) u.nonEmpty else true,"\nH is given but u is missing.\n")
   require(if(A.nonEmpty) r.nonEmpty else true,"\nA is given but r is missing.\n")
+  require(if (r.nonEmpty) A.nonEmpty else true, "\nr is given but A is missing.\n")
   require(H.nonEmpty || A.nonEmpty,"\nMust have some inequality or equality constraints")
 
 
@@ -94,10 +100,15 @@ with Duality { self =>
   // (b) A,r but not H,u    or
   // (c) H,u but not A,r
   //
-  // and we will deal with all these cases simultaneously
+  // and we will deal with all these cases simultaneously.
+  //
+  // Note that we must always add the constraint E_Q[1]=1 (i.e. Q is a probability).
+  // Thus when we set up the problem we will always have a matrix A and corresponding
+  // equality constraints.
 
-  val dualDim:Int = if(A.isEmpty) H.get.rows else
-                    if(H.isEmpty) A.get.rows else H.get.rows+A.get.rows
+  // summand 1 is for the constraint E_Q[1]=1
+  val dualDim:Int = if(A.isEmpty) 1+H.get.rows else
+                    if(H.isEmpty) 1+A.get.rows else 1+H.get.rows+A.get.rows
   val numInequalities:Int = if(H.isEmpty) 0 else H.get.rows
 
   val e = 2.7182811828459045    // exp(1.0)
@@ -105,15 +116,29 @@ with Duality { self =>
   val vec_R:DenseVector[Double] = DenseVector.fill[Double](n)(1.0/(n*e))
 
   /** The vector w=(u,r), see docs/maxent.pdf, after eq.(18).
+    * Note that we have to add the right hand side of the equality constraint
+    * E_Q[1]=sum(Q)=1 to the vector r (as first coordinate), even if we have no
+    * matrix A and vector r.
     */
-  val vec_w:DenseVector[Double] =
-    if(A.isEmpty) u.get else if (H.isEmpty) r.get else DenseVector.vertcat(u.get,r.get)
+  val vec_w:DenseVector[Double] = {
+
+    // extend r with new first coordinate 1.0 from the constraint E_Q[1]=sum(Q)=1.
+    val r_extended = Dist_KL.r_with_probEQ(n,r)
+    if (H.isEmpty) r_extended else DenseVector.vertcat(u.get,r_extended)
+  }
+
 
   /** The vertically stacked matrix B=(H',A')' with A stacked below H, see
-    * docs/maxent.pdf, after eq.(18).
+    * docs/maxent.pdf, after eq.(18). Note that A has to be augmented by the
+    * constraint E_Q[1]=sum(Q)=1 (as first row).
     */
-  val mat_B:DenseMatrix[Double] =
-    if(A.isEmpty) H.get else if (H.isEmpty) A.get else DenseMatrix.vertcat(H.get,A.get)
+  val mat_B:DenseMatrix[Double] = {
+
+    // extend A with new first row of 1s from the constraint E_Q[1]=sum(Q)=1.
+    val A_extended = Dist_KL.A_with_probEQ(n,A)
+    if (H.isEmpty) A_extended else DenseMatrix.vertcat(H.get,A_extended)
+  }
+
 
   /** The dual objective function $L_*(z)$, where $z=\theta=(\lambda,\nu)$,
     * see docs/maxent.pdf, eq.(20).
@@ -121,33 +146,29 @@ with Duality { self =>
   def dualObjFAt(z:DenseVector[Double]):Double =
     -((vec_w dot z) + (vec_R dot exp(-mat_B.t*z)))
 
-  /** The gradient of the dual objective function $L_*(z)$, where $z=\theta=(\lambda,\nu)$,
+  /** The gradient of the dual objective function $-L_*(z)$, where $z=\theta=(\lambda,\nu)$,
     * see docs/maxent.pdf, eq.(21).
     */
   def gradientDualObjFAt(z:DenseVector[Double]):DenseVector[Double] =
-    -vec_w + (mat_B*(vec_R:*exp(-mat_B.t*z)))
+    -vec_w + mat_B*(vec_R:*exp(-mat_B.t*z))
 
-  /** The Hessian of the dual objective function $L_*(z)$, where $z=\theta=(\lambda,\nu)$,
+  /** The Hessian of the dual objective function $-L_*(z)$, where $z=\theta=(\lambda,\nu)$,
     * see docs/maxent.pdf, eq.(22).
     */
   def hessianDualObjFAt(z:DenseVector[Double]):DenseMatrix[Double] = {
 
     val y:DenseVector[Double] = vec_R:*exp(-mat_B.t*z)
     // B*diag(y): multiply col_j(B) with y(j):
-    val Bdy = mat_B.copy
-    for(j <- 0 until Bdy.cols) Bdy(::,j) := mat_B(::,j)*y(j)
-    Bdy*mat_B.t
+    val Bdy = DenseMatrix.zeros[Double](mat_B.rows,mat_B.cols)
+    for(j <- 0 until Bdy.cols; i <- 0 until Bdy.rows) Bdy(i,j) = mat_B(i,j)*y(j)
+    -Bdy*mat_B.t
   }
 
   /** The function $Q=Q(z)=Q(\lambda,\nu)$ which computes the optimal primal
     * solution $Q_*$ from the optimal dual solution $z_*=(\lambda_*,\nu_*)$.
     * See docs/maxent.pdf
     */
-  def primalOptimum(z:DenseVector[Double]):DenseVector[Double] = {
-
-    val ones = DenseVector.fill(n)(1.0)
-    (vec_R:*exp(-(ones+mat_B.t*z)))*e
-  }
+  def primalOptimum(z:DenseVector[Double]):DenseVector[Double] = vec_R:*exp(-mat_B.t*z)
 
   /** Add the known (unique) solution to the minimization problem.
     * For testing purposes.
@@ -165,6 +186,30 @@ with Duality { self =>
 
 object Dist_KL {
 
+  /** Given optional equality constraints AQ=r
+    * extend A with new first row of 1s from the equality constraint
+    * E_Q[1]=sum(Q)=1.
+    * @param n dimension dim(Q) of KL-problem.
+    */
+  def A_with_probEQ(n:Int,A:Option[DenseMatrix[Double]]):DenseMatrix[Double] = {
+
+    val EQ1:DenseMatrix[Double] = DenseMatrix.fill(1,n)(1.0)
+    if(A.isEmpty) EQ1 else DenseMatrix.vertcat(EQ1,A.get)
+  }
+
+  /** Given optional equality constraints AQ=r
+    * extend r with new first coordinate 1.0 from the equality constraint
+    * E_Q[1]=sum(Q)=1.
+    * @param n dimension dim(Q) of KL-problem.
+    */
+  def r_with_probEQ(n:Int,r:Option[DenseVector[Double]]):DenseVector[Double] = {
+
+    val r1 = DenseVector.fill(1)(1.0)
+    if(r.isEmpty) r1 else DenseVector.vertcat(r1,r.get)
+  }
+
+
+
   /** Kullback-Leibler distance
     *
     *      d_KL(x,p) = sum_jp_j\log(p_j/x_j) = c-sum_jp_j\log(x_j)
@@ -180,22 +225,23 @@ object Dist_KL {
     override def valueAt(x: DenseVector[Double]): Double = {
 
       assert(x.length==n,"\nDimension mismatch x.length = "+x.length+"dim(d_KL) = "+n+"\n")
-      -sum(log(x))/n - log(n)
+      x dot log(x*n.toDouble)
     }
     override def gradientAt(x: DenseVector[Double]): DenseVector[Double] =
-      DenseVector.tabulate[Double](n)(j => -1.0/x(j)/n)
+      DenseVector.tabulate[Double](n)(j => 1+log(x(j))+log(n))
 
     override def hessianAt(x: DenseVector[Double]): DenseMatrix[Double] = {
 
       // diagonal
-      val d = DenseVector.tabulate[Double](n)(j => 1.0/(n*x(j)*x(j)))
+      val d = DenseVector.tabulate[Double](n)(j => 1.0/x(j))
       diag(d)
     }
   }
 
   def setWhereDefined(n:Int):ConvexSet = ConvexSets.firstQuadrant(n)
 
-  /** The equality constraint Ax=r combined with the constraint sum(x)=1.*/
+  /** The equality constraint Ax=r combined with the constraint sum(x)=1.
+    */
   def equalityConstraint(
     n:Int, A:Option[DenseMatrix[Double]],r:Option[DenseVector[Double]]
   ):EqualityConstraint = {
@@ -238,32 +284,33 @@ object Dist_KL {
     // if H is given, the so must be u, if A is given we need r
     require(if (H.nonEmpty) u.nonEmpty else true, "\nH is given but u is missing.\n")
     require(if (A.nonEmpty) r.nonEmpty else true, "\nA is given but r is missing.\n")
+    require(if (r.nonEmpty) A.nonEmpty else true, "\nr is given but A is missing.\n")
     require(H.nonEmpty || A.nonEmpty, "\nMust have some inequality or equality constraints")
 
     require(solverType == "BR" || solverType == "PD", s"\nUnknown solver: ${solverType}\n")
 
-    val C: ConvexSet = setWhereDefined(n)
+    // set where the constraints are defined
+    val C: ConvexSet = ConvexSets.wholeSpace(n)
     val pointWhereDefined = DenseVector.fill[Double](n)(1.0 / n)
+
+    // note: equalityConstraint already contains the constraint E_Q[1] = sum(Q) = 1
     val eqs = equalityConstraint(n,A,r)
+
+    val positivityCnts:List[Constraint] = Constraints.allCoordinatesPositive(n)
+
+    // funnily dist_KL_2A only works if we don't add in the constraint E_Q[1]01
+    // val eqs = equalityConstraint(n,A,r)
     val objF = objectiveFunction(n)
 
-    val solver: Solver = if (H.isEmpty)
+    val ineqs = if (H.isEmpty) ConstraintSet(n,positivityCnts,C,pointWhereDefined)
+                else ConstraintSet(H.get,u.get,C).addConstraints(positivityCnts)
+    val ineqsWithFeasiblePoint = ineqs.withFeasiblePoint(Some(eqs),pars,debugLevel) // phase I
 
-      EqualityConstrainedSolver(objF, C, pointWhereDefined, eqs, pars, logger)
-
-    else { // barrier or primal dual solver
-
-      val C:ConvexSet = ConvexSets.firstQuadrant(n)  // set where defined
-      val positivityCnts:List[Constraint] = Constraints.allCoordinatesPositive(n)
-      // HQ<=u, Q>=0
-      val ineqs = ConstraintSet(H.get,u.get,C).addConstraints(positivityCnts)
-      val ineqsWithFeasiblePoint = ineqs.withFeasiblePoint(Some(eqs),pars,debugLevel) // phase I
-
-      if (solverType == "BR")
+    val solver: Solver = if (solverType == "BR")
         BarrierSolver(objF,ineqsWithFeasiblePoint,Some(eqs),pars,logger)
        else
         PrimalDualSolver(C,objF,ineqsWithFeasiblePoint,Some(eqs),pars,logger)
-    }
+
     new Dist_KL(id,n,H,u,A,r,solver,logger)
   }
 }

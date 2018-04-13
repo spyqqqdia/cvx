@@ -44,8 +44,10 @@ abstract class Constraint(val id:String, val dim:Int, val ub:Double){
 
       override def isDefinedAt(u:DenseVector[Double]):Boolean = self.isDefinedAt(z + F * u)
       override def valueAt(u: DenseVector[Double]):Double = self.valueAt(z + F * u)
-      override def gradientAt(u: DenseVector[Double]):DenseVector[Double] = F.t * self.gradientAt(z + F * u)
-      override def hessianAt(u: DenseVector[Double]):DenseMatrix[Double] = (F.t * self.hessianAt(z + F * u)) * F
+      override def gradientAt(u: DenseVector[Double]):DenseVector[Double] =
+        F.t * self.gradientAt(z + F * u)
+      override def hessianAt(u: DenseVector[Double]):DenseMatrix[Double] =
+        (F.t * self.hessianAt(z + F * u)) * F
     }
   }
 

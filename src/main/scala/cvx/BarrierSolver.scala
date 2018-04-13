@@ -267,9 +267,9 @@ object BarrierSolver {
     * @param pars see [SolverParams].
     */
   def apply(
-             objF: ObjectiveFunction, cnts: ConstraintSet with FeasiblePoint,
-             eqs: Option[EqualityConstraint], pars: SolverParams, logger:Logger
-           ): BarrierSolver = {
+     objF: ObjectiveFunction, cnts: ConstraintSet with FeasiblePoint,
+     eqs: Option[EqualityConstraint], pars: SolverParams, logger:Logger
+  ): BarrierSolver = {
 
     val Feas = cnts.strictlyFeasibleSet
     val C = ConvexSet.addSamplePoint(Feas, cnts.feasiblePoint)
@@ -282,7 +282,9 @@ object BarrierSolver {
 
           val d = cnt.ub - cnt.valueAt(x)
           if (d <= 0)
-            throw new IllegalArgumentException("x not strictly feasible, d = " + d + ", x:\n" + x)
+            throw new IllegalArgumentException(
+              "\nbarrierFunction: x not strictly feasible, d = " + d + ", x:\n" + x
+            )
           sum - Math.log(d)
         })
 
@@ -292,7 +294,9 @@ object BarrierSolver {
           val d = cnt.ub - cnt.valueAt(x)
           val G = cnt.gradientAt(x)
           if (d <= 0)
-            throw new IllegalArgumentException("x not strictly feasible, d = " + d + ", x:\n" + x)
+            throw new IllegalArgumentException(
+              "\ngradientBarrierFunction: x not strictly feasible, d = " + d + ", x:\n" + x
+            )
           sum + G / d
         })
 
@@ -303,8 +307,9 @@ object BarrierSolver {
           val G = cnt.gradientAt(x)
           val H = cnt.hessianAt(x)
           if (d <= 0)
-            throw new IllegalArgumentException("x not strictly feasible, d = " + d + ", x:\n" + x)
-
+            throw new IllegalArgumentException(
+              "\nhessianBarrierFunction: x not strictly feasible, d = " + d + ", x:\n" + x
+            )
           val GGt = G * G.t
           sum + GGt / (d * d) + H / d
         })
