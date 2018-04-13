@@ -22,13 +22,14 @@ Be this at it may, Scala is an extremely elegant language and Breeze is a great 
 
 Now to point 1. Here we generalize the linear programming problem 
 
-   ? = argmin a'x subject to constraints b_i'x <= u_i and Ax=b,   (*)
+     `? = argmin a'x subject to constraints b_i'x <= u_i and Ax=b`,   (*)
 
 where `a'` denotes the transpose of the (column) vector `a` and hence `a'x` and `b_i'x` are the dot products  
-of the vectors `a` and `x` respectively `b_i` and `x`. by passing from linear to general twice continuously   
-differentiable convex functions (objective and constraints). More explicitly we try to solve the following problem:   
+of the vectors `a` and `x` respectively `b_i` and `x`. The generalization is done by passing from linear to
+general twice continuously differentiable convex functions (objective and constraints).
+More explicitly we try to solve the following problem:
 
-   ? = argmin f(x) subject to constraints g_i(x) <= u_i  and Ax=b,  (**)
+     `? = argmin f(x) subject to constraints g_i(x) <= u_i  and Ax=b`,  (**)
 
 where now `f(x)` and the `g_i(x)` are arbitrary twice continuously differentiable convex functions.   
 In this generality the problem is not solvable in practice with performance guarantees. Nemirovskii   
